@@ -127,10 +127,6 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
                 pos.x += (vel.x + std::sin(age * 4.4f + scriptPhase) * 10.0f) * dt;
                 pos.y += (vel.y + std::cos(age * 2.0f + scriptPhase) * 20.0f) * dt;
                 break;
-            case EnemyMovePattern::OrbitalDrift:
-                pos.x += (vel.x + std::cos(age * 3.0f + scriptPhase) * 34.0f) * dt;
-                pos.y += (vel.y + std::sin(age * 2.2f + scriptPhase) * 16.0f) * dt;
-                break;
             case EnemyMovePattern::Pincer:
                 pos.x += (vel.x * (1.0f + std::min(age, 1.6f) * 0.22f)) * dt;
                 pos.y += vel.y * dt;
@@ -154,9 +150,6 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
                 }
             } else if (firePattern == EnemyFirePattern::AimedSingle) {
                 if (ReadyToFire(0.0f)) FireAimed(playerPos, enemyBullets, 148.0f + loop * 10.0f);
-            } else if (firePattern == EnemyFirePattern::AimedPulse) {
-                float rate = fireRate > 0.0f ? fireRate : 0.82f;
-                if (ReadyToFire(rate)) FireAimed(playerPos, enemyBullets, 152.0f + loop * 11.0f);
             } else if (firePattern == EnemyFirePattern::FanPulse) {
                 float rate = fireRate > 0.0f ? fireRate : 1.05f;
                 if (ReadyToFire(rate)) {

@@ -21,19 +21,17 @@ enum class EnemyMovePattern {
     NeedleSweep = 2,
     DescendingScissors = 3,
     CrossLane = 4,
-    OrbitalDrift = 5,
-    Pincer = 6,
-    CollapseRetreat = 7,
-    GatePatrol = 8
+    Pincer = 5,
+    CollapseRetreat = 6,
+    GatePatrol = 7
 };
 
 enum class EnemyFirePattern {
     Default = 0,
     Hold = 1,
     AimedSingle = 2,
-    AimedPulse = 3,
-    FanPulse = 4,
-    TurretBurst = 5
+    FanPulse = 3,
+    TurretBurst = 4
 };
 
 struct Enemy {
