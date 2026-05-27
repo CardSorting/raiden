@@ -7,6 +7,14 @@ class Effects;
 
 enum class EnemyType { Popcorn, Turret, Miniboss };
 
+enum class BossAttackPhase {
+    Entrance = 0,
+    AzureNeedle = 1,
+    FallingStar = 2,
+    BrokenHalo = 3,
+    Overload = 4
+};
+
 struct Enemy {
     EnemyType type = EnemyType::Popcorn;
     Vector2 pos{};
@@ -34,8 +42,15 @@ struct Enemy {
     void Hit(int damage, Effects& effects);
     bool Offscreen(int height) const;
     bool IsBoss() const { return type == EnemyType::Miniboss; }
+    void BeginBossCombat();
+    BossAttackPhase BossPhase() const { return static_cast<BossAttackPhase>(phase); }
+    const char* BossAttackTitle() const;
 
 private:
     void FireAimed(Vector2 playerPos, std::vector<Bullet>& enemyBullets, float speed, int damage = 1) const;
     void FireRadial(std::vector<Bullet>& enemyBullets, int count, float speed, float angleOffset) const;
+    void FireAimedFan(Vector2 playerPos, std::vector<Bullet>& enemyBullets, int count, float speed, float spread, Color color, float size) const;
+    void FireRadialCustom(std::vector<Bullet>& enemyBullets, int count, float speed, float angleOffset, Color color, float size) const;
+    void FireRadialGap(std::vector<Bullet>& enemyBullets, int count, float speed, float angleOffset, float gapCenter, float gapWidth, Color color, float size) const;
+    void SetBossPhase(BossAttackPhase nextPhase);
 };

@@ -7,6 +7,7 @@
 #include "WaveManager.h"
 #include "AudioSystem.h"
 #include <vector>
+#include <string>
 
 class Game {
 public:
@@ -23,6 +24,96 @@ private:
         char initials[4];
         int score;
         int loop;
+    };
+
+    enum class CommsSpeaker { Ace, Control, Wrench, Shade, Boss };
+
+    struct CharacterCallsigns {
+        static const char* Callsign(CommsSpeaker speaker);
+        static const char* Name(CommsSpeaker speaker);
+        static Color ColorFor(CommsSpeaker speaker);
+    };
+
+    struct CommsMessage {
+        CommsSpeaker speaker = CommsSpeaker::Control;
+        const char* line1 = "";
+        const char* line2 = "";
+        int priority = 1;
+        float duration = 2.8f;
+    };
+
+    class CommsPortrait {
+    public:
+        void Draw(Vector2 pos, CommsSpeaker speaker, float moodPulse) const;
+    };
+
+    class DialogueBox {
+    public:
+        void Draw(const char* speaker, const char* line, CommsSpeaker portraitSpeaker, const CommsPortrait& portrait) const;
+    };
+
+    class ScriptedDialogue {
+    public:
+        struct Line {
+            const char* speaker;
+            const char* text;
+            CommsSpeaker portraitSpeaker;
+        };
+
+        void Begin(const std::vector<Line>& lines);
+        void Update(float dt);
+        void Draw(const DialogueBox& box, const CommsPortrait& portrait) const;
+        bool IsActive() const { return active_; }
+        void Reset();
+
+    private:
+        std::vector<Line> lines_;
+        size_t index_ = 0;
+        float lineTimer_ = 0.0f;
+        bool active_ = false;
+    };
+
+    class CommsQueue {
+    public:
+        bool Push(const CommsMessage& message);
+        void Update(float dt);
+        void Draw(const CommsPortrait& portrait) const;
+        void Reset();
+
+    private:
+        std::vector<CommsMessage> pending_;
+        CommsMessage current_{};
+        bool active_ = false;
+        float timer_ = 0.0f;
+        float cooldown_ = 0.0f;
+    };
+
+    class BossAttackNameOverlay {
+    public:
+        void Show(const char* title);
+        void Update(float dt);
+        void Draw() const;
+        void Reset();
+
+    private:
+        std::string title_;
+        float timer_ = 0.0f;
+    };
+
+    class MissionBriefingOverlay {
+    public:
+        void Begin();
+        void Update(float dt);
+        void Draw() const;
+        void Reset();
+
+    private:
+        float timer_ = 0.0f;
+    };
+
+    class StageClearDebrief {
+    public:
+        void Draw(float clearTimer, int loop, int lives, int bombs, int stageClearBonus) const;
     };
 
     State state_ = State::Title;
@@ -62,6 +153,27 @@ private:
     float scrollB_ = 0.0f;
     bool bossSpawned_ = false;
     bool bossPhaseChanged_ = false;
+    enum class BossStoryState { None, Entrance, Dialogue, Combat };
+    BossStoryState bossStoryState_ = BossStoryState::None;
+    int lastBossAttackPhase_ = -1;
+    bool bossDialogueStarted_ = false;
+    bool commsFirstWave_ = false;
+    bool commsUpperLane_ = false;
+    bool commsBreakThrough_ = false;
+    bool commsLowHealth_ = false;
+    bool commsBombUsed_ = false;
+    bool commsPickup_ = false;
+    bool commsBossEntrance_ = false;
+    bool commsBossBreach_ = false;
+    bool commsBossFinal_ = false;
+
+    CommsPortrait portrait_;
+    DialogueBox dialogueBox_;
+    ScriptedDialogue bossDialogue_;
+    CommsQueue commsQueue_;
+    BossAttackNameOverlay bossAttackName_;
+    MissionBriefingOverlay missionBriefing_;
+    StageClearDebrief stageClearDebrief_;
 
     AudioSystem audio_;
 
@@ -200,6 +312,14 @@ private:
     void Cleanup();
     void SpawnDrop(Vector2 pos, EnemyType source);
     bool BossAlive() const;
+    Enemy* ActiveBoss();
+    const Enemy* ActiveBoss() const;
+    void StartBossDialogue();
+    void UpdateBossStory(float dt);
+    void ShowBossAttackTitleIfChanged();
+    void ResetStorySystems();
+    void QueueComms(CommsSpeaker speaker, const char* line1, const char* line2 = "", int priority = 1, float duration = 2.8f);
+    void UpdateCommsEvents(float dt);
     void CheckScoreMilestones();
     // Settings and High Score Persist Helpers
     void LoadSettings();
