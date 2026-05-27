@@ -10,6 +10,10 @@ int main(int argc, char** argv) {
         audio.Shutdown();
         return 0;
     }
+    if (argc > 1 && std::strcmp(argv[1], "--audio-export") == 0) {
+        const char* directory = argc > 2 ? argv[2] : "audio_export";
+        return AudioSystem::ExportProceduralBank(directory) ? 0 : 1;
+    }
 
     Game game;
     game.Run();

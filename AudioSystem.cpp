@@ -5,13 +5,80 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
+#include <string>
 #include <thread>
 
 namespace {
 constexpr int SampleRate = 44100;
 constexpr float Pi2 = 6.28318530718f;
+
+struct ExportCueSpec {
+    AudioSystem::Cue cue;
+    const char* name;
+    int variants;
+};
+
+struct ExportMusicSpec {
+    AudioSystem::MusicTrack track;
+    const char* name;
+};
+
+constexpr ExportCueSpec ExportCues[] = {
+    { AudioSystem::Cue::VulcanShot, "player_vulcan_shot", 8 },
+    { AudioSystem::Cue::PlasmaShot, "player_plasma_shot", 5 },
+    { AudioSystem::Cue::MissileLaunch, "player_missile_launch", 4 },
+    { AudioSystem::Cue::EnemyBullet, "enemy_bullet", 6 },
+    { AudioSystem::Cue::EnemyStrongShot, "enemy_strong_shot", 4 },
+    { AudioSystem::Cue::ExplosionSmall, "explosion_small", 8 },
+    { AudioSystem::Cue::ExplosionMedium, "explosion_medium", 5 },
+    { AudioSystem::Cue::ExplosionLarge, "explosion_large", 3 },
+    { AudioSystem::Cue::BossDamage, "boss_damage", 5 },
+    { AudioSystem::Cue::BossPhaseChange, "boss_phase_change", 1 },
+    { AudioSystem::Cue::BossDefeat, "boss_defeat", 1 },
+    { AudioSystem::Cue::PlayerHit, "player_hit", 1 },
+    { AudioSystem::Cue::PlayerDeath, "player_death", 1 },
+    { AudioSystem::Cue::Respawn, "player_respawn", 1 },
+    { AudioSystem::Cue::Bomb, "bomb", 1 },
+    { AudioSystem::Cue::BombClear, "bomb_clear", 1 },
+    { AudioSystem::Cue::PickupPowerup, "pickup_powerup", 3 },
+    { AudioSystem::Cue::PickupWeaponSwitch, "pickup_weapon_switch", 2 },
+    { AudioSystem::Cue::PickupWeaponUpgrade, "pickup_weapon_upgrade", 1 },
+    { AudioSystem::Cue::PickupBomb, "pickup_bomb", 1 },
+    { AudioSystem::Cue::PickupMedal, "pickup_medal", 4 },
+    { AudioSystem::Cue::ScoreMilestone, "score_milestone", 1 },
+    { AudioSystem::Cue::FormationBonus, "formation_bonus", 1 },
+    { AudioSystem::Cue::ExtraLife, "extra_life", 1 },
+    { AudioSystem::Cue::MenuMove, "menu_move", 4 },
+    { AudioSystem::Cue::MenuConfirm, "menu_confirm", 2 },
+    { AudioSystem::Cue::MenuCancel, "menu_cancel", 2 },
+    { AudioSystem::Cue::InsertCoin, "insert_coin", 1 },
+    { AudioSystem::Cue::PressStart, "press_start", 1 },
+    { AudioSystem::Cue::Pause, "pause", 1 },
+    { AudioSystem::Cue::Resume, "resume", 1 },
+    { AudioSystem::Cue::ContinueTick, "continue_tick", 1 },
+    { AudioSystem::Cue::BonusTick, "bonus_tick", 4 },
+    { AudioSystem::Cue::HighScoreTick, "high_score_tick", 2 },
+    { AudioSystem::Cue::HighScoreEntry, "high_score_entry", 1 },
+    { AudioSystem::Cue::StageStart, "stage_start", 1 },
+    { AudioSystem::Cue::StageClear, "stage_clear", 1 },
+    { AudioSystem::Cue::GameOver, "game_over", 1 },
+    { AudioSystem::Cue::BossWarning, "boss_warning", 2 },
+    { AudioSystem::Cue::BossEntrance, "boss_entrance", 1 },
+    { AudioSystem::Cue::LowLife, "low_life_warning", 2 },
+    { AudioSystem::Cue::Victory, "victory", 1 },
+    { AudioSystem::Cue::AttractShimmer, "attract_shimmer", 1 },
+    { AudioSystem::Cue::Denied, "denied", 2 },
+};
+
+constexpr ExportMusicSpec ExportMusic[] = {
+    { AudioSystem::MusicTrack::Title, "music_title_loop" },
+    { AudioSystem::MusicTrack::Stage, "music_stage_loop" },
+    { AudioSystem::MusicTrack::Boss, "music_boss_loop" },
+};
 
 double AudioClockSeconds() {
     using Clock = std::chrono::steady_clock;
@@ -140,6 +207,17 @@ void Normalize(std::vector<float>& samples, float ceiling = 0.92f) {
     for (float s : samples) peak = std::max(peak, std::abs(s));
     float gain = std::min(ceiling / peak, 1.6f);
     for (float& s : samples) s *= gain;
+}
+
+void FadeLoopBoundary(std::vector<float>& samples, int fadeFrames) {
+    if ((int)samples.size() < fadeFrames * 2) return;
+    for (int i = 0; i < fadeFrames; ++i) {
+        float k = (float)i / (float)std::max(1, fadeFrames - 1);
+        float in = k * k * (3.0f - 2.0f * k);
+        float out = 1.0f - in;
+        samples[(size_t)i] *= in;
+        samples[samples.size() - 1u - (size_t)i] *= out;
+    }
 }
 
 Wave MakeWave(float duration, const std::function<float(float, int)>& sampleFn) {
@@ -842,6 +920,7 @@ Wave MakeMusic(AudioSystem::MusicTrack track) {
     const float stepTime = track == AudioSystem::MusicTrack::Boss ? 0.105f : 0.12f;
     const int framesPerStep = (int)(stepTime * (float)SampleRate);
     const int frames = framesPerStep * steps;
+    std::vector<float> mixFrames((size_t)frames);
     int16_t* samples = (int16_t*)std::malloc(sizeof(int16_t) * frames);
     if (!samples) return {};
 
@@ -898,8 +977,14 @@ Wave MakeMusic(AudioSystem::MusicTrack track) {
             drum += Noise(seed) * std::pow(1.0f - sp, 4.2f) * 0.045f;
         }
 
-        float mix = SoftLimit(bassVal + leadVal + arpVal + drum);
-        samples[i] = (int16_t)(std::clamp(mix, -1.0f, 1.0f) * 26000.0f);
+        mixFrames[(size_t)i] = bassVal + leadVal + arpVal + drum;
+    }
+
+    FadeLoopBoundary(mixFrames, 384);
+    Normalize(mixFrames, track == AudioSystem::MusicTrack::Boss ? 0.72f : 0.68f);
+    for (int i = 0; i < frames; ++i) {
+        float mix = SoftLimit(mixFrames[(size_t)i]);
+        samples[i] = (int16_t)(std::clamp(mix, -1.0f, 1.0f) * 30000.0f);
     }
 
     Wave w{};
@@ -909,6 +994,22 @@ Wave MakeMusic(AudioSystem::MusicTrack track) {
     w.channels = 1;
     w.data = samples;
     return w;
+}
+
+float WavePeak(const Wave& wave) {
+    if (!wave.data || wave.sampleSize != 16) return 0.0f;
+    const int16_t* samples = static_cast<const int16_t*>(wave.data);
+    unsigned int count = wave.frameCount * std::max(1u, wave.channels);
+    int peak = 0;
+    for (unsigned int i = 0; i < count; ++i) {
+        peak = std::max(peak, (int)std::abs(samples[i]));
+    }
+    return (float)peak / 32767.0f;
+}
+
+float WaveDuration(const Wave& wave) {
+    if (wave.sampleRate == 0) return 0.0f;
+    return (float)wave.frameCount / (float)wave.sampleRate;
 }
 } // namespace
 
@@ -1230,11 +1331,26 @@ bool AudioSystem::StealLowerPriorityVoice(Priority incomingPriority, Category in
     return true;
 }
 
+void AudioSystem::StopVoicesForFocus(Priority minimumPriorityToKeep, bool keepUi, bool keepWarning) {
+    int keepRank = PriorityRank(minimumPriorityToKeep);
+    for (CueBank& bank : cues_) {
+        if (keepUi && bank.category == Category::UI) continue;
+        if (keepWarning && bank.category == Category::Warning) continue;
+        if (PriorityRank(bank.priority) >= keepRank) continue;
+        for (Sound& sound : bank.variants) {
+            if (!IsSoundPlaying(sound)) continue;
+            StopSound(sound);
+            ++runtimeFocusStops_;
+        }
+    }
+}
+
 void AudioSystem::ResetRuntimeStats() {
     runtimePlayed_ = 0;
     runtimeCooldownDrops_ = 0;
     runtimePressureDrops_ = 0;
     runtimeStolenVoices_ = 0;
+    runtimeFocusStops_ = 0;
 }
 
 void AudioSystem::PlayCue(Cue cue, float pitch, float gain, float pan) {
@@ -1394,9 +1510,18 @@ void AudioSystem::PlayBossDamageAt(float x, float screenWidth) {
     PlayCue(Cue::BossDamage, RandomRange(0.92f, 1.06f), RandomRange(0.78f, 1.0f), PositionPan(x, screenWidth, Category::Explosion));
 }
 void AudioSystem::PlayPlayerHit() { PlayCue(Cue::PlayerHit); }
-void AudioSystem::PlayPlayerDeath() { PlayCue(Cue::PlayerDeath); }
+void AudioSystem::PlayPlayerDeath() {
+    StopVoicesForFocus(Priority::Critical, false, false);
+    musicDuckUntil_ = std::max(musicDuckUntil_, AudioClockSeconds() + 1.2);
+    PlayCue(Cue::PlayerDeath);
+}
 void AudioSystem::PlayRespawn() { PlayCue(Cue::Respawn); }
-void AudioSystem::PlayBomb() { PlayCue(Cue::Bomb); PlayBombClear(); }
+void AudioSystem::PlayBomb() {
+    StopVoicesForFocus(Priority::High, true, true);
+    musicDuckUntil_ = std::max(musicDuckUntil_, AudioClockSeconds() + 1.05);
+    PlayCue(Cue::Bomb);
+    PlayBombClear();
+}
 void AudioSystem::PlayBombClear() { PlayCue(Cue::BombClear); }
 void AudioSystem::PlayEnemyBullet() { PlayCue(Cue::EnemyBullet, RandomRange(0.93f, 1.1f), RandomRange(0.74f, 0.96f)); }
 void AudioSystem::PlayWeaponSwitch() { PlayCue(Cue::PickupWeaponSwitch, RandomRange(0.98f, 1.04f)); }
@@ -1471,11 +1596,19 @@ void AudioSystem::PlayHighScoreEntry() { StopMusic(); PlayCue(Cue::HighScoreEntr
 void AudioSystem::PlayStageStart() { PlayCue(Cue::StageStart); }
 void AudioSystem::PlayStageClear() { StopMusic(); PlayCue(Cue::StageClear); }
 void AudioSystem::PlayVictory() { StopMusic(); PlayCue(Cue::Victory); }
-void AudioSystem::PlayGameOver() { StopMusic(); PlayCue(Cue::GameOver); }
+void AudioSystem::PlayGameOver() {
+    StopMusic();
+    StopVoicesForFocus(Priority::Critical, false, false);
+    PlayCue(Cue::GameOver);
+}
 void AudioSystem::PlayBossWarning() { PlayCue(Cue::BossWarning); }
 void AudioSystem::PlayBossEntrance() { PlayCue(Cue::BossEntrance); }
 void AudioSystem::PlayBossPhaseChange() { PlayCue(Cue::BossPhaseChange); }
-void AudioSystem::PlayBossDefeat() { StopMusic(); PlayCue(Cue::BossDefeat); }
+void AudioSystem::PlayBossDefeat() {
+    StopMusic();
+    StopVoicesForFocus(Priority::Critical, false, false);
+    PlayCue(Cue::BossDefeat);
+}
 void AudioSystem::PlayLowLifeWarning() { PlayCue(Cue::LowLife); }
 void AudioSystem::PlayAttractShimmer() { PlayCue(Cue::AttractShimmer); }
 void AudioSystem::PlayDenied() { PlayCue(Cue::Denied); }
@@ -1551,7 +1684,64 @@ void AudioSystem::RunChaosAudit(float seconds) {
         Update();
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
-    TraceLog(LOG_INFO, "AUDIO AUDIT: played=%d cooldown_drops=%d pressure_drops=%d stolen_voices=%d max_voices=%d",
-             runtimePlayed_, runtimeCooldownDrops_, runtimePressureDrops_, runtimeStolenVoices_, MaxSfxVoices);
+    TraceLog(LOG_INFO, "AUDIO AUDIT: played=%d cooldown_drops=%d pressure_drops=%d stolen_voices=%d focus_stops=%d max_voices=%d",
+             runtimePlayed_, runtimeCooldownDrops_, runtimePressureDrops_, runtimeStolenVoices_, runtimeFocusStops_, MaxSfxVoices);
     StopMusic();
+}
+
+bool AudioSystem::ExportProceduralBank(const char* directory) {
+    std::filesystem::path root = directory && directory[0] ? directory : "audio_export";
+    std::error_code ec;
+    std::filesystem::create_directories(root, ec);
+    if (ec) {
+        TraceLog(LOG_WARNING, "AUDIO EXPORT: could not create directory '%s'", root.string().c_str());
+        return false;
+    }
+
+    std::ofstream manifest(root / "manifest.csv");
+    if (!manifest) {
+        TraceLog(LOG_WARNING, "AUDIO EXPORT: could not write manifest in '%s'", root.string().c_str());
+        return false;
+    }
+
+    manifest << "kind,name,variant,file,duration_seconds,peak\n";
+    int exported = 0;
+    for (const ExportCueSpec& spec : ExportCues) {
+        for (int variant = 0; variant < spec.variants; ++variant) {
+            Wave wave = MakeCueWave(spec.cue, variant);
+            if (!wave.data) return false;
+            std::string fileName = std::string(spec.name) + "_v" + std::to_string(variant) + ".wav";
+            std::filesystem::path path = root / fileName;
+            float duration = WaveDuration(wave);
+            float peak = WavePeak(wave);
+            bool ok = ExportWave(wave, path.string().c_str());
+            UnloadWave(wave);
+            if (!ok) {
+                TraceLog(LOG_WARNING, "AUDIO EXPORT: failed '%s'", path.string().c_str());
+                return false;
+            }
+            manifest << "sfx," << spec.name << "," << variant << "," << fileName << "," << duration << "," << peak << "\n";
+            ++exported;
+        }
+    }
+
+    for (const ExportMusicSpec& spec : ExportMusic) {
+        Wave wave = MakeMusic(spec.track);
+        if (!wave.data) return false;
+        std::string fileName = std::string(spec.name) + ".wav";
+        std::filesystem::path path = root / fileName;
+        float duration = WaveDuration(wave);
+        float peak = WavePeak(wave);
+        bool ok = ExportWave(wave, path.string().c_str());
+        UnloadWave(wave);
+        if (!ok) {
+            TraceLog(LOG_WARNING, "AUDIO EXPORT: failed '%s'", path.string().c_str());
+            return false;
+        }
+        manifest << "music," << spec.name << ",0," << fileName << "," << duration << "," << peak << "\n";
+        ++exported;
+    }
+
+    TraceLog(LOG_INFO, "AUDIO EXPORT: wrote %d procedural WAV files to '%s'", exported, root.string().c_str());
+    return true;
 }

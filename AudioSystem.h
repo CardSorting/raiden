@@ -125,6 +125,7 @@ public:
     void PlayDenied();
     void PlaySettingsTick();
     void RunChaosAudit(float seconds = 4.0f);
+    static bool ExportProceduralBank(const char* directory);
 
 private:
     enum class Category { Player, Enemy, Explosion, Pickup, UI, Warning, Music };
@@ -156,6 +157,7 @@ private:
     int runtimeCooldownDrops_ = 0;
     int runtimePressureDrops_ = 0;
     int runtimeStolenVoices_ = 0;
+    int runtimeFocusStops_ = 0;
     static constexpr int MaxSfxVoices = 14;
 
     void LoadCues();
@@ -173,6 +175,7 @@ private:
     float RandomPan(Category category);
     float PositionPan(float x, float screenWidth, Category category);
     bool StealLowerPriorityVoice(Priority incomingPriority, Category incomingCategory);
+    void StopVoicesForFocus(Priority minimumPriorityToKeep, bool keepUi, bool keepWarning);
     void ResetRuntimeStats();
     float CategoryGain(Category category) const;
     float NextRandom();
