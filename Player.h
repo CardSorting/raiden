@@ -21,6 +21,7 @@ public:
     bool isDemo = false;
     bool triggerBomb_ = false;
     float animationTime = 0.0f;
+    int controlLayout = 0;
 
     void ResetForNewGame();
     void ResetAfterHit();

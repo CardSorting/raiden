@@ -36,6 +36,7 @@ private:
     bool debug_ = false;
     bool shouldExit_ = false;
     int titleSelection_ = 0;
+    int pauseSelection_ = 0;
     float stageTime_ = 0.0f;
     int loop_ = 1;
     float clearTimer_ = 0.0f;
@@ -63,6 +64,7 @@ private:
     bool screenShakeEnabled_ = true;
     bool hitboxOverlayEnabled_ = false;
     bool isFullscreen_ = false;
+    int controlLayout_ = 0;
     int settingsSelection_ = 0;
 
     // Leaderboard Data
@@ -77,6 +79,7 @@ private:
     bool transitioning_ = false;
     float transitionTimer_ = 0.0f;
     State transitionTarget_ = State::Title;
+    float tutorialTimer_ = 0.0f;
 
     // Starfield Parallax Data
     struct Star {

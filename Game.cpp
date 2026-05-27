@@ -294,6 +294,7 @@ void Game::Run() {
 void Game::StartGame() {
     player_.ResetForNewGame();
     player_.isDemo = demoMode_;
+    player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     effects_.Clear();
     waves_.Reset();
@@ -303,6 +304,7 @@ void Game::StartGame() {
     bossSpawned_ = false;
     bossWarningTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
+    tutorialTimer_ = 4.0f;
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Playing;
     
@@ -316,6 +318,7 @@ void Game::ReturnToTitle() {
     titleSelection_ = 0;
     returnFromHowTo_ = State::Title;
     player_.ResetForNewGame();
+    player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     effects_.Clear();
     waves_.Reset();
@@ -414,6 +417,34 @@ void Game::Update(float dt) {
                 if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
             }
             
+            Vector2 mousePos = GetMousePosition();
+            static Vector2 lastMousePos = { -1.0f, -1.0f };
+            bool mouseMoved = (std::abs(mousePos.x - lastMousePos.x) > 0.5f || std::abs(mousePos.y - lastMousePos.y) > 0.5f);
+            lastMousePos = mousePos;
+            
+            if (mouseMoved) {
+                for (int i = 0; i < 5; ++i) {
+                    int y = 265 + i * 34;
+                    if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                        if (titleSelection_ != i) {
+                            titleSelection_ = i;
+                            titleTimer_ = 0.0f;
+                            if (audioReady_) PlaySound(menuSelectSound_);
+                        }
+                    }
+                }
+            }
+            
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                for (int i = 0; i < 5; ++i) {
+                    int y = 265 + i * 34;
+                    if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                        titleSelection_ = i;
+                        keyConfirm = true;
+                    }
+                }
+            }
+            
             if (keyUp) {
                 titleSelection_ = (titleSelection_ + 4) % 5;
                 titleTimer_ = 0.0f;
@@ -450,6 +481,12 @@ void Game::Update(float dt) {
                 backPressed = true;
             }
         }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            Vector2 mousePos = GetMousePosition();
+            if (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 520 && mousePos.y <= 556) {
+                backPressed = true;
+            }
+        }
         if (backPressed) {
             if (audioReady_) PlaySound(menuConfirmSound_);
             StartTransition(State::Title);
@@ -462,6 +499,12 @@ void Game::Update(float dt) {
         bool backPressed = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE);
         if (IsGamepadAvailable(0)) {
             if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
+                backPressed = true;
+            }
+        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            Vector2 mousePos = GetMousePosition();
+            if (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 520 && mousePos.y <= 556) {
                 backPressed = true;
             }
         }
@@ -478,37 +521,75 @@ void Game::Update(float dt) {
         }
         if (pausePressed) {
             if (audioReady_) PlaySound(menuConfirmSound_);
+            pauseSelection_ = 0;
             state_ = State::Paused;
         } else {
             UpdatePlaying(dt);
         }
     } else if (state_ == State::Paused) {
-        bool resumePressed = IsKeyPressed(KEY_P);
-        bool howtoPressed = IsKeyPressed(KEY_H);
-        bool quitPressed = IsKeyPressed(KEY_Q);
+        bool keyUp = IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W);
+        bool keyDown = IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S);
+        bool keyConfirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_P);
+        bool keyBack = IsKeyPressed(KEY_ESCAPE);
+        
         if (IsGamepadAvailable(0)) {
-            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-                resumePressed = true;
-            }
-            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
-                howtoPressed = true;
-            }
-            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-                quitPressed = true;
+            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_UP)) keyUp = true;
+            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN)) keyDown = true;
+            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
+            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT)) keyConfirm = true;
+            if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) keyBack = true;
+        }
+        
+        Vector2 mousePos = GetMousePosition();
+        static Vector2 pauseLastMouse = { -1.0f, -1.0f };
+        bool mouseMoved = (std::abs(mousePos.x - pauseLastMouse.x) > 0.5f || std::abs(mousePos.y - pauseLastMouse.y) > 0.5f);
+        pauseLastMouse = mousePos;
+        
+        if (mouseMoved) {
+            for (int i = 0; i < 3; ++i) {
+                int y = 300 + i * 40;
+                if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                    if (pauseSelection_ != i) {
+                        pauseSelection_ = i;
+                        if (audioReady_) PlaySound(menuSelectSound_);
+                    }
+                }
             }
         }
         
-        if (resumePressed) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            for (int i = 0; i < 3; ++i) {
+                int y = 300 + i * 40;
+                if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                    pauseSelection_ = i;
+                    keyConfirm = true;
+                }
+            }
+        }
+        
+        if (keyUp) {
+            pauseSelection_ = (pauseSelection_ + 2) % 3;
+            if (audioReady_) PlaySound(menuSelectSound_);
+        }
+        if (keyDown) {
+            pauseSelection_ = (pauseSelection_ + 1) % 3;
+            if (audioReady_) PlaySound(menuSelectSound_);
+        }
+        
+        if (keyConfirm) {
+            if (audioReady_) PlaySound(menuConfirmSound_);
+            if (pauseSelection_ == 0) {
+                state_ = State::Playing;
+            } else if (pauseSelection_ == 1) {
+                returnFromHowTo_ = State::Paused;
+                StartTransition(State::HowTo);
+            } else {
+                demoMode_ = false;
+                StartTransition(State::Title);
+            }
+        } else if (keyBack) {
             if (audioReady_) PlaySound(menuConfirmSound_);
             state_ = State::Playing;
-        } else if (howtoPressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
-            returnFromHowTo_ = State::Paused;
-            StartTransition(State::HowTo);
-        } else if (quitPressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
-            demoMode_ = false;
-            StartTransition(State::Title);
         }
     } else if (state_ == State::StageClear) {
         clearTimer_ += dt;
@@ -560,10 +641,20 @@ void Game::UpdatePlaying(float dt) {
     }
 
     stageTime_ += dt;
+    if (tutorialTimer_ > 0.0f) tutorialTimer_ -= dt;
     player_.Update(dt, enemies_, enemyBullets_);
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
-    if (audioReady_ && playerBullets_.size() > before) PlaySound(shootSound_);
+    if (audioReady_ && playerBullets_.size() > before) {
+        if (player_.weapon == WeaponType::Vulcan) {
+            SetSoundPitch(shootSound_, 1.0f);
+        } else if (player_.weapon == WeaponType::Plasma) {
+            SetSoundPitch(shootSound_, 0.65f);
+        } else {
+            SetSoundPitch(shootSound_, 1.45f);
+        }
+        PlaySound(shootSound_);
+    }
 
     if (player_.TryBomb()) {
         enemyBullets_.clear();
@@ -646,60 +737,126 @@ void Game::UpdateSettings() {
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
     }
     
+    Vector2 mousePos = GetMousePosition();
+    static Vector2 settingsLastMouse = { -1.0f, -1.0f };
+    bool mouseMoved = (std::abs(mousePos.x - settingsLastMouse.x) > 0.5f || std::abs(mousePos.y - settingsLastMouse.y) > 0.5f);
+    settingsLastMouse = mousePos;
+    
+    if (mouseMoved) {
+        for (int i = 0; i < 7; ++i) {
+            int y = 145 + i * 42;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                if (settingsSelection_ != i) {
+                    settingsSelection_ = i;
+                    if (audioReady_) PlaySound(menuSelectSound_);
+                }
+            }
+        }
+    }
+    
+    // Mouse dragging sliders
+    bool mouseDragging = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    if (mouseDragging) {
+        for (int i = 0; i < 2; ++i) {
+            int y = 145 + i * 42;
+            if (mousePos.x >= 270 && mousePos.x <= 390 && mousePos.y >= y - 10 && mousePos.y <= y + 20) {
+                settingsSelection_ = i;
+                int vol = (int)((mousePos.x - 280.0f + 5.0f) / 10.0f);
+                vol = std::clamp(vol, 0, 10);
+                if (i == 0 && sfxVolume_ != vol) {
+                    sfxVolume_ = vol;
+                    LoadSettings();
+                    SaveSettings();
+                    if (audioReady_) PlaySound(menuSelectSound_);
+                } else if (i == 1 && bgmVolume_ != vol) {
+                    bgmVolume_ = vol;
+                    LoadSettings();
+                    SaveSettings();
+                }
+            }
+        }
+    }
+    
+    // Mouse clicks
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        for (int i = 0; i < 7; ++i) {
+            int y = 145 + i * 42;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                settingsSelection_ = i;
+                keyConfirm = true;
+            }
+        }
+    }
+    
     if (keyUp) {
-        settingsSelection_ = (settingsSelection_ + 5) % 6;
+        settingsSelection_ = (settingsSelection_ + 6) % 7;
         if (audioReady_) PlaySound(menuSelectSound_);
     }
     if (keyDown) {
-        settingsSelection_ = (settingsSelection_ + 1) % 6;
+        settingsSelection_ = (settingsSelection_ + 1) % 7;
         if (audioReady_) PlaySound(menuSelectSound_);
     }
     
+    bool changed = false;
     if (settingsSelection_ == 0) {
         if (keyLeft && sfxVolume_ > 0) {
             sfxVolume_--;
-            LoadSettings();
+            changed = true;
             if (audioReady_) PlaySound(menuSelectSound_);
         }
         if (keyRight && sfxVolume_ < 10) {
             sfxVolume_++;
-            LoadSettings();
+            changed = true;
             if (audioReady_) PlaySound(menuSelectSound_);
         }
     } else if (settingsSelection_ == 1) {
         if (keyLeft && bgmVolume_ > 0) {
             bgmVolume_--;
-            LoadSettings();
+            changed = true;
             if (audioReady_) PlaySound(menuSelectSound_);
         }
         if (keyRight && bgmVolume_ < 10) {
             bgmVolume_++;
-            LoadSettings();
+            changed = true;
             if (audioReady_) PlaySound(menuSelectSound_);
         }
     } else if (settingsSelection_ == 2) {
         if (keyLeft || keyRight || keyConfirm) {
             screenShakeEnabled_ = !screenShakeEnabled_;
+            changed = true;
             if (audioReady_) PlaySound(menuConfirmSound_);
         }
     } else if (settingsSelection_ == 3) {
         if (keyLeft || keyRight || keyConfirm) {
             hitboxOverlayEnabled_ = !hitboxOverlayEnabled_;
             debug_ = hitboxOverlayEnabled_;
+            changed = true;
             if (audioReady_) PlaySound(menuConfirmSound_);
         }
     } else if (settingsSelection_ == 4) {
         if (keyLeft || keyRight || keyConfirm) {
             isFullscreen_ = !isFullscreen_;
             ToggleFullscreen();
+            changed = true;
             if (audioReady_) PlaySound(menuConfirmSound_);
         }
     } else if (settingsSelection_ == 5) {
+        if (keyLeft || keyRight || keyConfirm) {
+            controlLayout_ = (controlLayout_ + 1) % 2;
+            changed = true;
+            if (audioReady_) PlaySound(menuConfirmSound_);
+        }
+    } else if (settingsSelection_ == 6) {
         if (keyConfirm || IsKeyPressed(KEY_ESCAPE)) {
             SaveSettings();
             if (audioReady_) PlaySound(menuConfirmSound_);
             StartTransition(State::Title);
         }
+    }
+    
+    if (changed) {
+        LoadSettings();
+        SaveSettings();
     }
     
     if (IsKeyPressed(KEY_ESCAPE)) {
@@ -724,39 +881,99 @@ void Game::UpdateNameEntry() {
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
     }
     
+    Vector2 mousePos = GetMousePosition();
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        for (int i = 0; i < 3; ++i) {
+            int x = ScreenW / 2 - 75 + i * 56;
+            int y = 300;
+            
+            // Hover slot box
+            if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y && mousePos.y <= y + 50) {
+                nameEntryIndex_ = i;
+                if (audioReady_) PlaySound(menuSelectSound_);
+            }
+            
+            // Hover Up Arrow
+            if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y - 18 && mousePos.y <= y) {
+                nameEntryIndex_ = i;
+                nameEntryBuf_[i]++;
+                if (nameEntryBuf_[i] > 'Z') nameEntryBuf_[i] = 'A';
+                if (audioReady_) PlaySound(menuSelectSound_);
+            }
+            
+            // Hover Down Arrow
+            if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y + 50 && mousePos.y <= y + 68) {
+                nameEntryIndex_ = i;
+                nameEntryBuf_[i]--;
+                if (nameEntryBuf_[i] < 'A') nameEntryBuf_[i] = 'Z';
+                if (audioReady_) PlaySound(menuSelectSound_);
+            }
+        }
+        
+        // Click Confirm initials button
+        if (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 440 && mousePos.y <= 476) {
+            keyConfirm = true;
+        }
+    }
+    
+    static Vector2 entryLastMouse = { -1.0f, -1.0f };
+    bool mouseMoved = (std::abs(mousePos.x - entryLastMouse.x) > 0.5f || std::abs(mousePos.y - entryLastMouse.y) > 0.5f);
+    entryLastMouse = mousePos;
+    if (mouseMoved) {
+        if (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 440 && mousePos.y <= 476) {
+            if (nameEntryIndex_ != 3) {
+                nameEntryIndex_ = 3;
+                if (audioReady_) PlaySound(menuSelectSound_);
+            }
+        } else {
+            for (int i = 0; i < 3; ++i) {
+                int x = ScreenW / 2 - 75 + i * 56;
+                int y = 300;
+                if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y - 18 && mousePos.y <= y + 68) {
+                    if (nameEntryIndex_ != i) {
+                        nameEntryIndex_ = i;
+                        if (audioReady_) PlaySound(menuSelectSound_);
+                    }
+                }
+            }
+        }
+    }
+    
     if (keyLeft && nameEntryIndex_ > 0) {
         nameEntryIndex_--;
         if (audioReady_) PlaySound(menuSelectSound_);
     }
-    if (keyRight && nameEntryIndex_ < 2) {
+    if (keyRight && nameEntryIndex_ < 3) {
         nameEntryIndex_++;
         if (audioReady_) PlaySound(menuSelectSound_);
     }
     
-    char curChar = nameEntryBuf_[nameEntryIndex_];
-    if (keyUp) {
-        curChar++;
-        if (curChar > 'Z') curChar = 'A';
-        nameEntryBuf_[nameEntryIndex_] = curChar;
-        if (audioReady_) PlaySound(menuSelectSound_);
-    }
-    if (keyDown) {
-        curChar--;
-        if (curChar < 'A') curChar = 'Z';
-        nameEntryBuf_[nameEntryIndex_] = curChar;
-        if (audioReady_) PlaySound(menuSelectSound_);
-    }
-    
-    // Direct characters
-    for (int key = KEY_A; key <= KEY_Z; ++key) {
-        if (IsKeyPressed(key)) {
-            nameEntryBuf_[nameEntryIndex_] = (char)('A' + (key - KEY_A));
+    if (nameEntryIndex_ >= 0 && nameEntryIndex_ <= 2) {
+        char curChar = nameEntryBuf_[nameEntryIndex_];
+        if (keyUp) {
+            curChar++;
+            if (curChar > 'Z') curChar = 'A';
+            nameEntryBuf_[nameEntryIndex_] = curChar;
             if (audioReady_) PlaySound(menuSelectSound_);
-            if (nameEntryIndex_ < 2) nameEntryIndex_++;
+        }
+        if (keyDown) {
+            curChar--;
+            if (curChar < 'A') curChar = 'Z';
+            nameEntryBuf_[nameEntryIndex_] = curChar;
+            if (audioReady_) PlaySound(menuSelectSound_);
+        }
+        
+        // Direct characters
+        for (int key = KEY_A; key <= KEY_Z; ++key) {
+            if (IsKeyPressed(key)) {
+                nameEntryBuf_[nameEntryIndex_] = (char)('A' + (key - KEY_A));
+                if (audioReady_) PlaySound(menuSelectSound_);
+                if (nameEntryIndex_ < 2) nameEntryIndex_++;
+            }
         }
     }
     
-    if (keyConfirm) {
+    if (keyConfirm || (nameEntryIndex_ == 3 && IsKeyPressed(KEY_ENTER))) {
         nameEntryBuf_[3] = '\0';
         InsertHighScore(nameEntryBuf_, player_.score, loop_);
         SaveHighScores();
@@ -994,7 +1211,13 @@ void Game::DrawHowTo() const {
     DrawText("Tips", 58, 436, 18, GOLD);
     DrawText("Hold fire, tap bombs before panic, and use focus", 58, 460, 14, RAYWHITE);
     DrawText("movement (Shift / Gamepad L1/R1) when lanes tighten.", 58, 480, 14, RAYWHITE);
-    DrawText("ENTER / ESC / BACKSPACE returns", 124, 548, 15, SKYBLUE);
+    
+    Vector2 mousePos = GetMousePosition();
+    bool hovered = (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 520 && mousePos.y <= 556);
+    DrawRectangleRounded({ 140, 520, 200, 36 }, 0.25f, 4, hovered ? Fade(BLUE, 0.45f) : Fade(DARKGRAY, 0.3f));
+    DrawRectangleRoundedLines({ 140, 520, 200, 36 }, 0.25f, 4, hovered ? GOLD : GRAY);
+    int backW = MeasureText("BACK", 15);
+    DrawText("BACK", 240 - backW / 2, 531, 15, hovered ? GOLD : RAYWHITE);
 }
 
 void Game::DrawHighScores() const {
@@ -1020,8 +1243,12 @@ void Game::DrawHighScores() const {
         DrawText(TextFormat("L%02d", highScores_[i].loop), 340, y, 18, c);
     }
     
-    int promptW = MeasureText("ENTER / ESC / BACKSPACE to return", 14);
-    DrawText("ENTER / ESC / BACKSPACE to return", ScreenW / 2 - promptW / 2, 532, 14, SKYBLUE);
+    Vector2 mousePos = GetMousePosition();
+    bool hovered = (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 520 && mousePos.y <= 556);
+    DrawRectangleRounded({ 140, 520, 200, 36 }, 0.25f, 4, hovered ? Fade(BLUE, 0.45f) : Fade(DARKGRAY, 0.3f));
+    DrawRectangleRoundedLines({ 140, 520, 200, 36 }, 0.25f, 4, hovered ? GOLD : GRAY);
+    int backW = MeasureText("BACK TO TITLE", 15);
+    DrawText("BACK TO TITLE", 240 - backW / 2, 531, 15, hovered ? GOLD : RAYWHITE);
 }
 
 void Game::DrawSettings() const {
@@ -1031,45 +1258,50 @@ void Game::DrawSettings() const {
     int titleW = MeasureText("USER SETTINGS", 24);
     DrawText("USER SETTINGS", ScreenW / 2 - titleW / 2, 85, 24, GOLD);
 
-    const char* options[6] = {
+    const char* options[7] = {
         "SFX Volume",
         "Music Volume",
         "Screen Shake",
         "Hitboxes",
         "Fullscreen",
+        "Control Layout",
         "Save and Return"
     };
 
-    for (int i = 0; i < 6; ++i) {
-        int y = 160 + i * 48;
+    for (int i = 0; i < 7; ++i) {
+        int y = 145 + i * 42;
         bool selected = settingsSelection_ == i;
         
         if (selected) {
-            DrawRectangle(50, y - 8, ScreenW - 100, 32, Fade(BLUE, 0.35f));
-            DrawText(">", 58, y, 16, GOLD);
+            DrawRectangle(50, y - 6, ScreenW - 100, 26, Fade(BLUE, 0.35f));
+            DrawText(">", 58, y, 15, GOLD);
         }
         
-        DrawText(options[i], 78, y, 16, selected ? GOLD : RAYWHITE);
+        DrawText(options[i], 78, y, 15, selected ? GOLD : RAYWHITE);
         
         if (i == 0) {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "[ %d / 10 ]", sfxVolume_);
-            DrawText(buf, 280, y, 16, selected ? GOLD : SKYBLUE);
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + sfxVolume_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + sfxVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", sfxVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
         } else if (i == 1) {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "[ %d / 10 ]", bgmVolume_);
-            DrawText(buf, 280, y, 16, selected ? GOLD : SKYBLUE);
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + bgmVolume_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + bgmVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", bgmVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
         } else if (i == 2) {
-            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 16, screenShakeEnabled_ ? LIME : RED);
+            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 15, screenShakeEnabled_ ? LIME : RED);
         } else if (i == 3) {
-            DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 16, hitboxOverlayEnabled_ ? LIME : RED);
+            DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 15, hitboxOverlayEnabled_ ? LIME : RED);
         } else if (i == 4) {
-            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 16, isFullscreen_ ? LIME : RED);
+            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 15, isFullscreen_ ? LIME : RED);
+        } else if (i == 5) {
+            DrawText(controlLayout_ == 0 ? "ARROWS" : "WASD", 280, y, 15, controlLayout_ == 0 ? SKYBLUE : GOLD);
         }
     }
 
-    int promptW = MeasureText("UP/DOWN navigate  |  LEFT/RIGHT adjust", 13);
-    DrawText("UP/DOWN navigate  |  LEFT/RIGHT adjust", ScreenW / 2 - promptW / 2, 532, 13, GRAY);
+    int promptW = MeasureText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", 13);
+    DrawText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", ScreenW / 2 - promptW / 2, 532, 13, GRAY);
 }
 
 void Game::DrawNameEntry() const {
@@ -1102,10 +1334,20 @@ void Game::DrawNameEntry() const {
         if (isCurrent && (int)(GetTime() * 3) % 2 == 0) {
             DrawRectangle(x + 5, y + 42, 30, 4, GOLD);
         }
+
+        // Draw Up and Down Triangles for slot adjustments
+        DrawTriangle({(float)x + 10, (float)y - 6}, {(float)x + 20, (float)y - 16}, {(float)x + 30, (float)y - 6}, isCurrent ? GOLD : GRAY);
+        DrawTriangle({(float)x + 10, (float)y + 56}, {(float)x + 30, (float)y + 56}, {(float)x + 20, (float)y + 66}, isCurrent ? GOLD : GRAY);
     }
     
-    int tip1W = MeasureText("UP/DOWN/Direct Key choose char", 14);
-    DrawText("UP/DOWN/Direct Key choose char", ScreenW / 2 - tip1W / 2, 388, 14, GRAY);
+    bool confirmSelected = (nameEntryIndex_ == 3);
+    DrawRectangleRounded({ 140, 440, 200, 36 }, 0.25f, 4, confirmSelected ? Fade(BLUE, 0.45f) : Fade(DARKGRAY, 0.3f));
+    DrawRectangleRoundedLines({ 140, 440, 200, 36 }, 0.25f, 4, confirmSelected ? GOLD : GRAY);
+    int confW = MeasureText("CONFIRM INITIALS", 15);
+    DrawText("CONFIRM INITIALS", 240 - confW / 2, 451, 15, confirmSelected ? GOLD : RAYWHITE);
+
+    int tip1W = MeasureText("UP/DOWN/Arrows choose char", 14);
+    DrawText("UP/DOWN/Arrows choose char", ScreenW / 2 - tip1W / 2, 388, 14, GRAY);
     
     int tip2W = MeasureText("LEFT/RIGHT move cursor | ENTER confirm", 14);
     DrawText("LEFT/RIGHT move cursor | ENTER confirm", ScreenW / 2 - tip2W / 2, 412, 14, GRAY);
@@ -1142,6 +1384,28 @@ void Game::Draw() {
         int warnW = MeasureText("WARNING: HOSTILE CARRIER DETECTED", 16);
         DrawText("WARNING: HOSTILE CARRIER DETECTED", ScreenW / 2 - warnW / 2, 202, 16, warnColor);
     }
+
+    if (state_ == State::Playing && tutorialTimer_ > 0.0f) {
+        float alpha = std::min(1.0f, tutorialTimer_);
+        DrawRectangle(30, ScreenH - 180, ScreenW - 60, 90, Fade(BLACK, alpha * 0.85f));
+        DrawRectangleLines(30, ScreenH - 180, ScreenW - 60, 90, Fade(SKYBLUE, alpha * 0.75f));
+        
+        int textY = ScreenH - 165;
+        if (controlLayout_ == 0) {
+            int w1 = MeasureText("KEYBOARD CONTROLS (CLASSIC)", 15);
+            DrawText("KEYBOARD CONTROLS (CLASSIC)", ScreenW / 2 - w1 / 2, textY, 15, Fade(GOLD, alpha));
+            int w2 = MeasureText("MOVE: Arrow Keys  |  SHOOT: Z or SPACE  |  BOMB: X", 13);
+            DrawText("MOVE: Arrow Keys  |  SHOOT: Z or SPACE  |  BOMB: X", ScreenW / 2 - w2 / 2, textY + 24, 13, Fade(WHITE, alpha));
+        } else {
+            int w1 = MeasureText("KEYBOARD CONTROLS (LEFT-HAND / WASD)", 15);
+            DrawText("KEYBOARD CONTROLS (LEFT-HAND / WASD)", ScreenW / 2 - w1 / 2, textY, 15, Fade(GOLD, alpha));
+            int w2 = MeasureText("MOVE: W / A / S / D  |  SHOOT: J or SPACE  |  BOMB: K", 13);
+            DrawText("MOVE: W / A / S / D  |  SHOOT: J or SPACE  |  BOMB: K", ScreenW / 2 - w2 / 2, textY + 24, 13, Fade(WHITE, alpha));
+        }
+        int w3 = MeasureText("Gamepad: D-pad / Stick  |  Shoot: A/X  |  Bomb: B", 12);
+        DrawText("Gamepad: D-pad / Stick  |  Shoot: A/X  |  Bomb: B", ScreenW / 2 - w3 / 2, textY + 44, 12, Fade(GRAY, alpha));
+    }
+
     if (state_ == State::Title) {
         DrawTitleMenu();
     } else if (state_ == State::HowTo) {
@@ -1153,8 +1417,25 @@ void Game::Draw() {
     } else if (state_ == State::NameEntry) {
         DrawNameEntry();
     } else if (state_ == State::Paused) {
-        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.52f));
-        DrawCenteredText("PAUSED", "P / Action A: resume  |  H / Action Y: controls  |  Q / Action B: exit");
+        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.65f));
+        DrawRectangle(42, 200, ScreenW - 84, 250, Fade(BLACK, 0.8f));
+        DrawRectangleLines(42, 200, ScreenW - 84, 250, Fade(SKYBLUE, 0.75f));
+        
+        int pTitleW = MeasureText("PAUSED", 28);
+        DrawText("PAUSED", ScreenW / 2 - pTitleW / 2, 225, 28, RAYWHITE);
+        DrawLine(60, 265, ScreenW - 60, 265, Fade(SKYBLUE, 0.4f));
+        
+        const char* pItems[3] = { "Resume Mission", "How To Play", "Quit to Title" };
+        for (int i = 0; i < 3; ++i) {
+            int y = 300 + i * 40;
+            bool selected = (pauseSelection_ == i);
+            if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(BLUE, 0.45f));
+            DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
+            DrawText(pItems[i], 158, y, 16, selected ? GOLD : RAYWHITE);
+        }
+        
+        int tipW = MeasureText("UP/DOWN navigate  |  ENTER/CLICK confirm", 12);
+        DrawText("UP/DOWN navigate  |  ENTER/CLICK confirm", ScreenW / 2 - tipW / 2, 422, 12, GRAY);
     } else if (state_ == State::StageClear) {
         DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.35f));
         DrawCenteredText("STAGE CLEAR", TextFormat("Loop %d complete - next wave incoming", loop_));
@@ -1228,24 +1509,26 @@ void Game::InsertHighScore(const char* initials, int score, int loop) {
 }
 
 void Game::LoadSettings() {
+    sfxVolume_ = 8;
+    bgmVolume_ = 6;
+    screenShakeEnabled_ = true;
+    hitboxOverlayEnabled_ = false;
+    isFullscreen_ = false;
+    controlLayout_ = 0;
+
     FILE* f = std::fopen("settings.cfg", "r");
     if (f) {
-        std::fscanf(f, "sfxVol=%d\n", &sfxVolume_);
-        std::fscanf(f, "bgmVol=%d\n", &bgmVolume_);
-        int shake = 1, hitbox = 0, full = 0;
-        std::fscanf(f, "shake=%d\n", &shake);
-        std::fscanf(f, "hitbox=%d\n", &hitbox);
-        std::fscanf(f, "fullscreen=%d\n", &full);
-        screenShakeEnabled_ = (shake != 0);
-        hitboxOverlayEnabled_ = (hitbox != 0);
-        isFullscreen_ = (full != 0);
+        int tempSfx = 8, tempBgm = 6;
+        int shake = 1, hitbox = 0, full = 0, layout = 0;
+        
+        if (std::fscanf(f, "sfxVol=%d\n", &tempSfx) == 1) sfxVolume_ = std::clamp(tempSfx, 0, 10);
+        if (std::fscanf(f, "bgmVol=%d\n", &tempBgm) == 1) bgmVolume_ = std::clamp(tempBgm, 0, 10);
+        if (std::fscanf(f, "shake=%d\n", &shake) == 1) screenShakeEnabled_ = (shake != 0);
+        if (std::fscanf(f, "hitbox=%d\n", &hitbox) == 1) hitboxOverlayEnabled_ = (hitbox != 0);
+        if (std::fscanf(f, "fullscreen=%d\n", &full) == 1) isFullscreen_ = (full != 0);
+        if (std::fscanf(f, "layout=%d\n", &layout) == 1) controlLayout_ = std::clamp(layout, 0, 1);
+        
         std::fclose(f);
-    } else {
-        sfxVolume_ = 8;
-        bgmVolume_ = 6;
-        screenShakeEnabled_ = true;
-        hitboxOverlayEnabled_ = false;
-        isFullscreen_ = false;
     }
     
     debug_ = hitboxOverlayEnabled_;
@@ -1279,6 +1562,7 @@ void Game::SaveSettings() {
         std::fprintf(f, "shake=%d\n", screenShakeEnabled_ ? 1 : 0);
         std::fprintf(f, "hitbox=%d\n", hitboxOverlayEnabled_ ? 1 : 0);
         std::fprintf(f, "fullscreen=%d\n", isFullscreen_ ? 1 : 0);
+        std::fprintf(f, "layout=%d\n", controlLayout_);
         std::fclose(f);
     }
 }

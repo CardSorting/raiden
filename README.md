@@ -5,9 +5,9 @@ Sky Circuit is a complete local C++17/raylib vertical arcade shooter. It capture
 ## Quick Start for Players
 
 1. Launch the game.
-2. Use **Up/Down** to choose a title-menu option.
-3. Press **Enter** to start the mission or open **How To Play**.
-4. Hold fire, dodge with the tiny red core hitbox, and use bombs before the screen becomes unsafe.
+2. Hover and left-click menu choices to navigate, or use **Up/Down/W/S** and **Enter**.
+3. Adjust volumes by clicking and dragging sliders in the Settings menu.
+4. Hold fire (Z/Space/J), dodge with the tiny red core hitbox, and tap bomb (X/K) when the screen becomes unsafe.
 
 ## Features
 
@@ -35,19 +35,18 @@ Sky Circuit is a complete local C++17/raylib vertical arcade shooter. It capture
 
 ## Controls
 
-| Action | Keyboard | Gamepad |
-| --- | --- | --- |
-| Menu selection | Up/Down or W/S | D-Pad Up/Down |
-| Confirm selection | Enter or Space | Face Button Down (A / Cross) |
-| Move | Arrow keys or WASD | Left Analog Stick or D-Pad |
-| Focus / Slow movement | Left Shift | Shoulder Triggers (L1 / R1) |
-| Shoot | Hold Z or Space | Face Button Down / Left (A / X) |
-| Bomb | X | Face Button Right (B / Circle) |
-| Pause / Resume | P | Menu/Start Button |
-| Open help while paused | H | Face Button Up (Y / Triangle) |
-| Exit to Title from Pause | Q | Face Button Right (B / Circle) |
-| Back from submenus | Enter, Escape, or Backspace | Face Button Down / Right (A / B) |
-| Toggle hitboxes | F1 (in gameplay) | Configurable in Settings |
+| Action | Keyboard | Gamepad | Mouse |
+| --- | --- | --- | --- |
+| Menu selection | Up/Down or W/S | D-Pad Up/Down | Hover cursor over option |
+| Confirm selection | Enter or Space | Face Button Down (A / Cross) | Left-click option |
+| Adjust volume sliders | Left/Right or A/D | D-Pad Left/Right | Drag slider handle |
+| Back from submenus | Enter, Escape, or Backspace | Face Button Down / Right (A/B) | Left-click BACK button |
+| Move | Arrow keys or WASD | Left Analog Stick or D-Pad | - |
+| Focus / Slow movement | Left Shift | Shoulder Triggers (L1 / R1) | - |
+| Shoot | Hold Z or Space | Face Button Down / Left (A / X) | - |
+| Bomb | X | Face Button Right (B / Circle) | - |
+| Pause / Resume | P | Menu/Start Button | Navigate pause menu choices |
+| Toggle hitboxes | F1 (in gameplay) | Configurable in Settings | - |
 
 
 ## Build
@@ -108,5 +107,5 @@ cmake --build build -j
 ## Honest Limitations
 
 - There is no external art or music pipeline; presentation is intentionally procedural.
-- Scores are session-local and are not saved after the process exits.
 - The stage is a compact arcade loop rather than a multi-level campaign.
+- High scores are saved persistently to `highscores.txt` in the working directory.

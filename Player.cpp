@@ -81,10 +81,17 @@ void Player::Update(float dt, const std::vector<Enemy>& enemies, const std::vect
         }
     } else {
         // Keyboard movement
-        if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) dir.x -= 1;
-        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) dir.x += 1;
-        if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) dir.y -= 1;
-        if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) dir.y += 1;
+        if (controlLayout == 0) {
+            if (IsKeyDown(KEY_LEFT)) dir.x -= 1;
+            if (IsKeyDown(KEY_RIGHT)) dir.x += 1;
+            if (IsKeyDown(KEY_UP)) dir.y -= 1;
+            if (IsKeyDown(KEY_DOWN)) dir.y += 1;
+        } else {
+            if (IsKeyDown(KEY_A)) dir.x -= 1;
+            if (IsKeyDown(KEY_D)) dir.x += 1;
+            if (IsKeyDown(KEY_W)) dir.y -= 1;
+            if (IsKeyDown(KEY_S)) dir.y += 1;
+        }
 
         // Gamepad movement
         if (IsGamepadAvailable(0)) {
@@ -118,7 +125,17 @@ void Player::Update(float dt, const std::vector<Enemy>& enemies, const std::vect
 }
 
 void Player::TryShoot(std::vector<Bullet>& bullets) {
-    bool shootPressed = isDemo || IsKeyDown(KEY_Z) || IsKeyDown(KEY_SPACE) || (IsGamepadAvailable(0) && (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)));
+    bool shootPressed = isDemo;
+    if (!shootPressed) {
+        if (controlLayout == 0) {
+            shootPressed = IsKeyDown(KEY_Z) || IsKeyDown(KEY_SPACE);
+        } else {
+            shootPressed = IsKeyDown(KEY_J) || IsKeyDown(KEY_SPACE);
+        }
+        if (IsGamepadAvailable(0)) {
+            shootPressed = shootPressed || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+        }
+    }
     if (!shootPressed || shootTimer_ > 0.0f) return;
     int level = std::clamp(weaponLevel, 1, 4);
     if (weapon == WeaponType::Vulcan) {
@@ -148,7 +165,19 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
 }
 
 bool Player::TryBomb() {
-    bool bombPressed = IsKeyPressed(KEY_X) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) || (isDemo && triggerBomb_);
+    bool bombPressed = false;
+    if (isDemo) {
+        bombPressed = triggerBomb_;
+    } else {
+        if (controlLayout == 0) {
+            bombPressed = IsKeyPressed(KEY_X);
+        } else {
+            bombPressed = IsKeyPressed(KEY_K);
+        }
+        if (IsGamepadAvailable(0)) {
+            bombPressed = bombPressed || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+        }
+    }
     if (!bombPressed || bombs <= 0) return false;
     --bombs;
     invulnerable = true;
@@ -182,6 +211,11 @@ void Player::Draw(bool debug) const {
         
         DrawTriangle({pos.x + 6, pos.y + 14}, {pos.x + 3, pos.y + 14}, {pos.x + 9, pos.y + 14 + flameH}, SKYBLUE);
         DrawTriangle({pos.x + 5, pos.y + 14}, {pos.x + 4, pos.y + 14}, {pos.x + 7, pos.y + 14 + (flameH * 0.6f)}, WHITE);
+
+        // Central main thruster plume
+        float centerFlameH = 15.0f + std::sin(animationTime * 50.0f) * 5.0f;
+        DrawTriangle({pos.x - 3.5f, pos.y + 14}, {pos.x, pos.y + 14 + centerFlameH}, {pos.x + 3.5f, pos.y + 14}, ORANGE);
+        DrawTriangle({pos.x - 2.0f, pos.y + 14}, {pos.x, pos.y + 14 + (centerFlameH * 0.6f)}, {pos.x + 2.0f, pos.y + 14}, YELLOW);
     }
     
     if (!blink) {

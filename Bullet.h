@@ -15,6 +15,8 @@ struct Bullet {
     bool active = true;
     bool homing = false;
     Color color = WHITE;
+    Vector2 trail_[6]{};
+    int trailCount_ = 0;
 
     Bullet() = default;
     Bullet(Vector2 p, Vector2 v, float r, int d, BulletOwner o, Color c, bool seek = false);
