@@ -339,7 +339,7 @@ void Game::BossAttackNameOverlay::Reset() {
 }
 
 void Game::MissionBriefingOverlay::Begin() {
-    timer_ = 6.2f;
+    timer_ = 5.6f;
 }
 
 void Game::MissionBriefingOverlay::Update(float dt) {
@@ -352,11 +352,12 @@ void Game::MissionBriefingOverlay::Draw() const {
     DrawRectangle(0, 78, 480, 126, Fade(BLACK, 0.72f * alpha));
     DrawLine(32, 78, 448, 78, Fade(SKYBLUE, 0.55f * alpha));
     DrawLine(32, 204, 448, 204, Fade(SKYBLUE, 0.30f * alpha));
-    const char* title = "STAGE 1: BLUE RELAY";
+    const char* title = "STAGE 1: SKY CIRCUIT";
     DrawText(title, 240 - MeasureText(title, 26) / 2, 94, 26, Fade(GOLD, alpha));
-    DrawText("ACE: Liora Vance / Ship SOLACE-IX", 62, 132, 14, Fade(SKYBLUE, alpha));
-    DrawText("Pierce the orbital warzone and cut the runaway relay", 62, 154, 13, Fade(RAYWHITE, alpha));
-    DrawText("before it burns the evacuation corridor below.", 62, 174, 13, Fade(RAYWHITE, alpha));
+    DrawText("Unauthorized Entry Through the Upper Gate", 62, 126, 13, Fade(SKYBLUE, alpha));
+    DrawText("SOLACE-IX // LAUNCH CLEARANCE DENIED", 62, 150, 13, Fade(Color{255, 112, 132, 255}, alpha));
+    DrawText("Manual override accepted.", 62, 170, 13, Fade(RAYWHITE, alpha));
+    DrawText("ACE: Liora Vance // Keep the channel open.", 62, 190, 12, Fade(GRAY, alpha));
 }
 
 void Game::MissionBriefingOverlay::Reset() {
@@ -369,10 +370,12 @@ void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bo
     DrawRectangleLines(30, 86, 420, 468, Fade(GOLD, 0.8f));
 
     const char* title = "STAGE CLEAR";
-    DrawText(title, 240 - MeasureText(title, 32) / 2, 118, 32, GOLD);
-    DrawText("ACE: Core silence confirmed... but the sky is still ringing.", 52, 166, 12, SKYBLUE);
-    DrawText("MOTHER-3: The overload jumped to the upper ring.", 52, 184, 12, RAYWHITE);
-    DrawLine(50, 214, 430, 214, Fade(GOLD, 0.4f));
+    DrawText(title, 240 - MeasureText(title, 32) / 2, 106, 32, GOLD);
+    DrawText("MOTHER-3: Gate is open. Barely.", 52, 154, 12, RAYWHITE);
+    DrawText("WRENCH: SOLACE is scorched, but flying.", 52, 172, 12, Color{255, 184, 76, 255});
+    DrawText("SHADE: So the locked door was personal.", 52, 190, 12, Color{190, 128, 255, 255});
+    DrawText("ACE: No. It was waiting.", 52, 208, 12, SKYBLUE);
+    DrawLine(50, 232, 430, 232, Fade(GOLD, 0.4f));
 
     int baseBonus = 2000;
     int livesBonus = lives * 500;
@@ -384,16 +387,16 @@ void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bo
         shownTotalBonus = (int)((float)totalBonus * reveal);
     }
 
-    DrawText("MISSION PERFORMANCE RESULTS", 60, 238, 15, SKYBLUE);
-    DrawText("Base Clear Bonus:", 60, 274, 15, RAYWHITE);
-    DrawText(TextFormat("+%d", baseBonus), 322, 274, 15, LIME);
-    DrawText(TextFormat("Survivor Lives (%d):", lives), 60, 308, 15, RAYWHITE);
-    DrawText(TextFormat("+%d", livesBonus), 322, 308, 15, LIME);
-    DrawText(TextFormat("Remaining Bombs (%d):", bombs), 60, 342, 15, RAYWHITE);
-    DrawText(TextFormat("+%d", bombsBonus), 322, 342, 15, LIME);
-    DrawLine(60, 380, 420, 380, Fade(GRAY, 0.5f));
-    DrawText("TOTAL STAGE BONUS:", 60, 404, 18, GOLD);
-    DrawText(TextFormat("+%d", shownTotalBonus), 322, 404, 18, GOLD);
+    DrawText("MISSION PERFORMANCE RESULTS", 60, 254, 15, SKYBLUE);
+    DrawText("Base Clear Bonus:", 60, 288, 15, RAYWHITE);
+    DrawText(TextFormat("+%d", baseBonus), 322, 288, 15, LIME);
+    DrawText(TextFormat("Survivor Lives (%d):", lives), 60, 320, 15, RAYWHITE);
+    DrawText(TextFormat("+%d", livesBonus), 322, 320, 15, LIME);
+    DrawText(TextFormat("Remaining Bombs (%d):", bombs), 60, 352, 15, RAYWHITE);
+    DrawText(TextFormat("+%d", bombsBonus), 322, 352, 15, LIME);
+    DrawLine(60, 388, 420, 388, Fade(GRAY, 0.5f));
+    DrawText("TOTAL STAGE BONUS:", 60, 410, 18, GOLD);
+    DrawText(TextFormat("+%d", shownTotalBonus), 322, 410, 18, GOLD);
 
     const char* hook = "NEXT: THE EMPTY ORBITAL CHOIR";
     DrawText(hook, 240 - MeasureText(hook, 15) / 2, 468, 15, Color{255, 112, 132, 255});
@@ -569,6 +572,7 @@ void Game::StartGame() {
     bossWarningKlaxonTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
     bossDeathExplosionTimer_ = 0.0f;
+    bossClearDelayTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
     playerShotShakeTimer_ = 0.0f;
@@ -582,6 +586,7 @@ void Game::StartGame() {
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Playing;
     
+    audio_.SetMusicDucked(false);
     audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
     if (!demoMode_) audio_.PlayStageStart();
 }
@@ -607,6 +612,7 @@ void Game::ReturnToTitle() {
     bossWarningKlaxonTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
     bossDeathExplosionTimer_ = 0.0f;
+    bossClearDelayTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
     playerShotShakeTimer_ = 0.0f;
@@ -616,6 +622,7 @@ void Game::ReturnToTitle() {
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Title;
     
+    audio_.SetMusicDucked(false);
     audio_.PlayMusic(AudioSystem::MusicTrack::Title);
 }
 
@@ -632,6 +639,7 @@ void Game::NextLoop() {
     bossWarningKlaxonTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
     bossDeathExplosionTimer_ = 0.0f;
+    bossClearDelayTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
     playerShotShakeTimer_ = 0.0f;
@@ -643,6 +651,7 @@ void Game::NextLoop() {
     waves_.Reset();
     player_.bombs = std::min(6, player_.bombs + 1);
     state_ = State::Playing;
+    audio_.SetMusicDucked(false);
     audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
     audio_.PlayStageStart();
 }
@@ -1156,6 +1165,30 @@ void Game::Update(float dt) {
 }
 
 void Game::UpdatePlaying(float dt) {
+    if (bossClearDelayTimer_ > 0.0f) {
+        bossClearDelayTimer_ -= dt;
+        enemyBullets_.clear();
+        playerBullets_.clear();
+        player_.Update(dt, effects_, enemies_, enemyBullets_);
+        if (bossClearDelayTimer_ <= 0.0f) {
+            audio_.SetMusicDucked(false);
+            audio_.PlayStageClear();
+            state_ = State::StageClear;
+            clearTimer_ = 0.0f;
+            stageClearTickTimer_ = 0.0f;
+            stageClearTicksPlayed_ = 0;
+            int baseBonus = 2000;
+            int livesBonus = player_.lives * 500;
+            int bombsBonus = player_.bombs * 200;
+            int stageBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
+            if (difficulty_ == 1) stageBonus = (stageBonus * 3) / 2;
+            stageClearBonus_ = stageBonus;
+            player_.score += stageBonus;
+            CheckScoreMilestones();
+        }
+        return;
+    }
+
     if (bossDeathTimer_ > 0.0f) {
         bossDeathTimer_ -= dt;
         bossDeathExplosionTimer_ += dt;
@@ -1222,23 +1255,10 @@ void Game::UpdatePlaying(float dt) {
             effects_.Shake(26.0f, 0.72f);
             
             // Trigger screen white flash
-            screenFlashTimer_ = 0.10f;
+            screenFlashTimer_ = 0.16f;
 
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
-            audio_.PlayStageClear();
-            
-            state_ = State::StageClear;
-            clearTimer_ = 0.0f;
-            stageClearTickTimer_ = 0.0f;
-            stageClearTicksPlayed_ = 0;
-            int baseBonus = 2000;
-            int livesBonus = player_.lives * 500;
-            int bombsBonus = player_.bombs * 200;
-            int stageBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
-            if (difficulty_ == 1) stageBonus = (stageBonus * 3) / 2;
-            stageClearBonus_ = stageBonus;
-            player_.score += stageBonus;
-            CheckScoreMilestones();
+            bossClearDelayTimer_ = 1.05f;
         }
         
         enemyBullets_.clear();
@@ -1294,7 +1314,7 @@ void Game::UpdatePlaying(float dt) {
         audio_.PlayBomb();
         if (!commsBombUsed_) {
             commsBombUsed_ = true;
-            QueueComms(CommsSpeaker::Shade, "Good burst. Expensive burst.", "Try not to make Nix cry.", 2, 2.7f);
+            QueueComms(CommsSpeaker::Shade, "That bought you three seconds.", "Use them.", 2, 2.4f);
         }
     } else if (bombRequested && player_.bombs <= 0 && !demoMode_) {
         audio_.PlayDenied();
@@ -1329,7 +1349,7 @@ void Game::UpdatePlaying(float dt) {
         audio_.PlayBossWarning();
         if (!commsBossEntrance_) {
             commsBossEntrance_ = true;
-            QueueComms(CommsSpeaker::Control, "Carrier silhouette dropping in!", "All channels clear for boss contact.", 4, 2.8f);
+            QueueComms(CommsSpeaker::Control, "Gate signature ahead.", "That is not a drone.", 4, 2.7f);
         }
     }
 
@@ -1381,7 +1401,7 @@ void Game::UpdatePlaying(float dt) {
             audio_.PlayBossPhaseChange();
             if (!commsBossBreach_) {
                 commsBossBreach_ = true;
-                QueueComms(CommsSpeaker::Wrench, "That carrier’s core is exposed!", "Hit the bright wound!", 5, 3.0f);
+                QueueComms(CommsSpeaker::Wrench, "Armor breach!", "I see the core!", 5, 2.6f);
             }
             break;
         }
@@ -1416,7 +1436,7 @@ void Game::UpdatePlaying(float dt) {
         }
         enemyBullets_.clear();
         audio_.PlayBossDefeat();
-        effects_.AddText(bossDeathPos_, "CORE COLLAPSE IMMINENT", GOLD);
+        effects_.AddText(bossDeathPos_, "CORE COLLAPSE", GOLD);
     }
 
     // Low-life ticking audio warning while the player is in danger.
@@ -2133,11 +2153,11 @@ void Game::HandleCollisions() {
         if (!commsPickup_ && !isMedal) {
             commsPickup_ = true;
             if (p.type == PowerupType::Upgrade) {
-                QueueComms(CommsSpeaker::Wrench, "Power route is stable.", "Solace-IX likes that one.", 2, 2.5f);
+                QueueComms(CommsSpeaker::Wrench, "Output’s cleaner.", "SOLACE still answers.", 2, 2.5f);
             } else if (p.type == PowerupType::Bomb) {
-                QueueComms(CommsSpeaker::Control, "Bomb capsule loaded.", "Use it before pride gets loud.", 2, 2.5f);
+                QueueComms(CommsSpeaker::Control, "Bomb capsule loaded.", "Save it for the ugly part.", 2, 2.5f);
             } else {
-                QueueComms(CommsSpeaker::Shade, "Weapon swap online.", "Pick a mood and commit.", 2, 2.5f);
+                QueueComms(CommsSpeaker::Shade, "New teeth.", "Same stubborn pilot.", 2, 2.5f);
             }
         }
     }
@@ -2178,6 +2198,7 @@ const Enemy* Game::ActiveBoss() const {
 void Game::ResetStorySystems() {
     bossStoryState_ = BossStoryState::None;
     lastBossAttackPhase_ = -1;
+    for (bool& shown : bossAttackShown_) shown = false;
     bossDialogueStarted_ = false;
     commsFirstWave_ = false;
     commsUpperLane_ = false;
@@ -2204,10 +2225,10 @@ void Game::StartBossDialogue() {
     bossWarningKlaxonTimer_ = 0.0f;
     audio_.PlayBossWarning();
     bossDialogue_.Begin({
-        {"ACE", "Vantage-9, unlock the lane. Civilians are still below us.", CommsSpeaker::Ace},
-        {"VANTAGE-9", "Unauthorized ace detected. Elegant vector. Unacceptable intent.", CommsSpeaker::Boss},
-        {"SHADE", "That thing just complimented your flight path. Weirdly jealous.", CommsSpeaker::Shade},
-        {"VANTAGE-9", "Orbital Gatekeeper engaging. Your sky ends here.", CommsSpeaker::Boss}
+        {"ACE", "Route’s closed. I’ll cut one.", CommsSpeaker::Ace},
+        {"VANTAGE-9", "UNREGISTERED ACE DETECTED. SOLACE SIGNATURE: OBSOLETE.", CommsSpeaker::Boss},
+        {"SHADE", "Good news: it hates you specifically.", CommsSpeaker::Shade},
+        {"VANTAGE-9", "SKY CIRCUIT ACCESS DENIED. MEMORY OF FLIGHT: REVOKED.", CommsSpeaker::Boss}
     });
 }
 
@@ -2228,7 +2249,6 @@ void Game::UpdateBossStory(float dt) {
                 lastBossAttackPhase_ = -1;
                 ShowBossAttackTitleIfChanged();
                 effects_.AddText({boss->pos.x, boss->pos.y + 55.0f}, "DUEL START", GOLD);
-                QueueComms(CommsSpeaker::Control, "Boss energy spike. Move!", "", 4, 2.2f);
             }
         }
     }
@@ -2238,13 +2258,23 @@ void Game::ShowBossAttackTitleIfChanged() {
     const Enemy* boss = ActiveBoss();
     if (!boss || bossStoryState_ != BossStoryState::Combat) return;
     int phase = static_cast<int>(boss->BossPhase());
-    if (phase <= 0 || phase == lastBossAttackPhase_) return;
+    if (phase <= 0 || phase >= 5 || phase == lastBossAttackPhase_) return;
     lastBossAttackPhase_ = phase;
+    if (bossAttackShown_[phase]) return;
+    bossAttackShown_[phase] = true;
     bossAttackName_.Show(boss->BossAttackTitle());
     audio_.PlayBossPhaseChange();
-    if (boss->BossPhase() == BossAttackPhase::Overload && !commsBossFinal_) {
+
+    if (boss->BossPhase() == BossAttackPhase::AzureNeedle) {
+        QueueComms(CommsSpeaker::Boss, "ACCESS DENIED.", "GATE LAW: DESCEND.", 5, 2.4f);
+    } else if (boss->BossPhase() == BossAttackPhase::FallingStar) {
+        QueueComms(CommsSpeaker::Control, "Gate lattice forming.", "Read the gaps, not the glow.", 4, 2.7f);
+    } else if (boss->BossPhase() == BossAttackPhase::BrokenHalo) {
+        QueueComms(CommsSpeaker::Boss, "PILOT MEMORY INVALID.", "WHITE HALO DENIAL.", 5, 2.5f);
+    } else if (boss->BossPhase() == BossAttackPhase::Overload && !commsBossFinal_) {
         commsBossFinal_ = true;
-        QueueComms(CommsSpeaker::Wrench, "Final pattern incoming!", "Solace-IX heat is climbing!", 5, 2.8f);
+        audio_.SetMusicDucked(true);
+        QueueComms(CommsSpeaker::Boss, "FINAL GATE LAW:", "COLLAPSE.", 5, 2.5f);
     }
 }
 
@@ -2262,19 +2292,19 @@ void Game::UpdateCommsEvents(float dt) {
 
     if (!commsFirstWave_ && stageTime_ > 0.75f) {
         commsFirstWave_ = true;
-        QueueComms(CommsSpeaker::Control, "Ace, you’re entering the Sky Circuit.", "Keep your line clean.", 2, 3.0f);
+        QueueComms(CommsSpeaker::Ace, "Keep the channel open.", "I’m going in.", 2, 2.7f);
     }
-    if (!commsUpperLane_ && stageTime_ > 7.0f && !bossSpawned_) {
+    if (!commsUpperLane_ && stageTime_ > 5.2f && !bossSpawned_) {
         commsUpperLane_ = true;
-        QueueComms(CommsSpeaker::Shade, "Enemy lock-ons from the upper lane!", "Try not to autograph them.", 2, 2.8f);
+        QueueComms(CommsSpeaker::Control, "Upper lane is hostile.", "Keep low.", 2, 2.4f);
     }
     if (!commsBreakThrough_ && stageTime_ > 18.0f && !bossSpawned_) {
         commsBreakThrough_ = true;
-        QueueComms(CommsSpeaker::Control, "Don’t chase the drones.", "Break through the lane.", 2, 2.7f);
+        QueueComms(CommsSpeaker::Shade, "You always pick the locked door.", "Don’t drift admiring it.", 2, 2.7f);
     }
     if (!commsLowHealth_ && player_.lives <= 1) {
         commsLowHealth_ = true;
-        QueueComms(CommsSpeaker::Wrench, "Solace-IX is barely holding!", "One clean dodge at a time.", 4, 3.0f);
+        QueueComms(CommsSpeaker::Wrench, "SOLACE is heating fast.", "Ease the frame, Liora.", 4, 3.0f);
     }
 }
 
@@ -2573,6 +2603,23 @@ void Game::DrawBackground() const {
     DrawCircleGradient(120, (int)nY1, 260, nebulaColor1, Fade(BLACK, 0.0f));
     DrawCircleGradient(360, (int)nY2, 340, nebulaColor2, Fade(BLACK, 0.0f));
     DrawCircleGradient(200, (int)(nY2 - ScreenH), 290, nebulaColor3, Fade(BLACK, 0.0f));
+
+    // 1a. Faint orbital gate silhouette: the stage's recurring denial icon.
+    if (bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
+        float gateAlpha = BossAlive() ? 0.18f : 0.11f;
+        float gatePulse = 0.5f + 0.5f * std::sin((float)GetTime() * 1.8f);
+        Vector2 gateCenter = {240.0f, 128.0f};
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRing(gateCenter, 124.0f, 128.0f, 0.0f, 360.0f, 64, Fade(Color{90, 210, 255, 255}, gateAlpha));
+        DrawRing(gateCenter, 92.0f, 94.0f, 0.0f, 360.0f, 64, Fade(Color{255, 86, 120, 255}, gateAlpha * 0.42f));
+        for (int i = 0; i < 8; ++i) {
+            float a = ((float)i / 8.0f) * PI * 2.0f + (float)GetTime() * 0.14f;
+            Vector2 p1 = {gateCenter.x + std::cos(a) * 95.0f, gateCenter.y + std::sin(a) * 95.0f};
+            Vector2 p2 = {gateCenter.x + std::cos(a) * 126.0f, gateCenter.y + std::sin(a) * 126.0f};
+            DrawLineEx(p1, p2, 2.0f, Fade(Color{90, 210, 255, 255}, gateAlpha * (0.55f + gatePulse * 0.45f)));
+        }
+        EndBlendMode();
+    }
 
     // 1b. Layer 1b: Sweeping Background Industrial Searchlights (Stage Phase 3 / Boss Alert)
     if (beat >= 60 || bossWarningTimer_ > 0.0f || BossAlive()) {

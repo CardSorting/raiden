@@ -351,9 +351,9 @@ void Player::Draw(bool debug) const {
     float tiltOffset = -tilt_ * 3.2f;
 
     if (!blink) {
-        Color plumeColor1 = focusMode ? Color{0, 150, 255, 148} : Color{255, 100, 0, 152};
-        Color plumeColor2 = focusMode ? Color{100, 220, 255, 205} : Color{255, 220, 0, 205};
-        Color glowColor = focusMode ? SKYBLUE : ORANGE;
+        Color plumeColor1 = focusMode ? Color{0, 150, 255, 148} : Color{78, 214, 255, 168};
+        Color plumeColor2 = focusMode ? Color{100, 220, 255, 205} : Color{190, 126, 255, 205};
+        Color glowColor = focusMode ? SKYBLUE : Color{82, 230, 255, 255};
 
         // Emissive engine exhaust bloom (additive circular gradients)
         BeginBlendMode(BLEND_ADDITIVE);
@@ -414,8 +414,10 @@ void Player::Draw(bool debug) const {
                 Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
                 Rectangle dest = { ghostPos.x, ghostPos.y + recoilOffset_, (float)tex.width * 1.5f, (float)tex.height * 1.5f * scaleY_ };
                 Vector2 origin = { (float)tex.width * 1.5f / 2.0f, (float)tex.height * 1.5f * scaleY_ / 2.0f };
-                Color trailColor = Fade(SKYBLUE, alpha);
+                Color trailColor = Fade(i == 1 ? Color{88, 226, 255, 255} : Color{174, 116, 255, 255}, alpha);
                 SpriteManager::Instance().DrawRect(spriteId, src, dest, origin, 0.0f, trailColor);
+                DrawLineEx({ghostPos.x, ghostPos.y + 8.0f}, {ghostPos.x - 11.0f, ghostPos.y + 20.0f}, 1.4f, Fade(Color{88, 226, 255, 255}, alpha * 0.75f));
+                DrawLineEx({ghostPos.x, ghostPos.y + 8.0f}, {ghostPos.x + 11.0f, ghostPos.y + 20.0f}, 1.4f, Fade(Color{174, 116, 255, 255}, alpha * 0.75f));
             }
         }
         EndBlendMode();

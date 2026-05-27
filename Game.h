@@ -156,6 +156,7 @@ private:
     enum class BossStoryState { None, Entrance, Dialogue, Combat };
     BossStoryState bossStoryState_ = BossStoryState::None;
     int lastBossAttackPhase_ = -1;
+    bool bossAttackShown_[5]{};
     bool bossDialogueStarted_ = false;
     bool commsFirstWave_ = false;
     bool commsUpperLane_ = false;
@@ -218,6 +219,7 @@ private:
     float bossWarningKlaxonTimer_ = 0.0f;
     float bossDeathTimer_ = 0.0f;
     float bossDeathExplosionTimer_ = 0.0f;
+    float bossClearDelayTimer_ = 0.0f;
     Vector2 bossDeathPos_{};
     float lowLifeAudioTimer_ = 0.0f;
     float enemyShotAudioTimer_ = 0.0f;
