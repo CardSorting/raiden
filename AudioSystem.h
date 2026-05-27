@@ -59,6 +59,7 @@ public:
         Victory,
         AttractShimmer,
         Denied,
+        SettingsTick,
         Count
     };
 
@@ -78,6 +79,7 @@ public:
     void StopMusic();
 
     void PlayPlayerShot(WeaponType weapon);
+    void PlayPlayerShotAt(WeaponType weapon, int weaponLevel, float x, float screenWidth);
     void PlayEnemyShot(EnemyShotType type);
     void PlayEnemyShotAt(EnemyShotType type, float x, float screenWidth);
     void PlayExplosion(ExplosionSize size);

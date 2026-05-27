@@ -206,6 +206,7 @@ void Game::Update(float dt) {
         debug_ = !debug_;
         hitboxOverlayEnabled_ = debug_;
         SaveSettings();
+        audio_.PlaySettingsTick();
     }
     
     scrollA_ += (80.0f + loop_ * 6.0f) * dt;
@@ -637,7 +638,7 @@ void Game::UpdatePlaying(float dt) {
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
     if (playerBullets_.size() > before) {
-        audio_.PlayPlayerShot(player_.weapon);
+        audio_.PlayPlayerShotAt(player_.weapon, player_.weaponLevel, player_.pos.x, (float)ScreenW);
     }
 
     bool bombRequested = player_.BombPressed();
@@ -804,6 +805,7 @@ void Game::UpdateSettings() {
                     bgmVolume_ = vol;
                     SaveSettings();
                     ApplyVolumeSettings();
+                    audio_.PlaySettingsTick();
                 }
             }
         }
@@ -905,6 +907,7 @@ void Game::UpdateSettings() {
     } else if (settingsSelection_ == 8) {
         if (keyConfirm) {
             clearScoresSelection_ = 0;
+            audio_.PlayMenuConfirm();
             StartTransition(State::ClearScoresConfirm);
         }
     } else if (settingsSelection_ == 9) {

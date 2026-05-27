@@ -72,6 +72,7 @@ constexpr ExportCueSpec ExportCues[] = {
     { AudioSystem::Cue::Victory, "victory", 1 },
     { AudioSystem::Cue::AttractShimmer, "attract_shimmer", 1 },
     { AudioSystem::Cue::Denied, "denied", 2 },
+    { AudioSystem::Cue::SettingsTick, "settings_tick", 3 },
 };
 
 constexpr ExportMusicSpec ExportMusic[] = {
@@ -629,30 +630,41 @@ Wave MakeExtraLife() {
     return w;
 }
 
-Wave MakeMenuMove() {
+Wave MakeMenuMove(int variant) {
     float phase = 0.0f;
-    return MakeWave(0.042f, [&](float t, int) mutable {
-        float k = t / 0.042f;
-        phase += (980.0f + 260.0f * k) / (float)SampleRate;
-        return OscTriangle(phase) * PercEnv(t, 0.042f, 0.001f, 1.7f) * 0.48f;
+    float clickPhase = 0.17f;
+    float base = 920.0f + (float)(variant % 4) * 70.0f;
+    return MakeWave(0.046f, [=](float t, int) mutable {
+        float k = t / 0.046f;
+        phase += (base + 340.0f * k) / (float)SampleRate;
+        clickPhase += (base * 2.0f + 120.0f * (float)variant) / (float)SampleRate;
+        float snap = (k < 0.18f ? 1.0f - k / 0.18f : 0.0f) * OscSquare(clickPhase, 0.18f) * 0.13f;
+        return (OscTriangle(phase) * 0.45f + snap) * PercEnv(t, 0.046f, 0.001f, 1.55f);
     });
 }
 
-Wave MakeMenuConfirm() {
+Wave MakeMenuConfirm(int variant) {
     float phase = 0.0f;
-    return MakeWave(0.17f, [&](float t, int) mutable {
-        int note = t < 0.055f ? 72 : (t < 0.105f ? 76 : 79);
+    float low = 0.31f;
+    return MakeWave(0.18f, [=](float t, int) mutable {
+        int shift = variant % 2;
+        int note = t < 0.055f ? 72 + shift : (t < 0.11f ? 76 + shift : 79 + shift);
         phase += MidiNote(note) / (float)SampleRate;
-        return (OscSquare(phase, 0.42f) * 0.26f + OscSine(phase * 2.0f) * 0.14f) * PercEnv(t, 0.17f, 0.003f, 1.25f);
+        low += MidiNote(note - 24) / (float)SampleRate;
+        return (OscSquare(phase, 0.42f) * 0.25f + OscSine(phase * 2.0f) * 0.13f + OscTriangle(low) * 0.11f) *
+               PercEnv(t, 0.18f, 0.003f, 1.12f);
     });
 }
 
-Wave MakeMenuCancel() {
+Wave MakeMenuCancel(int variant) {
     float phase = 0.0f;
-    return MakeWave(0.15f, [&](float t, int) mutable {
-        float k = t / 0.15f;
-        phase += (520.0f + (260.0f - 520.0f) * k) / (float)SampleRate;
-        return OscTriangle(phase) * PercEnv(t, 0.15f, 0.004f, 1.6f) * 0.44f;
+    float edge = 0.42f;
+    float start = 560.0f - (float)(variant % 2) * 45.0f;
+    return MakeWave(0.16f, [=](float t, int) mutable {
+        float k = t / 0.16f;
+        phase += PitchSweep(start, 210.0f, k, 0.88f) / (float)SampleRate;
+        edge += PitchSweep(start * 1.5f, 360.0f, k, 1.2f) / (float)SampleRate;
+        return (OscTriangle(phase) * 0.40f + OscSquare(edge, 0.30f) * 0.10f) * PercEnv(t, 0.16f, 0.004f, 1.45f);
     });
 }
 
@@ -726,12 +738,15 @@ Wave MakeBonusTick(int variant) {
     });
 }
 
-Wave MakeHighScoreTick() {
+Wave MakeHighScoreTick(int variant) {
     // Character entry tick: tiny glassy selector sound.
     float p = 0.0f;
-    return MakeWave(0.045f, [&](float t, int) mutable {
-        p += 1480.0f / (float)SampleRate;
-        return OscSine(p) * PercEnv(t, 0.045f, 0.001f, 1.5f) * 0.34f;
+    float b = 0.21f;
+    return MakeWave(0.052f, [=](float t, int) mutable {
+        float hz = 1420.0f + (float)(variant % 2) * 180.0f;
+        p += hz / (float)SampleRate;
+        b += hz * 1.5f / (float)SampleRate;
+        return (OscSine(p) * 0.30f + OscTriangle(b) * 0.08f) * PercEnv(t, 0.052f, 0.001f, 1.45f);
     });
 }
 
@@ -855,12 +870,29 @@ Wave MakeAttractShimmer() {
     });
 }
 
-Wave MakeDenied() {
+Wave MakeDenied(int variant) {
     float phase = 0.0f;
-    return MakeWave(0.20f, [&](float t, int) mutable {
-        float hz = t < 0.09f ? 180.0f : 145.0f;
+    unsigned int seed = 0xD311u + (unsigned int)variant * 91u;
+    return MakeWave(0.22f, [=](float t, int) mutable {
+        float hz = t < 0.09f ? 190.0f - (float)variant * 12.0f : 138.0f - (float)variant * 8.0f;
         phase += hz / (float)SampleRate;
-        return OscSquare(phase, 0.34f) * PercEnv(t, 0.20f, 0.003f, 1.2f) * 0.38f;
+        float staticClick = (t < 0.018f ? 1.0f - t / 0.018f : 0.0f) * Noise(seed) * 0.11f;
+        return (OscSquare(phase, 0.34f) * 0.38f + staticClick) * PercEnv(t, 0.22f, 0.003f, 1.18f);
+    });
+}
+
+Wave MakeSettingsTick(int variant) {
+    float tone = 0.0f;
+    float relay = 0.33f;
+    unsigned int seed = 0x5E77u + (unsigned int)variant * 37u;
+    float base = 720.0f + (float)(variant % 3) * 58.0f;
+    return MakeWave(0.064f, [=](float t, int) mutable {
+        float k = t / 0.064f;
+        tone += PitchSweep(base, base * 1.22f, k, 0.72f) / (float)SampleRate;
+        relay += (base * 2.0f) / (float)SampleRate;
+        float contact = (k < 0.22f ? 1.0f - k / 0.22f : 0.0f) * Noise(seed) * 0.08f;
+        return (OscTriangle(tone) * 0.30f + OscSquare(relay, 0.16f) * 0.10f + contact) *
+               PercEnv(t, 0.064f, 0.001f, 1.25f);
     });
 }
 
@@ -890,16 +922,16 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::ScoreMilestone: return MakeScoreMilestone();
         case AudioSystem::Cue::FormationBonus: return MakeFormationBonus();
         case AudioSystem::Cue::ExtraLife: return MakeExtraLife();
-        case AudioSystem::Cue::MenuMove: return MakeMenuMove();
-        case AudioSystem::Cue::MenuConfirm: return MakeMenuConfirm();
-        case AudioSystem::Cue::MenuCancel: return MakeMenuCancel();
+        case AudioSystem::Cue::MenuMove: return MakeMenuMove(variant);
+        case AudioSystem::Cue::MenuConfirm: return MakeMenuConfirm(variant);
+        case AudioSystem::Cue::MenuCancel: return MakeMenuCancel(variant);
         case AudioSystem::Cue::InsertCoin: return MakeInsertCoin();
         case AudioSystem::Cue::PressStart: return MakePressStart();
         case AudioSystem::Cue::Pause: return MakePause();
         case AudioSystem::Cue::Resume: return MakeResume();
         case AudioSystem::Cue::ContinueTick: return MakeContinueTick();
         case AudioSystem::Cue::BonusTick: return MakeBonusTick(variant);
-        case AudioSystem::Cue::HighScoreTick: return MakeHighScoreTick();
+        case AudioSystem::Cue::HighScoreTick: return MakeHighScoreTick(variant);
         case AudioSystem::Cue::HighScoreEntry: return MakeHighScoreEntry();
         case AudioSystem::Cue::StageStart: return MakeStageStart();
         case AudioSystem::Cue::StageClear: return MakeStageClear();
@@ -909,7 +941,8 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::LowLife: return MakeLowLife();
         case AudioSystem::Cue::Victory: return MakeVictory();
         case AudioSystem::Cue::AttractShimmer: return MakeAttractShimmer();
-        case AudioSystem::Cue::Denied: return MakeDenied();
+        case AudioSystem::Cue::Denied: return MakeDenied(variant);
+        case AudioSystem::Cue::SettingsTick: return MakeSettingsTick(variant);
         case AudioSystem::Cue::Count: break;
     }
     return {};
@@ -1093,6 +1126,7 @@ void AudioSystem::LoadCues() {
     soundsReady_ &= AddCue(Cue::Victory, Category::UI, Priority::Critical, 0.95f, 0.8f, 1);
     soundsReady_ &= AddCue(Cue::AttractShimmer, Category::UI, Priority::Low, 0.35f, 1.8f, 1);
     soundsReady_ &= AddCue(Cue::Denied, Category::UI, Priority::Normal, 0.68f, 0.1f, 2);
+    soundsReady_ &= AddCue(Cue::SettingsTick, Category::UI, Priority::Low, 0.46f, 0.018f, 3);
 
     std::array<MusicTrack, 3> tracks = { MusicTrack::Title, MusicTrack::Stage, MusicTrack::Boss };
     for (int i = 0; i < 3; ++i) {
@@ -1395,7 +1429,7 @@ void AudioSystem::PlayCue(Cue cue, float pitch, float gain, float pan) {
         ++runtimePressureDrops_;
         return;
     }
-    if (bank.priority == Priority::Normal && (activeVoices >= 15 || activeInCategory > VoiceBudget(bank.category))) {
+    if (bank.priority == Priority::Normal && (activeVoices >= MaxSfxVoices || activeInCategory > VoiceBudget(bank.category))) {
         ++runtimePressureDrops_;
         return;
     }
@@ -1481,15 +1515,31 @@ void AudioSystem::StopMusic() {
 }
 
 void AudioSystem::PlayPlayerShot(WeaponType weapon) {
+    PlayPlayerShotAt(weapon, 1, 0.5f, 1.0f);
+}
+
+void AudioSystem::PlayPlayerShotAt(WeaponType weapon, int weaponLevel, float x, float screenWidth) {
+    int level = std::clamp(weaponLevel, 1, 4);
+    float pan = PositionPan(x, screenWidth, Category::Player);
+    float levelGain = 0.92f + (float)(level - 1) * 0.045f;
     switch (weapon) {
         case WeaponType::Vulcan:
-            PlayCue(Cue::VulcanShot, RandomRange(0.97f, 1.04f), RandomRange(0.86f, 1.0f));
+            PlayCue(Cue::VulcanShot,
+                    RandomRange(0.98f, 1.055f) - (float)(level - 1) * 0.006f,
+                    RandomRange(0.86f, 1.0f) * levelGain,
+                    pan);
             break;
         case WeaponType::Plasma:
-            PlayCue(Cue::PlasmaShot, RandomRange(0.96f, 1.03f), RandomRange(0.9f, 1.04f));
+            PlayCue(Cue::PlasmaShot,
+                    RandomRange(0.94f, 1.02f) - (float)(level - 1) * 0.018f,
+                    RandomRange(0.90f, 1.05f) * (0.96f + (float)(level - 1) * 0.06f),
+                    pan);
             break;
         case WeaponType::Missile:
-            PlayCue(Cue::MissileLaunch, RandomRange(0.95f, 1.04f), RandomRange(0.9f, 1.05f));
+            PlayCue(Cue::MissileLaunch,
+                    RandomRange(0.94f, 1.04f) - (float)(level - 1) * 0.01f,
+                    RandomRange(0.90f, 1.06f) * (0.95f + (float)(level - 1) * 0.055f),
+                    pan);
             break;
     }
 }
@@ -1639,7 +1689,7 @@ void AudioSystem::PlayBossDefeat() {
 void AudioSystem::PlayLowLifeWarning() { PlayCue(Cue::LowLife); }
 void AudioSystem::PlayAttractShimmer() { PlayCue(Cue::AttractShimmer); }
 void AudioSystem::PlayDenied() { PlayCue(Cue::Denied); }
-void AudioSystem::PlaySettingsTick() { PlayCue(Cue::VulcanShot, 1.08f, 0.62f); }
+void AudioSystem::PlaySettingsTick() { PlayCue(Cue::SettingsTick, RandomRange(0.98f, 1.06f), 0.88f); }
 
 void AudioSystem::RunChaosAudit(float seconds) {
     if (!Ready()) return;
