@@ -509,6 +509,23 @@ Wave MakeScoreMilestone() {
     });
 }
 
+Wave MakeFormationBonus() {
+    // Group-clear reward: mechanical payout plus bright flourish, bigger than a medal but shorter than extra life.
+    unsigned int seed = 0xF0B0u;
+    float lead = 0.0f;
+    float relay = 0.25f;
+    constexpr int notes[6] = { 67, 72, 76, 79, 84, 91 };
+    return MakeWave(0.56f, [&](float t, int) mutable {
+        int idx = std::clamp((int)(t / 0.075f), 0, 5);
+        float local = std::fmod(t, 0.075f);
+        lead += MidiNote(notes[idx]) / (float)SampleRate;
+        relay += PitchSweep(420.0f, 1180.0f, t / 0.56f, 1.2f) / (float)SampleRate;
+        float clickGate = (std::sin(t * Pi2 * 23.0f) > 0.45f) ? 1.0f : 0.0f;
+        float click = (OscSquare(relay, 0.18f) + Noise(seed) * 0.35f) * clickGate * std::exp(-t * 4.0f) * 0.15f;
+        return OscSquare(lead, 0.43f) * PercEnv(local, 0.075f, 0.003f, 0.85f) * 0.30f + click;
+    });
+}
+
 Wave MakeExtraLife() {
     // Rare extra-life signature: unmistakable, longer major arpeggio with echo baked into the sample.
     float p = 0.0f;
@@ -611,6 +628,23 @@ Wave MakeContinueTick() {
     return MakeWave(0.075f, [&](float t, int) mutable {
         p += 440.0f / (float)SampleRate;
         return OscSquare(p, 0.30f) * PercEnv(t, 0.075f, 0.001f, 1.4f) * 0.36f;
+    });
+}
+
+Wave MakeBonusTick(int variant) {
+    // Stage-clear payout tick: bright counter relay with a little metal, built to stack quickly.
+    unsigned int seed = 0xB07Au + (unsigned int)variant * 73u;
+    float tone = 0.0f;
+    float bell = 0.23f;
+    OnePoleHighPass hp;
+    return MakeWave(0.082f, [=](float t, int) mutable {
+        float k = t / 0.082f;
+        float base = 760.0f + (float)(variant % 4) * 46.0f;
+        tone += PitchSweep(base, base * 1.38f, k, 0.7f) / (float)SampleRate;
+        bell += (base * 2.01f) / (float)SampleRate;
+        float strike = hp.Process(Noise(seed), 1700.0f) * (k < 0.20f ? 1.0f - k / 0.20f : 0.0f) * 0.18f;
+        return (OscTriangle(tone) * 0.34f + OscSine(bell) * 0.15f + strike) *
+               PercEnv(t, 0.082f, 0.001f, 1.15f);
     });
 }
 
@@ -776,6 +810,7 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::PickupBomb: return MakePickupBomb();
         case AudioSystem::Cue::PickupMedal: return MakePickupMedal();
         case AudioSystem::Cue::ScoreMilestone: return MakeScoreMilestone();
+        case AudioSystem::Cue::FormationBonus: return MakeFormationBonus();
         case AudioSystem::Cue::ExtraLife: return MakeExtraLife();
         case AudioSystem::Cue::MenuMove: return MakeMenuMove();
         case AudioSystem::Cue::MenuConfirm: return MakeMenuConfirm();
@@ -785,6 +820,7 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::Pause: return MakePause();
         case AudioSystem::Cue::Resume: return MakeResume();
         case AudioSystem::Cue::ContinueTick: return MakeContinueTick();
+        case AudioSystem::Cue::BonusTick: return MakeBonusTick(variant);
         case AudioSystem::Cue::HighScoreTick: return MakeHighScoreTick();
         case AudioSystem::Cue::HighScoreEntry: return MakeHighScoreEntry();
         case AudioSystem::Cue::StageStart: return MakeStageStart();
@@ -926,6 +962,7 @@ void AudioSystem::LoadCues() {
     soundsReady_ &= AddCue(Cue::PickupBomb, Category::Pickup, Priority::High, 0.82f, 0.08f, 1);
     soundsReady_ &= AddCue(Cue::PickupMedal, Category::Pickup, Priority::Normal, 0.76f, 0.035f, 4);
     soundsReady_ &= AddCue(Cue::ScoreMilestone, Category::Pickup, Priority::High, 0.72f, 0.3f, 1);
+    soundsReady_ &= AddCue(Cue::FormationBonus, Category::Pickup, Priority::High, 0.78f, 0.18f, 1);
     soundsReady_ &= AddCue(Cue::ExtraLife, Category::Pickup, Priority::Critical, 0.94f, 1.0f, 1);
     soundsReady_ &= AddCue(Cue::MenuMove, Category::UI, Priority::Normal, 0.54f, 0.025f, 4);
     soundsReady_ &= AddCue(Cue::MenuConfirm, Category::UI, Priority::Normal, 0.74f, 0.04f, 2);
@@ -935,6 +972,7 @@ void AudioSystem::LoadCues() {
     soundsReady_ &= AddCue(Cue::Pause, Category::UI, Priority::High, 0.62f, 0.08f, 1);
     soundsReady_ &= AddCue(Cue::Resume, Category::UI, Priority::High, 0.68f, 0.08f, 1);
     soundsReady_ &= AddCue(Cue::ContinueTick, Category::UI, Priority::Normal, 0.62f, 0.08f, 1);
+    soundsReady_ &= AddCue(Cue::BonusTick, Category::Pickup, Priority::Normal, 0.42f, 0.018f, 4);
     soundsReady_ &= AddCue(Cue::HighScoreTick, Category::UI, Priority::Normal, 0.52f, 0.02f, 2);
     soundsReady_ &= AddCue(Cue::HighScoreEntry, Category::UI, Priority::Critical, 0.92f, 0.8f, 1);
     soundsReady_ &= AddCue(Cue::StageStart, Category::UI, Priority::High, 0.86f, 0.2f, 1);
@@ -1009,7 +1047,9 @@ bool AudioSystem::AddCue(Cue cue, Category category, Priority priority, float ba
 void AudioSystem::Update() {
     if (!Ready() || currentMusic_ == MusicTrack::None) return;
     double now = AudioClockSeconds();
-    float targetMusicGain = now < musicDuckUntil_ ? 0.52f : 1.0f;
+    float targetMusicGain = 1.0f;
+    if (now < musicDuckUntil_) targetMusicGain = std::min(targetMusicGain, 0.52f);
+    if (musicManuallyDucked_) targetMusicGain = std::min(targetMusicGain, 0.38f);
     currentMusicGain_ += (targetMusicGain - currentMusicGain_) * 0.12f;
     ApplyMusicVolume();
 
@@ -1030,6 +1070,10 @@ void AudioSystem::SetVolumes(int sfxVolume, int musicVolume) {
 void AudioSystem::SetMasterVolume(float volume) {
     masterVolume_ = std::clamp(volume, 0.0f, 1.0f);
     ApplyVolumes();
+}
+
+void AudioSystem::SetMusicDucked(bool ducked) {
+    musicManuallyDucked_ = ducked;
 }
 
 void AudioSystem::ApplyVolumes() {
@@ -1153,6 +1197,17 @@ float AudioSystem::RandomPan(Category category) {
     return 0.5f;
 }
 
+float AudioSystem::PositionPan(float x, float screenWidth, Category category) {
+    if (screenWidth <= 1.0f) return RandomPan(category);
+    float normalized = std::clamp(x / screenWidth, 0.0f, 1.0f);
+    float centerBlend = 0.20f;
+    if (category == Category::Pickup) centerBlend = 0.36f;
+    if (category == Category::Enemy) centerBlend = 0.24f;
+    if (category == Category::Explosion) centerBlend = 0.16f;
+    float pan = normalized * (1.0f - centerBlend) + 0.5f * centerBlend;
+    return std::clamp(pan + RandomRange(-0.025f, 0.025f), 0.08f, 0.92f);
+}
+
 bool AudioSystem::StealLowerPriorityVoice(Priority incomingPriority, Category incomingCategory) {
     int incomingRank = PriorityRank(incomingPriority);
     int bestRank = incomingRank;
@@ -1171,25 +1226,36 @@ bool AudioSystem::StealLowerPriorityVoice(Priority incomingPriority, Category in
 
     if (!candidate) return false;
     StopSound(*candidate);
+    ++runtimeStolenVoices_;
     return true;
 }
 
-void AudioSystem::PlayCue(Cue cue, float pitch, float gain) {
+void AudioSystem::ResetRuntimeStats() {
+    runtimePlayed_ = 0;
+    runtimeCooldownDrops_ = 0;
+    runtimePressureDrops_ = 0;
+    runtimeStolenVoices_ = 0;
+}
+
+void AudioSystem::PlayCue(Cue cue, float pitch, float gain, float pan) {
     if (!Ready()) return;
     CueBank& bank = cues_[(size_t)cue];
     if (bank.variants.empty()) return;
 
     double now = AudioClockSeconds();
     if (now - bank.lastPlayed < bank.cooldown && bank.priority != Priority::Critical) {
+        ++runtimeCooldownDrops_;
         return;
     }
 
     int activeVoices = CountPlaying();
     int activeInCategory = CountPlaying(bank.category);
     if (bank.priority == Priority::Low && (activeVoices >= 12 || activeInCategory >= VoiceBudget(bank.category))) {
+        ++runtimePressureDrops_;
         return;
     }
     if (bank.priority == Priority::Normal && (activeVoices >= 15 || activeInCategory > VoiceBudget(bank.category))) {
+        ++runtimePressureDrops_;
         return;
     }
     if (activeVoices >= MaxSfxVoices && bank.priority != Priority::Low && bank.priority != Priority::Normal) {
@@ -1210,17 +1276,22 @@ void AudioSystem::PlayCue(Cue cue, float pitch, float gain) {
     }
 
     if (choice < 0) {
-        if (bank.priority == Priority::Low || bank.priority == Priority::Normal) return;
+        if (bank.priority == Priority::Low || bank.priority == Priority::Normal) {
+            ++runtimePressureDrops_;
+            return;
+        }
         choice = offset;
         StopSound(bank.variants[(size_t)choice]);
+        ++runtimeStolenVoices_;
     }
 
     Sound& sound = bank.variants[(size_t)choice];
     float mixGain = CongestionGain(activeVoices, activeInCategory, bank.priority);
     SetSoundPitch(sound, std::clamp(pitch, 0.25f, 3.0f));
-    SetSoundPan(sound, RandomPan(bank.category));
+    SetSoundPan(sound, pan >= 0.0f ? std::clamp(pan, 0.0f, 1.0f) : RandomPan(bank.category));
     SetSoundVolume(sound, masterVolume_ * bank.baseGain * CategoryGain(bank.category) * CategoryHeadroom(bank.category, bank.priority) * mixGain * std::clamp(gain, 0.0f, 1.4f));
     PlaySound(sound);
+    ++runtimePlayed_;
     bank.lastPlayed = now;
 
     if (bank.priority == Priority::Critical) {
@@ -1245,6 +1316,7 @@ void AudioSystem::PlayMusic(MusicTrack track) {
     if (currentMusic_ == track && track != MusicTrack::None) return;
     StopMusic();
     currentMusic_ = track;
+    musicManuallyDucked_ = false;
     if (track != MusicTrack::None) {
         Sound& music = MusicSound(track);
         SetSoundPitch(music, 1.0f);
@@ -1287,6 +1359,15 @@ void AudioSystem::PlayEnemyShot(EnemyShotType type) {
     }
 }
 
+void AudioSystem::PlayEnemyShotAt(EnemyShotType type, float x, float screenWidth) {
+    float pan = PositionPan(x, screenWidth, Category::Enemy);
+    if (type == EnemyShotType::Strong) {
+        PlayCue(Cue::EnemyStrongShot, RandomRange(0.92f, 1.08f), RandomRange(0.78f, 1.0f), pan);
+    } else {
+        PlayCue(Cue::EnemyBullet, RandomRange(0.93f, 1.1f), RandomRange(0.74f, 0.96f), pan);
+    }
+}
+
 void AudioSystem::PlayExplosion(ExplosionSize size) {
     if (size == ExplosionSize::Small) {
         PlayCue(Cue::ExplosionSmall, RandomRange(0.91f, 1.13f), RandomRange(0.82f, 1.0f));
@@ -1297,7 +1378,21 @@ void AudioSystem::PlayExplosion(ExplosionSize size) {
     }
 }
 
+void AudioSystem::PlayExplosionAt(ExplosionSize size, float x, float screenWidth) {
+    float pan = PositionPan(x, screenWidth, Category::Explosion);
+    if (size == ExplosionSize::Small) {
+        PlayCue(Cue::ExplosionSmall, RandomRange(0.91f, 1.13f), RandomRange(0.82f, 1.0f), pan);
+    } else if (size == ExplosionSize::Medium) {
+        PlayCue(Cue::ExplosionMedium, RandomRange(0.88f, 1.04f), RandomRange(0.92f, 1.08f), pan);
+    } else {
+        PlayCue(Cue::ExplosionLarge, RandomRange(0.92f, 1.02f), RandomRange(0.94f, 1.06f), pan);
+    }
+}
+
 void AudioSystem::PlayBossDamage() { PlayCue(Cue::BossDamage, RandomRange(0.92f, 1.06f), RandomRange(0.78f, 1.0f)); }
+void AudioSystem::PlayBossDamageAt(float x, float screenWidth) {
+    PlayCue(Cue::BossDamage, RandomRange(0.92f, 1.06f), RandomRange(0.78f, 1.0f), PositionPan(x, screenWidth, Category::Explosion));
+}
 void AudioSystem::PlayPlayerHit() { PlayCue(Cue::PlayerHit); }
 void AudioSystem::PlayPlayerDeath() { PlayCue(Cue::PlayerDeath); }
 void AudioSystem::PlayRespawn() { PlayCue(Cue::Respawn); }
@@ -1306,33 +1401,71 @@ void AudioSystem::PlayBombClear() { PlayCue(Cue::BombClear); }
 void AudioSystem::PlayEnemyBullet() { PlayCue(Cue::EnemyBullet, RandomRange(0.93f, 1.1f), RandomRange(0.74f, 0.96f)); }
 void AudioSystem::PlayWeaponSwitch() { PlayCue(Cue::PickupWeaponSwitch, RandomRange(0.98f, 1.04f)); }
 void AudioSystem::PlayWeaponUpgrade() { PlayCue(Cue::PickupWeaponUpgrade); }
+void AudioSystem::PlayMedal(int chain) {
+    int step = std::clamp(chain - 1, 0, 14);
+    float pitch = 0.94f + (float)(step % 8) * 0.045f + (step >= 8 ? 0.08f : 0.0f);
+    float gain = 0.82f + (float)std::min(step, 8) * 0.025f;
+    PlayCue(Cue::PickupMedal, pitch, gain);
+}
+
+void AudioSystem::PlayMedalAt(int chain, float x, float screenWidth) {
+    int step = std::clamp(chain - 1, 0, 14);
+    float pitch = 0.94f + (float)(step % 8) * 0.045f + (step >= 8 ? 0.08f : 0.0f);
+    float gain = 0.82f + (float)std::min(step, 8) * 0.025f;
+    PlayCue(Cue::PickupMedal, pitch, gain, PositionPan(x, screenWidth, Category::Pickup));
+}
+
 void AudioSystem::PlayPickup(PowerupType type) {
     switch (type) {
         case PowerupType::WeaponChange: PlayPickup(PickupType::WeaponSwitch); break;
         case PowerupType::Upgrade: PlayPickup(PickupType::WeaponUpgrade); break;
         case PowerupType::Bomb: PlayPickup(PickupType::Bomb); break;
-        case PowerupType::Medal: PlayPickup(PickupType::Medal); break;
+        case PowerupType::Medal: PlayMedal(1); break;
     }
 }
+void AudioSystem::PlayPickupAt(PowerupType type, float x, float screenWidth) {
+    switch (type) {
+        case PowerupType::WeaponChange: PlayPickupAt(PickupType::WeaponSwitch, x, screenWidth); break;
+        case PowerupType::Upgrade: PlayPickupAt(PickupType::WeaponUpgrade, x, screenWidth); break;
+        case PowerupType::Bomb: PlayPickupAt(PickupType::Bomb, x, screenWidth); break;
+        case PowerupType::Medal: PlayMedalAt(1, x, screenWidth); break;
+    }
+}
+
 void AudioSystem::PlayPickup(PickupType type) {
     switch (type) {
         case PickupType::Powerup: PlayCue(Cue::PickupPowerup, RandomRange(0.97f, 1.06f)); break;
         case PickupType::WeaponSwitch: PlayCue(Cue::PickupWeaponSwitch, RandomRange(0.98f, 1.05f)); break;
         case PickupType::WeaponUpgrade: PlayCue(Cue::PickupWeaponUpgrade); break;
         case PickupType::Bomb: PlayCue(Cue::PickupBomb); break;
-        case PickupType::Medal: PlayCue(Cue::PickupMedal, RandomRange(0.97f, 1.07f)); break;
+        case PickupType::Medal: PlayMedal(1); break;
+    }
+}
+void AudioSystem::PlayPickupAt(PickupType type, float x, float screenWidth) {
+    float pan = PositionPan(x, screenWidth, Category::Pickup);
+    switch (type) {
+        case PickupType::Powerup: PlayCue(Cue::PickupPowerup, RandomRange(0.97f, 1.06f), 1.0f, pan); break;
+        case PickupType::WeaponSwitch: PlayCue(Cue::PickupWeaponSwitch, RandomRange(0.98f, 1.05f), 1.0f, pan); break;
+        case PickupType::WeaponUpgrade: PlayCue(Cue::PickupWeaponUpgrade, 1.0f, 1.0f, pan); break;
+        case PickupType::Bomb: PlayCue(Cue::PickupBomb, 1.0f, 1.0f, pan); break;
+        case PickupType::Medal: PlayMedalAt(1, x, screenWidth); break;
     }
 }
 void AudioSystem::PlayScoreMilestone() { PlayCue(Cue::ScoreMilestone); }
+void AudioSystem::PlayFormationBonus() { PlayCue(Cue::FormationBonus); }
+void AudioSystem::PlayFormationBonusAt(float x, float screenWidth) {
+    PlayCue(Cue::FormationBonus, 1.0f, 1.0f, PositionPan(x, screenWidth, Category::Pickup));
+}
 void AudioSystem::PlayExtraLife() { PlayCue(Cue::ExtraLife); }
 void AudioSystem::PlayMenuMove() { PlayCue(Cue::MenuMove, RandomRange(0.96f, 1.05f)); }
 void AudioSystem::PlayMenuConfirm() { PlayCue(Cue::MenuConfirm); }
 void AudioSystem::PlayMenuCancel() { PlayCue(Cue::MenuCancel); }
 void AudioSystem::PlayInsertCoin() { PlayCue(Cue::InsertCoin); }
 void AudioSystem::PlayPressStart() { PlayCue(Cue::PressStart); }
-void AudioSystem::PlayPause() { PlayCue(Cue::Pause); }
-void AudioSystem::PlayResume() { PlayCue(Cue::Resume); }
+void AudioSystem::PlayPause() { SetMusicDucked(true); PlayCue(Cue::Pause); }
+void AudioSystem::PlayResume() { SetMusicDucked(false); PlayCue(Cue::Resume); }
 void AudioSystem::PlayContinueTick() { PlayCue(Cue::ContinueTick); }
+void AudioSystem::PlayBonusTick(int step) { PlayCue(Cue::BonusTick, 0.92f + (float)(step % 18) * 0.018f, 0.82f); }
 void AudioSystem::PlayHighScoreTick() { PlayCue(Cue::HighScoreTick, RandomRange(0.98f, 1.08f)); }
 void AudioSystem::PlayHighScoreEntry() { StopMusic(); PlayCue(Cue::HighScoreEntry); }
 void AudioSystem::PlayStageStart() { PlayCue(Cue::StageStart); }
@@ -1350,6 +1483,7 @@ void AudioSystem::PlaySettingsTick() { PlayCue(Cue::VulcanShot, 1.08f, 0.62f); }
 
 void AudioSystem::RunChaosAudit(float seconds) {
     if (!Ready()) return;
+    ResetRuntimeStats();
     SetMasterVolume(1.0f);
     SetVolumes(8, 6);
     PlayMusic(MusicTrack::Stage);
@@ -1387,7 +1521,8 @@ void AudioSystem::RunChaosAudit(float seconds) {
             PowerupType type = pickupStep % 4 == 0 ? PowerupType::WeaponChange :
                                pickupStep % 4 == 1 ? PowerupType::Upgrade :
                                pickupStep % 4 == 2 ? PowerupType::Bomb : PowerupType::Medal;
-            PlayPickup(type);
+            if (type == PowerupType::Medal) PlayMedal(pickupStep);
+            else PlayPickup(type);
             ++pickupStep;
             nextPickup += 0.31;
         }
@@ -1399,6 +1534,8 @@ void AudioSystem::RunChaosAudit(float seconds) {
         if (now >= nextUi) {
             PlayMenuMove();
             if (pickupStep % 3 == 0) PlayScoreMilestone();
+            if (pickupStep % 5 == 0) PlayFormationBonus();
+            PlayBonusTick(pickupStep);
             nextUi += 0.42;
         }
         Update();
@@ -1414,5 +1551,7 @@ void AudioSystem::RunChaosAudit(float seconds) {
         Update();
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+    TraceLog(LOG_INFO, "AUDIO AUDIT: played=%d cooldown_drops=%d pressure_drops=%d stolen_voices=%d max_voices=%d",
+             runtimePlayed_, runtimeCooldownDrops_, runtimePressureDrops_, runtimeStolenVoices_, MaxSfxVoices);
     StopMusic();
 }

@@ -46,6 +46,9 @@ private:
     float stageTime_ = 0.0f;
     int loop_ = 1;
     float clearTimer_ = 0.0f;
+    float stageClearTickTimer_ = 0.0f;
+    int stageClearTicksPlayed_ = 0;
+    int stageClearBonus_ = 0;
     float gameOverTimer_ = 0.0f;
     int credits_ = 0;
     int difficulty_ = 0; // 0 = Normal, 1 = Ace
@@ -63,6 +66,7 @@ private:
     AudioSystem audio_;
 
     // Settings
+    int masterVolume_ = 9;
     int sfxVolume_ = 8;
     int bgmVolume_ = 6;
     bool screenShakeEnabled_ = true;
@@ -105,6 +109,8 @@ private:
     Vector2 bossDeathPos_{};
     float lowLifeAudioTimer_ = 0.0f;
     float enemyShotAudioTimer_ = 0.0f;
+    float medalChainTimer_ = 0.0f;
+    int medalChain_ = 0;
 
     // Formation tracking counters
     int formationCount_[10]{};

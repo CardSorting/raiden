@@ -77,6 +77,9 @@ void Game::StartGame() {
     waves_.Reset();
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
+    stageClearTickTimer_ = 0.0f;
+    stageClearTicksPlayed_ = 0;
+    stageClearBonus_ = 0;
     loop_ = 1;
     bossSpawned_ = false;
     bossPhaseChanged_ = false;
@@ -86,6 +89,8 @@ void Game::StartGame() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    medalChainTimer_ = 0.0f;
+    medalChain_ = 0;
     nextScoreMilestone_ = 10000;
     nextExtraLifeScore_ = 50000;
     tutorialTimer_ = 4.0f;
@@ -106,6 +111,9 @@ void Game::ReturnToTitle() {
     waves_.Reset();
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
+    stageClearTickTimer_ = 0.0f;
+    stageClearTicksPlayed_ = 0;
+    stageClearBonus_ = 0;
     loop_ = 1;
     bossSpawned_ = false;
     bossPhaseChanged_ = false;
@@ -116,6 +124,8 @@ void Game::ReturnToTitle() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    medalChainTimer_ = 0.0f;
+    medalChain_ = 0;
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Title;
     
@@ -126,6 +136,9 @@ void Game::NextLoop() {
     ++loop_;
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
+    stageClearTickTimer_ = 0.0f;
+    stageClearTicksPlayed_ = 0;
+    stageClearBonus_ = 0;
     bossSpawned_ = false;
     bossPhaseChanged_ = false;
     bossWarningTimer_ = 0.0f;
@@ -134,6 +147,8 @@ void Game::NextLoop() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    medalChainTimer_ = 0.0f;
+    medalChain_ = 0;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     waves_.Reset();
     player_.bombs = std::min(6, player_.bombs + 1);
@@ -153,6 +168,9 @@ void Game::Update(float dt) {
             credits_++;
             audio_.PlayInsertCoin();
             effects_.AddText({ 240, 320 }, "CREDIT +1", GOLD);
+        } else {
+            audio_.PlayDenied();
+            effects_.AddText({ 240, 320 }, "CREDIT MAX", RED);
         }
     }
 
@@ -477,6 +495,14 @@ void Game::Update(float dt) {
         }
     } else if (state_ == State::StageClear) {
         clearTimer_ += dt;
+        if (clearTimer_ > 0.92f && clearTimer_ < 3.45f && stageClearTicksPlayed_ < 22) {
+            stageClearTickTimer_ -= dt;
+            if (stageClearTickTimer_ <= 0.0f) {
+                stageClearTickTimer_ += 0.115f;
+                audio_.PlayBonusTick(stageClearTicksPlayed_);
+                ++stageClearTicksPlayed_;
+            }
+        }
         bool skipPressed = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         if (IsGamepadAvailable(0)) {
             if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) skipPressed = true;
@@ -574,22 +600,25 @@ void Game::UpdatePlaying(float dt) {
             Vector2 offset = { (float)GetRandomValue(-40, 40), (float)GetRandomValue(-40, 40) };
             effects_.Explosion({ bossDeathPos_.x + offset.x, bossDeathPos_.y + offset.y }, ORANGE, 14);
             effects_.Shake(5.0f, 0.15f);
-            audio_.PlayExplosion(ExplosionSize::Small);
+            audio_.PlayExplosionAt(ExplosionSize::Small, bossDeathPos_.x + offset.x, (float)ScreenW);
         }
         
         if (bossDeathTimer_ <= 0.0f) {
             effects_.Explosion(bossDeathPos_, VIOLET, 85);
             effects_.Shake(14.0f, 0.6f);
-            audio_.PlayExplosion(ExplosionSize::Large);
+            audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
             audio_.PlayStageClear();
             
             state_ = State::StageClear;
             clearTimer_ = 0.0f;
+            stageClearTickTimer_ = 0.0f;
+            stageClearTicksPlayed_ = 0;
             int baseBonus = 2000;
             int livesBonus = player_.lives * 500;
             int bombsBonus = player_.bombs * 200;
             int stageBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
             if (difficulty_ == 1) stageBonus = (stageBonus * 3) / 2;
+            stageClearBonus_ = stageBonus;
             player_.score += stageBonus;
             CheckScoreMilestones();
         }
@@ -600,6 +629,10 @@ void Game::UpdatePlaying(float dt) {
 
     stageTime_ += dt;
     if (tutorialTimer_ > 0.0f) tutorialTimer_ -= dt;
+    if (medalChainTimer_ > 0.0f) {
+        medalChainTimer_ -= dt;
+        if (medalChainTimer_ <= 0.0f) medalChain_ = 0;
+    }
     player_.Update(dt, enemies_, enemyBullets_);
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
@@ -607,12 +640,16 @@ void Game::UpdatePlaying(float dt) {
         audio_.PlayPlayerShot(player_.weapon);
     }
 
+    bool bombRequested = player_.BombPressed();
     if (player_.TryBomb()) {
         enemyBullets_.clear();
         for (auto& e : enemies_) e.Hit(e.IsBoss() ? 28 : 99);
         effects_.Explosion(player_.pos, SKYBLUE, 58);
         effects_.Shake(10.0f, 0.35f);
         audio_.PlayBomb();
+    } else if (bombRequested && player_.bombs <= 0 && !demoMode_) {
+        audio_.PlayDenied();
+        effects_.AddText(player_.pos, "NO BOMBS!", RED);
     }
 
     // Boss warning klaxon timer loop
@@ -660,7 +697,14 @@ void Game::UpdatePlaying(float dt) {
     if (enemyBullets_.size() > beforeBullets) {
         enemyShotAudioTimer_ -= dt;
         if (enemyShotAudioTimer_ <= 0.0f) {
-            audio_.PlayEnemyShot(BossAlive() ? EnemyShotType::Strong : EnemyShotType::Basic);
+            float shotX = 240.0f;
+            int shotCount = 0;
+            for (size_t i = beforeBullets; i < enemyBullets_.size(); ++i) {
+                shotX += enemyBullets_[i].pos.x;
+                ++shotCount;
+            }
+            if (shotCount > 0) shotX /= (float)(shotCount + 1);
+            audio_.PlayEnemyShotAt(BossAlive() ? EnemyShotType::Strong : EnemyShotType::Basic, shotX, (float)ScreenW);
             enemyShotAudioTimer_ = 0.07f;
         }
     }
@@ -726,7 +770,7 @@ void Game::UpdateSettings() {
     settingsLastMouse = mousePos;
     
     if (lastInputType_ == InputType::Mouse && mouseMoved) {
-        for (int i = 0; i < 9; ++i) {
+        for (int i = 0; i < 10; ++i) {
             int y = 145 + i * 30;
             if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                 if (settingsSelection_ != i) {
@@ -740,18 +784,23 @@ void Game::UpdateSettings() {
     // Mouse dragging sliders
     bool mouseDragging = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     if (mouseDragging) {
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 3; ++i) {
             int y = 145 + i * 30;
             if (mousePos.x >= 270 && mousePos.x <= 390 && mousePos.y >= y - 10 && mousePos.y <= y + 20) {
                 settingsSelection_ = i;
                 int vol = (int)((mousePos.x - 280.0f + 5.0f) / 10.0f);
                 vol = std::clamp(vol, 0, 10);
-                if (i == 0 && sfxVolume_ != vol) {
+                if (i == 0 && masterVolume_ != vol) {
+                    masterVolume_ = vol;
+                    SaveSettings();
+                    ApplyVolumeSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 1 && sfxVolume_ != vol) {
                     sfxVolume_ = vol;
                     SaveSettings();
                     ApplyVolumeSettings();
                     audio_.PlaySettingsTick();
-                } else if (i == 1 && bgmVolume_ != vol) {
+                } else if (i == 2 && bgmVolume_ != vol) {
                     bgmVolume_ = vol;
                     SaveSettings();
                     ApplyVolumeSettings();
@@ -762,7 +811,7 @@ void Game::UpdateSettings() {
     
     // Mouse clicks
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        for (int i = 0; i < 9; ++i) {
+        for (int i = 0; i < 10; ++i) {
             int y = 145 + i * 30;
             if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                 settingsSelection_ = i;
@@ -772,17 +821,28 @@ void Game::UpdateSettings() {
     }
     
     if (keyUp) {
-        settingsSelection_ = (settingsSelection_ + 8) % 9;
+        settingsSelection_ = (settingsSelection_ + 9) % 10;
         audio_.PlayMenuMove();
     }
     if (keyDown) {
-        settingsSelection_ = (settingsSelection_ + 1) % 9;
+        settingsSelection_ = (settingsSelection_ + 1) % 10;
         audio_.PlayMenuMove();
     }
     
     bool changed = false;
     bool triggerBeep = false;
     if (settingsSelection_ == 0) {
+        if (keyLeft && masterVolume_ > 0) {
+            masterVolume_--;
+            changed = true;
+            triggerBeep = true;
+        }
+        if (keyRight && masterVolume_ < 10) {
+            masterVolume_++;
+            changed = true;
+            triggerBeep = true;
+        }
+    } else if (settingsSelection_ == 1) {
         if (keyLeft && sfxVolume_ > 0) {
             sfxVolume_--;
             changed = true;
@@ -793,7 +853,7 @@ void Game::UpdateSettings() {
             changed = true;
             triggerBeep = true;
         }
-    } else if (settingsSelection_ == 1) {
+    } else if (settingsSelection_ == 2) {
         if (keyLeft && bgmVolume_ > 0) {
             bgmVolume_--;
             changed = true;
@@ -804,7 +864,7 @@ void Game::UpdateSettings() {
             changed = true;
             triggerBeep = true;
         }
-    } else if (settingsSelection_ == 2) {
+    } else if (settingsSelection_ == 3) {
         if (keyLeft || keyRight || keyConfirm) {
             screenShakeEnabled_ = !screenShakeEnabled_;
             changed = true;
@@ -813,28 +873,28 @@ void Game::UpdateSettings() {
                 effects_.Shake(8.0f, 0.25f);
             }
         }
-    } else if (settingsSelection_ == 3) {
+    } else if (settingsSelection_ == 4) {
         if (keyLeft || keyRight || keyConfirm) {
             hitboxOverlayEnabled_ = !hitboxOverlayEnabled_;
             debug_ = hitboxOverlayEnabled_;
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 4) {
+    } else if (settingsSelection_ == 5) {
         if (keyLeft || keyRight || keyConfirm) {
             isFullscreen_ = !isFullscreen_;
             ToggleFullscreen();
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 5) {
+    } else if (settingsSelection_ == 6) {
         if (keyLeft || keyRight || keyConfirm) {
             controlLayout_ = (controlLayout_ + 1) % 2;
             player_.controlLayout = controlLayout_;
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 6) {
+    } else if (settingsSelection_ == 7) {
         if (keyConfirm) {
             ResetSettingsToDefault();
             audio_.PlayMenuConfirm();
@@ -842,12 +902,12 @@ void Game::UpdateSettings() {
             settingsFeedbackText_ = "SETTINGS RESET!";
             settingsFeedbackColor_ = SKYBLUE;
         }
-    } else if (settingsSelection_ == 7) {
+    } else if (settingsSelection_ == 8) {
         if (keyConfirm) {
             clearScoresSelection_ = 0;
             StartTransition(State::ClearScoresConfirm);
         }
-    } else if (settingsSelection_ == 8) {
+    } else if (settingsSelection_ == 9) {
         if (keyConfirm || IsKeyPressed(KEY_ESCAPE)) {
             SaveSettings();
             audio_.PlayMenuConfirm();
@@ -869,6 +929,7 @@ void Game::UpdateSettings() {
 }
 
 void Game::ResetSettingsToDefault() {
+    masterVolume_ = 9;
     sfxVolume_ = 8;
     bgmVolume_ = 6;
     screenShakeEnabled_ = true;
@@ -1195,11 +1256,11 @@ void Game::HandleCollisions() {
                 SpawnDrop(e.pos, e.type);
 
                 if (e.IsBoss()) {
-                    audio_.PlayExplosion(ExplosionSize::Large);
+                    audio_.PlayExplosionAt(ExplosionSize::Large, e.pos.x, (float)ScreenW);
                 } else if (e.type == EnemyType::Turret) {
-                    audio_.PlayExplosion(ExplosionSize::Medium);
+                    audio_.PlayExplosionAt(ExplosionSize::Medium, e.pos.x, (float)ScreenW);
                 } else {
-                    audio_.PlayExplosion(ExplosionSize::Small);
+                    audio_.PlayExplosionAt(ExplosionSize::Small, e.pos.x, (float)ScreenW);
                 }
 
                 if (e.formationId > 0 && e.formationId < 10) {
@@ -1211,14 +1272,14 @@ void Game::HandleCollisions() {
                             player_.score += bonus;
                             effects_.AddText(e.pos, TextFormat("FORMATION BONUS! +%d", bonus), GOLD);
                             powerups_.emplace_back(PowerupType::Medal, e.pos);
-                            audio_.PlayPickup(PowerupType::Medal);
+                            audio_.PlayFormationBonusAt(e.pos.x, (float)ScreenW);
                         }
                     }
                 }
             } else if (e.IsBoss()) {
-                audio_.PlayBossDamage();
+                audio_.PlayBossDamageAt(e.pos.x, (float)ScreenW);
             } else if (e.type == EnemyType::Turret) {
-                audio_.PlayBossDamage();
+                audio_.PlayBossDamageAt(e.pos.x, (float)ScreenW);
             }
             break;
         }
@@ -1291,10 +1352,13 @@ void Game::HandleCollisions() {
         else {
             int scoreGain = (difficulty_ == 1) ? 750 : 500;
             player_.score += scoreGain;
-            effects_.AddText(p.pos, TextFormat("+%d", scoreGain), GOLD);
+            medalChain_ = medalChainTimer_ > 0.0f ? medalChain_ + 1 : 1;
+            medalChainTimer_ = 1.35f;
+            effects_.AddText(p.pos, medalChain_ > 1 ? TextFormat("+%d  x%d", scoreGain, medalChain_) : TextFormat("+%d", scoreGain), GOLD);
             isMedal = true;
         }
-        audio_.PlayPickup(isMedal ? PowerupType::Medal : p.type);
+        if (isMedal) audio_.PlayMedalAt(medalChain_, p.pos.x, (float)ScreenW);
+        else audio_.PlayPickupAt(p.type, p.pos.x, (float)ScreenW);
     }
 }
 
@@ -1892,7 +1956,8 @@ void Game::DrawSettings() const {
     int titleW = MeasureText("USER SETTINGS", 24);
     DrawText("USER SETTINGS", ScreenW / 2 - titleW / 2, 85, 24, GOLD);
 
-    const char* options[9] = {
+    const char* options[10] = {
+        "Master Volume",
         "SFX Volume",
         "Music Volume",
         "Screen Shake",
@@ -1904,7 +1969,7 @@ void Game::DrawSettings() const {
         "Save and Return"
     };
 
-    for (int i = 0; i < 9; ++i) {
+    for (int i = 0; i < 10; ++i) {
         int y = 145 + i * 30;
         bool selected = settingsSelection_ == i;
         
@@ -1917,17 +1982,22 @@ void Game::DrawSettings() const {
         
         if (i == 0) {
             DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + masterVolume_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + masterVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", masterVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
+        } else if (i == 1) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
             DrawLine(280, y + 7, 280 + sfxVolume_ * 10, y + 7, SKYBLUE);
             DrawCircle(280 + sfxVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
             DrawText(TextFormat("%d", sfxVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
-        } else if (i == 1) {
+        } else if (i == 2) {
             DrawLine(280, y + 7, 380, y + 7, GRAY);
             DrawLine(280, y + 7, 280 + bgmVolume_ * 10, y + 7, SKYBLUE);
             DrawCircle(280 + bgmVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
             DrawText(TextFormat("%d", bgmVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
-        } else if (i == 2) {
-            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 15, screenShakeEnabled_ ? LIME : RED);
         } else if (i == 3) {
+            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 15, screenShakeEnabled_ ? LIME : RED);
+        } else if (i == 4) {
             DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 15, hitboxOverlayEnabled_ ? LIME : RED);
             
             // Draw mini player ship preview next to the option (at x = 355)
@@ -1947,16 +2017,16 @@ void Game::DrawSettings() const {
             } else {
                 DrawCircleV(shipPos, 1.5f, DARKGRAY);
             }
-        } else if (i == 4) {
-            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 15, isFullscreen_ ? LIME : RED);
         } else if (i == 5) {
+            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 15, isFullscreen_ ? LIME : RED);
+        } else if (i == 6) {
             DrawText(controlLayout_ == 0 ? "ARROWS" : "WASD", 280, y, 15, controlLayout_ == 0 ? SKYBLUE : GOLD);
         }
     }
  
     // Visual Control Layout Schematic Panel
     int bx = ScreenW / 2 - 180;
-    int by = 434;
+    int by = 462;
     
     DrawRectangle(bx - 10, by - 24, 360, 100, Fade(DARKGRAY, 0.18f));
     DrawRectangleLines(bx - 10, by - 24, 360, 100, Fade(SKYBLUE, 0.38f));
@@ -1988,8 +2058,8 @@ void Game::DrawSettings() const {
     DrawText("SHOOT (ALT)", bx + 230, by + 23, 9, GOLD);
     drawKey(bx + 218, by + 40, 116, 24, "Spacebar", GOLD);
     
-    int promptW = MeasureText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", 13);
-    DrawText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", ScreenW / 2 - promptW / 2, 545, 13, GRAY);
+    int promptW = MeasureText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", 12);
+    DrawText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", ScreenW / 2 - promptW / 2, 548, 12, GRAY);
     
     if (settingsFeedbackTimer_ > 0.0f) {
         float alpha = std::min(1.0f, settingsFeedbackTimer_ / 0.4f);
@@ -2233,7 +2303,12 @@ void Game::Draw() {
         int baseBonus = 2000;
         int livesBonus = player_.lives * 500;
         int bombsBonus = player_.bombs * 200;
-        int totalBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
+        int totalBonus = stageClearBonus_ > 0 ? stageClearBonus_ : (baseBonus + livesBonus + bombsBonus) * loop_;
+        int shownTotalBonus = totalBonus;
+        if (clearTimer_ < 3.45f) {
+            float reveal = std::clamp((clearTimer_ - 0.92f) / 2.53f, 0.0f, 1.0f);
+            shownTotalBonus = (int)((float)totalBonus * reveal);
+        }
         
         DrawText("MISSION PERFORMANCE RESULTS", 60, 220, 16, SKYBLUE);
         
@@ -2249,7 +2324,7 @@ void Game::Draw() {
         DrawLine(60, 385, ScreenW - 60, 385, Fade(GRAY, 0.5f));
         
         DrawText("TOTAL STAGE BONUS:", 60, 410, 18, GOLD);
-        DrawText(TextFormat("+%d", totalBonus), 320, 410, 18, GOLD);
+        DrawText(TextFormat("+%d", shownTotalBonus), 320, 410, 18, GOLD);
         
         int loopW = MeasureText(TextFormat("ADVANCING TO LOOP %d", loop_ + 1), 16);
         DrawText(TextFormat("ADVANCING TO LOOP %d", loop_ + 1), ScreenW / 2 - loopW / 2, 470, 16, SKYBLUE);
@@ -2415,10 +2490,12 @@ void Game::InsertHighScore(const char* initials, int score, int loop) {
 }
 
 void Game::ApplyVolumeSettings() {
+    audio_.SetMasterVolume((float)masterVolume_ / 10.0f);
     audio_.SetVolumes(sfxVolume_, bgmVolume_);
 }
 
 void Game::LoadSettings() {
+    masterVolume_ = 9;
     sfxVolume_ = 8;
     bgmVolume_ = 6;
     screenShakeEnabled_ = true;
@@ -2443,7 +2520,8 @@ void Game::LoadSettings() {
             
             try {
                 int val = std::stoi(valStr);
-                if (key == "sfxVol") sfxVolume_ = std::clamp(val, 0, 10);
+                if (key == "masterVol") masterVolume_ = std::clamp(val, 0, 10);
+                else if (key == "sfxVol") sfxVolume_ = std::clamp(val, 0, 10);
                 else if (key == "bgmVol") bgmVolume_ = std::clamp(val, 0, 10);
                 else if (key == "shake") screenShakeEnabled_ = (val != 0);
                 else if (key == "hitbox") hitboxOverlayEnabled_ = (val != 0);
@@ -2473,6 +2551,7 @@ void Game::LoadSettings() {
 void Game::SaveSettings() {
     std::ofstream file("settings.cfg");
     if (file.is_open()) {
+        file << "masterVol=" << masterVolume_ << "\n";
         file << "sfxVol=" << sfxVolume_ << "\n";
         file << "bgmVol=" << bgmVolume_ << "\n";
         file << "shake=" << (screenShakeEnabled_ ? 1 : 0) << "\n";

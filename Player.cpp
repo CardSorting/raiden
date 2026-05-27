@@ -164,7 +164,7 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
     }
 }
 
-bool Player::TryBomb() {
+bool Player::BombPressed() const {
     bool bombPressed = false;
     if (isDemo) {
         bombPressed = triggerBomb_;
@@ -178,7 +178,11 @@ bool Player::TryBomb() {
             bombPressed = bombPressed || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
         }
     }
-    if (!bombPressed || bombs <= 0) return false;
+    return bombPressed;
+}
+
+bool Player::TryBomb() {
+    if (!BombPressed() || bombs <= 0) return false;
     --bombs;
     invulnerable = true;
     invulnTimer = 1.1f;

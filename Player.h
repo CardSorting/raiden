@@ -28,6 +28,7 @@ public:
     void Update(float dt, const std::vector<Enemy>& enemies = {}, const std::vector<Bullet>& enemyBullets = {});
     void Draw(bool debug) const;
     void TryShoot(std::vector<Bullet>& playerBullets);
+    bool BombPressed() const;
     bool TryBomb();
     void NextWeapon();
     void UpgradeWeapon();
@@ -36,4 +37,3 @@ public:
 private:
     float shootTimer_ = 0.0f;
 };
-

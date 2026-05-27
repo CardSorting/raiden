@@ -36,6 +36,7 @@ public:
         PickupBomb,
         PickupMedal,
         ScoreMilestone,
+        FormationBonus,
         ExtraLife,
         MenuMove,
         MenuConfirm,
@@ -45,6 +46,7 @@ public:
         Pause,
         Resume,
         ContinueTick,
+        BonusTick,
         HighScoreTick,
         HighScoreEntry,
         StageStart,
@@ -69,14 +71,18 @@ public:
 
     void SetVolumes(int sfxVolume, int musicVolume);
     void SetMasterVolume(float volume);
+    void SetMusicDucked(bool ducked);
 
     void PlayMusic(MusicTrack track);
     void StopMusic();
 
     void PlayPlayerShot(WeaponType weapon);
     void PlayEnemyShot(EnemyShotType type);
+    void PlayEnemyShotAt(EnemyShotType type, float x, float screenWidth);
     void PlayExplosion(ExplosionSize size);
+    void PlayExplosionAt(ExplosionSize size, float x, float screenWidth);
     void PlayBossDamage();
+    void PlayBossDamageAt(float x, float screenWidth);
     void PlayPlayerDeath();
     void PlayPlayerHit();
     void PlayRespawn();
@@ -85,9 +91,15 @@ public:
     void PlayEnemyBullet();
     void PlayWeaponSwitch();
     void PlayWeaponUpgrade();
+    void PlayMedal(int chain);
+    void PlayMedalAt(int chain, float x, float screenWidth);
     void PlayPickup(PowerupType type);
+    void PlayPickupAt(PowerupType type, float x, float screenWidth);
     void PlayPickup(PickupType type);
+    void PlayPickupAt(PickupType type, float x, float screenWidth);
     void PlayScoreMilestone();
+    void PlayFormationBonus();
+    void PlayFormationBonusAt(float x, float screenWidth);
     void PlayExtraLife();
     void PlayMenuMove();
     void PlayMenuConfirm();
@@ -97,6 +109,7 @@ public:
     void PlayPause();
     void PlayResume();
     void PlayContinueTick();
+    void PlayBonusTick(int step = 0);
     void PlayHighScoreTick();
     void PlayHighScoreEntry();
     void PlayStageStart();
@@ -137,13 +150,18 @@ private:
     float musicMaster_ = 0.6f;
     double musicDuckUntil_ = -1000.0;
     float currentMusicGain_ = 1.0f;
+    bool musicManuallyDucked_ = false;
     unsigned int randomSeed_ = 0x51434452u;
+    int runtimePlayed_ = 0;
+    int runtimeCooldownDrops_ = 0;
+    int runtimePressureDrops_ = 0;
+    int runtimeStolenVoices_ = 0;
     static constexpr int MaxSfxVoices = 14;
 
     void LoadCues();
     void UnloadCues();
     bool AddCue(Cue cue, Category category, Priority priority, float baseGain, float cooldown, int variants);
-    void PlayCue(Cue cue, float pitch = 1.0f, float gain = 1.0f);
+    void PlayCue(Cue cue, float pitch = 1.0f, float gain = 1.0f, float pan = -1.0f);
     void ApplyVolumes();
     void ApplyMusicVolume();
     int CountPlaying() const;
@@ -153,7 +171,9 @@ private:
     float CongestionGain(int activeVoices, int activeInCategory, Priority priority) const;
     float CategoryHeadroom(Category category, Priority priority) const;
     float RandomPan(Category category);
+    float PositionPan(float x, float screenWidth, Category category);
     bool StealLowerPriorityVoice(Priority incomingPriority, Category incomingCategory);
+    void ResetRuntimeStats();
     float CategoryGain(Category category) const;
     float NextRandom();
     float RandomRange(float lo, float hi);
