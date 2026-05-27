@@ -29,7 +29,8 @@ public:
         PlayerHit,
         PlayerDeath,
         Respawn,
-        Bomb,
+        BombCharge,
+        BombDetonation,
         BombClear,
         PickupPowerup,
         PickupWeaponSwitch,
@@ -91,6 +92,8 @@ public:
     void PlayPlayerHit();
     void PlayRespawn();
     void PlayBomb();
+    void PlayBombCharge();
+    void PlayBombDetonation();
     void PlayBombClear();
     void PlayEnemyBullet();
     void PlayWeaponSwitch();

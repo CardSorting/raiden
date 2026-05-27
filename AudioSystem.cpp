@@ -42,7 +42,8 @@ constexpr ExportCueSpec ExportCues[] = {
     { AudioSystem::Cue::PlayerHit, "player_hit", 1 },
     { AudioSystem::Cue::PlayerDeath, "player_death", 1 },
     { AudioSystem::Cue::Respawn, "player_respawn", 1 },
-    { AudioSystem::Cue::Bomb, "bomb", 1 },
+    { AudioSystem::Cue::BombCharge, "bomb_charge", 1 },
+    { AudioSystem::Cue::BombDetonation, "bomb_detonation", 1 },
     { AudioSystem::Cue::BombClear, "bomb_clear", 1 },
     { AudioSystem::Cue::PickupPowerup, "pickup_powerup", 3 },
     { AudioSystem::Cue::PickupWeaponSwitch, "pickup_weapon_switch", 2 },
@@ -480,29 +481,45 @@ Wave MakeRespawn() {
     });
 }
 
-Wave MakeBomb() {
+Wave MakeBombCharge() {
     unsigned int seed = 0x7700u;
     float bass = 0.0f;
     float riser = 0.0f;
+    float latch = 0.33f;
+    OnePoleHighPass hp;
+    return MakeWave(0.82f, [=](float t, int) mutable {
+        float k = t / 0.82f;
+        bass += PitchSweep(58.0f, 34.0f, std::min(k * 1.4f, 1.0f), 0.65f) / (float)SampleRate;
+        riser += Vibrato(PitchSweep(160.0f, 2100.0f, std::pow(k, 1.6f), 1.0f), t, 0.014f, 8.0f) / (float)SampleRate;
+        latch += PitchSweep(380.0f, 1120.0f, k, 1.25f) / (float)SampleRate;
+        float pulse = OscSine(bass) * std::exp(-t * 1.4f) * 0.78f;
+        float warning = CabinetDrive(OscSaw(riser), 1.42f, 0.10f) * Adsr(t, 0.82f, 0.025f, 0.16f, 0.70f, 0.16f) * 0.34f;
+        float relay = hp.Process(Noise(seed), 1600.0f) * (k < 0.10f || (k > 0.66f && k < 0.74f) ? 0.34f : 0.0f);
+        float latchTone = OscSquare(latch, 0.18f) * std::pow(k, 1.5f) * std::pow(1.0f - k, 0.35f) * 0.16f;
+        return pulse + warning + relay + latchTone;
+    });
+}
+
+Wave MakeBombDetonation() {
+    unsigned int seed = 0x7701u;
     float shred = 0.21f;
+    float sub = 0.0f;
     float pinkLow = 0.0f;
     float pinkMid = 0.0f;
     OnePoleLowPass lp;
     OnePoleHighPass hp;
-    return MakeWave(1.72f, [=](float t, int) mutable {
-        float k = t / 1.72f;
-        bass += PitchSweep(62.0f, 26.0f, std::min(k * 1.45f, 1.0f), 0.68f) / (float)SampleRate;
-        riser += PitchSweep(160.0f, 1850.0f, std::pow(k, 1.55f), 1.0f) / (float)SampleRate;
-        shred += PitchSweep(920.0f, 110.0f, k, 0.75f) / (float)SampleRate;
-        float pulse = OscSine(bass) * std::exp(-t * 1.45f) * 0.98f;
-        float warning = CabinetDrive(OscSaw(riser), 1.35f, 0.08f) * Adsr(t, 1.72f, 0.035f, 0.2f, 0.62f, 0.44f) * 0.28f;
-        float blastStart = std::clamp((k - 0.50f) / (0.68f - 0.50f), 0.0f, 1.0f);
-        blastStart = blastStart * blastStart * (3.0f - 2.0f * blastStart);
-        float body = lp.Process(PinkNoise(seed, pinkLow, pinkMid), 1180.0f) * blastStart * std::exp(-std::max(0.0f, t - 0.82f) * 2.0f) * 0.72f;
-        float glass = hp.Process(Noise(seed), 2100.0f) * blastStart * std::exp(-std::max(0.0f, t - 0.82f) * 5.0f) * 0.28f;
+    return MakeWave(1.16f, [=](float t, int) mutable {
+        float k = t / 1.16f;
+        float armedDelay = std::clamp((t - 0.10f) / 0.08f, 0.0f, 1.0f);
+        armedDelay = armedDelay * armedDelay * (3.0f - 2.0f * armedDelay);
+        sub += PitchSweep(72.0f, 24.0f, k, 0.58f) / (float)SampleRate;
+        shred += PitchSweep(1080.0f, 86.0f, k, 0.72f) / (float)SampleRate;
+        float impact = OscSine(sub) * std::exp(-std::max(0.0f, t - 0.10f) * 3.0f) * 1.00f * armedDelay;
+        float body = lp.Process(PinkNoise(seed, pinkLow, pinkMid), 1180.0f) * armedDelay * std::exp(-std::max(0.0f, t - 0.14f) * 2.1f) * 0.76f;
+        float glass = hp.Process(Noise(seed), 2100.0f) * armedDelay * std::exp(-std::max(0.0f, t - 0.12f) * 5.2f) * 0.31f;
         float shredGate = (std::sin(t * Pi2 * (18.0f + k * 30.0f)) > 0.1f) ? 1.0f : 0.25f;
-        float metalTear = Bitcrush(OscSquare(shred, 0.18f), 16.0f) * shredGate * blastStart * std::exp(-std::max(0.0f, t - 0.74f) * 3.3f) * 0.22f;
-        return pulse + warning + CabinetDrive(body + glass + metalTear, 1.65f, 0.16f);
+        float metalTear = Bitcrush(OscSquare(shred, 0.18f), 16.0f) * shredGate * armedDelay * std::exp(-std::max(0.0f, t - 0.16f) * 3.4f) * 0.25f;
+        return impact + CabinetDrive(body + glass + metalTear, 1.70f, 0.18f);
     });
 }
 
@@ -903,7 +920,7 @@ Wave MakeAttractShimmer() {
         a += Vibrato(880.0f, t, 0.012f, 5.0f) / (float)SampleRate;
         b += 1320.0f / (float)SampleRate;
         float env = Adsr(t, 0.72f, 0.08f, 0.14f, 0.42f, 0.28f);
-        return (OscSine(a) * 0.19f + OscTriangle(b) * 0.12f) * env * Tremolo(t, 0.45f, 6.0f);
+        return (OscSine(a) * 0.32f + OscTriangle(b) * 0.2f) * env * Tremolo(t, 0.45f, 6.0f);
     });
 }
 
@@ -977,7 +994,8 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::PlayerHit: return MakePlayerHit();
         case AudioSystem::Cue::PlayerDeath: return MakePlayerDeath();
         case AudioSystem::Cue::Respawn: return MakeRespawn();
-        case AudioSystem::Cue::Bomb: return MakeBomb();
+        case AudioSystem::Cue::BombCharge: return MakeBombCharge();
+        case AudioSystem::Cue::BombDetonation: return MakeBombDetonation();
         case AudioSystem::Cue::BombClear: return MakeBombClear();
         case AudioSystem::Cue::PickupPowerup: return MakePickupPowerup();
         case AudioSystem::Cue::PickupWeaponSwitch: return MakePickupWeaponSwitch();
@@ -1182,7 +1200,8 @@ void AudioSystem::LoadCues() {
     soundsReady_ &= AddCue(Cue::PlayerHit, Category::Explosion, Priority::Critical, 0.92f, 0.12f, 1);
     soundsReady_ &= AddCue(Cue::PlayerDeath, Category::Explosion, Priority::Critical, 1.0f, 0.25f, 1);
     soundsReady_ &= AddCue(Cue::Respawn, Category::Player, Priority::High, 0.72f, 0.25f, 1);
-    soundsReady_ &= AddCue(Cue::Bomb, Category::Explosion, Priority::Critical, 1.0f, 0.5f, 1);
+    soundsReady_ &= AddCue(Cue::BombCharge, Category::Warning, Priority::Critical, 0.88f, 0.5f, 1);
+    soundsReady_ &= AddCue(Cue::BombDetonation, Category::Explosion, Priority::Critical, 1.0f, 0.5f, 1);
     soundsReady_ &= AddCue(Cue::BombClear, Category::Explosion, Priority::High, 0.78f, 0.35f, 1);
     soundsReady_ &= AddCue(Cue::PickupPowerup, Category::Pickup, Priority::Normal, 0.82f, 0.045f, 3);
     soundsReady_ &= AddCue(Cue::PickupWeaponSwitch, Category::Pickup, Priority::Normal, 0.74f, 0.055f, 2);
@@ -1686,9 +1705,12 @@ void AudioSystem::PlayRespawn() { PlayCue(Cue::Respawn); }
 void AudioSystem::PlayBomb() {
     StopVoicesForFocus(Priority::High, true, true);
     musicDuckUntil_ = std::max(musicDuckUntil_, AudioClockSeconds() + 1.05);
-    PlayCue(Cue::Bomb);
+    PlayBombCharge();
+    PlayBombDetonation();
     PlayBombClear();
 }
+void AudioSystem::PlayBombCharge() { PlayCue(Cue::BombCharge); }
+void AudioSystem::PlayBombDetonation() { PlayCue(Cue::BombDetonation); }
 void AudioSystem::PlayBombClear() { PlayCue(Cue::BombClear); }
 void AudioSystem::PlayEnemyBullet() { PlayCue(Cue::EnemyBullet, RandomRange(0.93f, 1.1f), RandomRange(0.74f, 0.96f)); }
 void AudioSystem::PlayWeaponSwitch() { PlayCue(Cue::PickupWeaponSwitch, RandomRange(0.98f, 1.04f)); }
