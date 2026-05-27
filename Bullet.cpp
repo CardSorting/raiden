@@ -1,6 +1,7 @@
 #include "Bullet.h"
 #include "Enemy.h"
 #include "SpriteManager.h"
+#include "Effects.h"
 #include <cmath>
 
 
@@ -15,7 +16,7 @@ Bullet::Bullet(Vector2 p, Vector2 v, float r, int d, BulletOwner o, Color c, boo
     for (int i = 0; i < 6; ++i) trail_[i] = p;
 }
 
-void Bullet::Update(float dt, const std::vector<Enemy>& enemies) {
+void Bullet::Update(float dt, const std::vector<Enemy>& enemies, Effects& effects) {
     for (int i = 5; i > 0; --i) {
         trail_[i] = trail_[i - 1];
     }
@@ -39,6 +40,11 @@ void Bullet::Update(float dt, const std::vector<Enemy>& enemies) {
             vel.y = vel.y * 0.91f + desired.y * speed * 0.09f;
         }
     }
+
+    if (homing && owner == BulletOwner::Player && GetRandomValue(0, 100) < 35) {
+        effects.Smoke(pos, Color{110, 110, 115, 180});
+    }
+
     pos.x += vel.x * dt;
     pos.y += vel.y * dt;
 }
@@ -93,28 +99,33 @@ void Bullet::Draw(bool debug) const {
             }
         }
     } else {
-        // Enemy bullets with glowing neon motion trails and high-contrast white hot centers
+        // Enemy bullets: First draw black safety mask for contrast separation!
+        for (int i = trailCount_ - 1; i >= 0; --i) {
+            DrawCircleV(trail_[i], radius * (1.4f - (float)i * 0.10f), BLACK);
+        }
+        DrawCircleV(pos, radius * 1.5f, BLACK);
+
+        // Then draw neon glowing trails additively
         BeginBlendMode(BLEND_ADDITIVE);
         for (int i = 0; i < trailCount_; ++i) {
             float alpha = 1.0f - (float)i / (float)trailCount_;
-            DrawCircleV(trail_[i], radius * (1.1f - (float)i * 0.10f), Fade(color, alpha * 0.65f));
-            DrawCircleV(trail_[i], radius * (0.6f - (float)i * 0.08f), Fade(WHITE, alpha * 0.45f));
+            DrawCircleV(trail_[i], radius * (1.3f - (float)i * 0.10f), Fade(color, alpha * 0.65f));
+            DrawCircleV(trail_[i], radius * (0.8f - (float)i * 0.08f), Fade(WHITE, alpha * 0.45f));
         }
         EndBlendMode();
 
         // Draw basic shapes or sprite representations
         if (radius >= 6.8f) {
-            // Spiky Strong projectile
             float spin = (float)GetTime() * -250.0f;
             SpriteManager::Instance().Draw(SpriteId::BulletEnemyStrong, pos, spin, 1.3f);
         } else {
-            // Basic orb
             SpriteManager::Instance().Draw(SpriteId::BulletEnemyBasic, pos, 0.0f, 1.3f);
         }
         
         // Draw the high-contrast white core and neon border on top
-        DrawCircleV(pos, radius * 0.45f, WHITE);
-        DrawCircleLines((int)pos.x, (int)pos.y, (int)(radius + 1.0f), Fade(color, 0.9f));
+        DrawCircleV(pos, radius * 0.55f, WHITE);
+        DrawCircleLines((int)pos.x, (int)pos.y, (int)(radius + 1.0f), Fade(color, 0.95f));
+        DrawCircleLines((int)pos.x, (int)pos.y, (int)(radius + 2.0f), Fade(color, 0.45f));
     }
 
     if (debug) DrawCircleLines((int)pos.x, (int)pos.y, radius, GREEN);

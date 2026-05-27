@@ -103,20 +103,33 @@ void Effects::Draw() const {
     for (const auto& p : particles_) {
         float a = p.life / p.maxLife;
         Color col = p.color;
-        if (a > 0.82f) {
-            col = WHITE;
-        } else if (a > 0.55f) {
-            col = YELLOW;
-        } else if (a > 0.32f) {
-            col = ORANGE;
-        } else if (a > 0.15f) {
-            col = RED;
-        } else {
-            col = Color{80, 80, 85, 255}; // dark ash gray
+        
+        bool isThruster = (p.color.r == SKYBLUE.r && p.color.g == SKYBLUE.g && p.color.b == SKYBLUE.b);
+        if (!isThruster) {
+            if (a > 0.82f) {
+                col = WHITE;
+            } else if (a > 0.55f) {
+                col = YELLOW;
+            } else if (a > 0.32f) {
+                col = ORANGE;
+            } else if (a > 0.15f) {
+                col = RED;
+            } else {
+                col = Color{80, 80, 85, 255}; // dark ash gray
+            }
         }
 
-        float sz = p.radius * (0.45f + a * 0.75f);
-        DrawRectangleV({ p.pos.x - sz / 2.0f, p.pos.y - sz / 2.0f }, { sz, sz }, Fade(col, a));
+        float speedSq = p.vel.x * p.vel.x + p.vel.y * p.vel.y;
+        if (speedSq > 6000.0f) {
+            float dtOffset = 0.024f;
+            Vector2 tail = { p.pos.x - p.vel.x * dtOffset * a, p.pos.y - p.vel.y * dtOffset * a };
+            float thickness = p.radius * (0.4f + a * 0.6f);
+            if (thickness < 1.0f) thickness = 1.0f;
+            DrawLineEx(p.pos, tail, thickness, Fade(col, a));
+        } else {
+            float sz = p.radius * (0.45f + a * 0.75f);
+            DrawCircleV(p.pos, sz / 2.0f, Fade(col, a));
+        }
     }
 
     // 5. Draw score / event indicators
@@ -214,6 +227,10 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
             else if (i % 3 == 1) d.spriteId = SpriteId::DebrisEnemyWing;
             else d.spriteId = SpriteId::DebrisEnemyThruster;
             d.size = (float)GetRandomValue(12, 18) / 10.0f;
+        } else if (debrisSprite == SpriteId::DebrisPlayerWingLeft || debrisSprite == SpriteId::DebrisPlayerWingRight) {
+            d.spriteId = (i % 2 == 0) ? SpriteId::DebrisPlayerWingLeft : SpriteId::DebrisPlayerWingRight;
+            d.useSprite = true;
+            d.size = (float)GetRandomValue(10, 15) / 10.0f;
         } else if (debrisSprite != SpriteId::AsteroidChunk) {
             d.spriteId = debrisSprite;
             d.useSprite = true;
@@ -242,31 +259,44 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     }
 }
 
-void Effects::Spark(Vector2 pos, Color color) {
+void Effects::Spark(Vector2 pos, Color color, Vector2 biasVel) {
     // Spark particles
-    int count = 6;
+    int count = 8;
     for (int i = 0; i < count; ++i) {
-        float angle = (float)i / (float)count * 6.2831853f + (float)GetRandomValue(-40, 40) * 0.01f;
-        float speed = (float)GetRandomValue(95, 185);
+        float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+        float speed = (float)GetRandomValue(85, 210);
         Particle p;
         p.pos = pos;
-        p.vel = {std::cos(angle) * speed, std::sin(angle) * speed};
-        p.life = p.maxLife = (float)GetRandomValue(10, 25) / 100.0f;
-        p.radius = (float)GetRandomValue(1, 3);
+        p.vel = { std::cos(angle) * speed + biasVel.x * 0.45f, std::sin(angle) * speed + biasVel.y * 0.45f };
+        p.life = p.maxLife = (float)GetRandomValue(10, 32) / 100.0f;
+        p.radius = (float)GetRandomValue(15, 30) / 10.0f;
         p.color = color;
         particles_.push_back(p);
     }
 }
 
-void Effects::EngineExhaust(Vector2 pos, Color color) {
+void Effects::EngineExhaust(Vector2 pos, Color color, Vector2 biasVel) {
     Particle p;
     p.pos = pos;
-    // Launch downwards (between 80 and 100 degrees)
-    float angle = (float)GetRandomValue(80, 100) * DEG2RAD;
-    float speed = (float)GetRandomValue(50, 110);
-    p.vel = { std::cos(angle) * speed, std::sin(angle) * speed };
+    // Launch downwards with bias tilt
+    float angle = (float)GetRandomValue(82, 98) * DEG2RAD;
+    float speed = (float)GetRandomValue(60, 120);
+    p.vel = { std::cos(angle) * speed + biasVel.x, std::sin(angle) * speed + biasVel.y };
     p.life = p.maxLife = (float)GetRandomValue(15, 38) / 100.0f;
     p.radius = (float)GetRandomValue(12, 28) / 10.0f;
+    p.color = color;
+    particles_.push_back(p);
+}
+
+void Effects::Smoke(Vector2 pos, Color color) {
+    Particle p;
+    p.pos = pos;
+    // Slow drifting smoke particles
+    float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+    float speed = (float)GetRandomValue(15, 45);
+    p.vel = { std::cos(angle) * speed, std::sin(angle) * speed + 25.0f }; // slight downward drift from scrolling
+    p.life = p.maxLife = (float)GetRandomValue(45, 95) / 100.0f;
+    p.radius = (float)GetRandomValue(35, 75) / 10.0f; // larger radius
     p.color = color;
     particles_.push_back(p);
 }

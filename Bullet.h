@@ -3,6 +3,7 @@
 #include <vector>
 
 struct Enemy;
+class Effects;
 
 enum class BulletOwner { Player, Enemy };
 
@@ -21,7 +22,7 @@ struct Bullet {
     Bullet() = default;
     Bullet(Vector2 p, Vector2 v, float r, int d, BulletOwner o, Color c, bool seek = false);
 
-    void Update(float dt, const std::vector<Enemy>& enemies);
+    void Update(float dt, const std::vector<Enemy>& enemies, Effects& effects);
     void Draw(bool debug) const;
     bool Offscreen(int width, int height) const;
 };

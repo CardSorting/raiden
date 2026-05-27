@@ -64,8 +64,9 @@ public:
     void Draw() const;
     void Clear();
     void Explosion(Vector2 pos, Color color, int count = 24, SpriteId debrisSprite = SpriteId::AsteroidChunk);
-    void Spark(Vector2 pos, Color color);
-    void EngineExhaust(Vector2 pos, Color color = ORANGE);
+    void Spark(Vector2 pos, Color color, Vector2 biasVel = {0.0f, 0.0f});
+    void EngineExhaust(Vector2 pos, Color color = ORANGE, Vector2 biasVel = {0.0f, 0.0f});
+    void Smoke(Vector2 pos, Color color = GRAY);
     void DebrisShower(Vector2 pos, Color color, int count);
     void Shake(float amount, float time);
     Vector2 ShakeOffset() const;

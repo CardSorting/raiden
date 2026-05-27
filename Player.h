@@ -27,8 +27,12 @@ public:
     float tilt_ = 0.0f;             // Horizontal banking/tilt animation state
     float muzzleFlashTimer_ = 0.0f;  // Screen duration timer for weapon fire sparks
     float recoilOffset_ = 0.0f;      // Recoil shift offset
+    float recoilVel_ = 0.0f;         // Recoil speed velocity for spring physics
     float scaleY_ = 1.0f;            // Squash/stretch recoil scaling factor
+    float scaleYVel_ = 0.0f;         // Scale elasticity speed velocity for spring physics
     float heat_ = 0.0f;              // Wing vent heat level for ember particles
+    Vector2 pastPositions_[8]{};    // Ring buffer of past positions for ghost trails
+    int positionCount_ = 0;          // Count of elements in the past positions buffer
 
     void ResetForNewGame();
     void ResetAfterHit();

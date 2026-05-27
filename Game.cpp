@@ -29,12 +29,12 @@ static const char* FS_CODE =
     "uniform sampler2D texture0;\n"
     "uniform vec4 colDiffuse;\n"
     "\n"
-    "const float curvature = 0.045;\n"
-    "const float scanlineWeight = 0.22;\n"
+    "const float curvature = 0.038;\n"
+    "const float scanlineWeight = 0.16;\n"
     "const float scanlineFreq = 640.0;\n"
-    "const float chromaticOffset = 0.0018;\n"
-    "const float vignetteStrength = 0.12;\n"
-    "const float brightness = 1.18;\n"
+    "const float chromaticOffset = 0.0016;\n"
+    "const float vignetteStrength = 0.14;\n"
+    "const float brightness = 1.25;\n"
     "\n"
     "vec2 curve(vec2 uv) {\n"
     "    uv = uv * 2.0 - 1.0;\n"
@@ -58,22 +58,48 @@ static const char* FS_CODE =
     "    col.b = texture(texture0, uv + offRed).b;\n"
     "    col.a = texture(texture0, uv).a;\n"
     "\n"
-    "    // Phosphor glow bloom bleed simulation\n"
-    "    vec4 bloom = texture(texture0, uv + vec2(-0.001, -0.001)) +\n"
-    "                 texture(texture0, uv + vec2(0.001, -0.001)) +\n"
-    "                 texture(texture0, uv + vec2(-0.001, 0.001)) +\n"
-    "                 texture(texture0, uv + vec2(0.001, 0.001));\n"
-    "    col.rgb = mix(col.rgb, bloom.rgb * 0.25, 0.14);\n"
+    "    // Horizontal electron-beam glow bleed\n"
+    "    vec4 bleed = texture(texture0, uv + vec2(-0.0015, 0.0)) * 0.22 +\n"
+    "                 texture(texture0, uv + vec2(-0.0008, 0.0)) * 0.35 +\n"
+    "                 texture(texture0, uv + vec2(0.0008, 0.0)) * 0.35 +\n"
+    "                 texture(texture0, uv + vec2(0.0015, 0.0)) * 0.22;\n"
+    "    col.rgb = mix(col.rgb, bleed.rgb, 0.12);\n"
     "\n"
+    "    // Curved scanlines\n"
     "    float scanline = sin(uv.y * scanlineFreq * 3.14159265 * 2.0);\n"
     "    scanline = mix(1.0, (scanline + 1.0) * 0.5, scanlineWeight);\n"
     "    col.rgb *= scanline;\n"
-    "    float grid = sin(uv.x * 480.0 * 3.14159265 * 2.0);\n"
-    "    grid = mix(1.0, (grid + 1.0) * 0.5, 0.08);\n"
-    "    col.rgb *= grid;\n"
+    "\n"
+    "    // High-fidelity shadow slot mask\n"
+    "    vec2 maskCoord = uv * vec2(480.0, 640.0);\n"
+    "    float xMod = mod(maskCoord.x, 3.0);\n"
+    "    float mRed = 1.0;\n"
+    "    float mGreen = 1.0;\n"
+    "    float mBlue = 1.0;\n"
+    "    if (xMod < 1.0) { mRed = 1.0; mGreen = 0.88; mBlue = 0.84; }\n"
+    "    else if (xMod < 2.0) { mRed = 0.88; mGreen = 1.0; mBlue = 0.88; }\n"
+    "    else { mRed = 0.84; mGreen = 0.88; mBlue = 1.0; }\n"
+    "\n"
+    "    float yMod = mod(maskCoord.y + step(1.5, xMod) * 1.5, 3.0);\n"
+    "    if (yMod < 0.6) {\n"
+    "        mRed *= 0.84;\n"
+    "        mGreen *= 0.84;\n"
+    "        mBlue *= 0.84;\n"
+    "    }\n"
+    "    col.r *= mRed;\n"
+    "    col.g *= mGreen;\n"
+    "    col.b *= mBlue;\n"
+    "\n"
+    "    // Corner vignette\n"
     "    float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);\n"
     "    vignette = clamp(pow(16.0 * vignette, vignetteStrength), 0.0, 1.0);\n"
     "    col.rgb *= vignette;\n"
+    "\n"
+    "    // Cabinet ambient marquee glare reflection\n"
+    "    float glare = 1.0 - length(uv - vec2(0.35, 0.25));\n"
+    "    glare = clamp(pow(glare, 5.0) * 0.035, 0.0, 1.0);\n"
+    "    col.rgb += vec3(glare);\n"
+    "\n"
     "    col.rgb *= brightness;\n"
     "    finalColor = col * colDiffuse * fragColor;\n"
     "}";
@@ -825,17 +851,20 @@ void Game::UpdatePlaying(float dt) {
         bossDeathTimer_ -= dt;
         bossDeathExplosionTimer_ += dt;
         
+        // Slowly drift the boss position down during its death sequence
+        bossDeathPos_.y += 15.0f * dt;
+        
         // Phase 1: 1.6s - 1.2s (Left/right wing pods rupture - sparks + shrapnel)
         if (bossDeathTimer_ > 1.2f) {
             if (bossDeathExplosionTimer_ > 0.06f) {
                 bossDeathExplosionTimer_ = 0.0f;
-                Vector2 wingOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-28.0f, 0.0f} : Vector2{28.0f, 0.0f};
+                Vector2 wingOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-35.0f, 0.0f} : Vector2{35.0f, 0.0f};
                 Vector2 spawnPos = { bossDeathPos_.x + wingOffset.x + GetRandomValue(-6, 6), bossDeathPos_.y + wingOffset.y + GetRandomValue(-6, 6) };
-                effects_.Spark(spawnPos, GOLD);
-                effects_.Explosion(spawnPos, ORANGE, 10);
-                effects_.DebrisShower(spawnPos, Color{145, 40, 200, 255}, 5); // Purple wing trim
+                effects_.Spark(spawnPos, GOLD, {wingOffset.x * 2.0f, 30.0f});
+                effects_.Explosion(spawnPos, ORANGE, 12, SpriteId::DebrisEnemyWing);
+                effects_.DebrisShower(spawnPos, Color{145, 40, 200, 255}, 5);
                 effects_.DebrisShower(spawnPos, DARKGRAY, 4);
-                effects_.Shake(4.0f, 0.12f);
+                effects_.Shake(4.5f, 0.12f);
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
@@ -843,11 +872,11 @@ void Game::UpdatePlaying(float dt) {
         else if (bossDeathTimer_ > 0.7f) {
             if (bossDeathExplosionTimer_ > 0.08f) {
                 bossDeathExplosionTimer_ = 0.0f;
-                Vector2 engineOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-16.0f, 22.0f} : Vector2{16.0f, 22.0f};
+                Vector2 engineOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-20.0f, 26.0f} : Vector2{20.0f, 26.0f};
                 Vector2 spawnPos = { bossDeathPos_.x + engineOffset.x + GetRandomValue(-5, 5), bossDeathPos_.y + engineOffset.y + GetRandomValue(-5, 5) };
-                effects_.Explosion(spawnPos, GRAY, 15);
-                effects_.DebrisShower(spawnPos, Color{80, 80, 85, 255}, 6); // Engine plating parts
-                effects_.Shake(6.0f, 0.15f);
+                effects_.Explosion(spawnPos, GRAY, 15, SpriteId::DebrisEnemyThruster);
+                effects_.DebrisShower(spawnPos, Color{80, 80, 85, 255}, 6);
+                effects_.Shake(6.5f, 0.15f);
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
@@ -855,30 +884,31 @@ void Game::UpdatePlaying(float dt) {
         else if (bossDeathTimer_ > 0.1f) {
             if (bossDeathExplosionTimer_ > 0.08f) {
                 bossDeathExplosionTimer_ = 0.0f;
-                Vector2 randOffset = { (float)GetRandomValue(-20, 20), (float)GetRandomValue(-20, 20) };
+                Vector2 randOffset = { (float)GetRandomValue(-25, 25), (float)GetRandomValue(-25, 25) };
                 Vector2 spawnPos = { bossDeathPos_.x + randOffset.x, bossDeathPos_.y + randOffset.y };
-                effects_.Explosion(spawnPos, ORANGE, 16);
-                effects_.Shake(8.0f, 0.15f);
+                effects_.Explosion(spawnPos, ORANGE, 18, SpriteId::DebrisBossCore);
+                effects_.Shake(9.0f, 0.15f);
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
-        // Phase 4: 0.1s - 0.0s (Final detonation charging - white sparks)
+        // Phase 4: 0.1s - 0.0s (Final detonation charging - blinding white sparks)
         else {
             if (bossDeathExplosionTimer_ > 0.04f) {
                 bossDeathExplosionTimer_ = 0.0f;
-                effects_.Spark(bossDeathPos_, WHITE);
+                effects_.Spark(bossDeathPos_, WHITE, {0.0f, 0.0f});
             }
         }
 
         if (bossDeathTimer_ <= 0.0f) {
-            effects_.Explosion(bossDeathPos_, VIOLET, 95);
-            effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 10); // Gold core shards
-            effects_.DebrisShower(bossDeathPos_, DARKGRAY, 12); // Hull shards
-            effects_.DebrisShower(bossDeathPos_, RED, 8); // Hot core slag
-            effects_.Shake(24.0f, 0.8f);
+            // Catastrophic detonation!
+            effects_.Explosion(bossDeathPos_, VIOLET, 95, SpriteId::DebrisBossCore);
+            effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 16); // Gold core shards
+            effects_.DebrisShower(bossDeathPos_, DARKGRAY, 20); // Hull shards
+            effects_.DebrisShower(bossDeathPos_, RED, 14); // Hot core slag
+            effects_.Shake(28.0f, 0.9f);
             
-            // Trigger full-screen white flash
-            screenFlashTimer_ = 0.15f;
+            // Trigger screen white flash
+            screenFlashTimer_ = 0.18f;
 
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
             audio_.PlayStageClear();
@@ -965,13 +995,9 @@ void Game::UpdatePlaying(float dt) {
     }
 
     for (auto& b : playerBullets_) {
-        b.Update(dt, enemies_);
-        if (b.homing && GetRandomValue(0, 1) == 0) {
-            // Spawn a light gray smoke particle behind homing missiles
-            effects_.Explosion(b.pos, Color{130, 130, 135, 130}, 1);
-        }
+        b.Update(dt, enemies_, effects_);
     }
-    for (auto& b : enemyBullets_) b.Update(dt, enemies_);
+    for (auto& b : enemyBullets_) b.Update(dt, {}, effects_);
     size_t beforeBullets = enemyBullets_.size();
     for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_ + (difficulty_ == 1 ? 1 : 0));
     if (enemyBullets_.size() > beforeBullets) {
@@ -1002,11 +1028,16 @@ void Game::UpdatePlaying(float dt) {
         }
     }
 
-    // Spawn damage smoke particles from damaged boss core
+    // Spawn damage smoke and spark venting from damaged boss core and wings
     for (const auto& e : enemies_) {
         if (e.active && e.IsBoss() && e.hp < e.maxHp / 2) {
-            if (GetRandomValue(0, 4) == 0) {
-                effects_.Explosion(Vector2{ e.pos.x + (float)GetRandomValue(-24, 24), e.pos.y + (float)GetRandomValue(-24, 24) }, Color{80, 80, 80, 160}, 1);
+            float damageRatio = 1.0f - (float)e.hp / (float)e.maxHp;
+            if (GetRandomValue(0, 100) < (int)(damageRatio * 55.0f)) {
+                Vector2 ventPos = { e.pos.x + (float)GetRandomValue(-48, 48), e.pos.y + (float)GetRandomValue(-25, 20) };
+                effects_.Smoke(ventPos, Color{60, 60, 65, 200});
+                if (GetRandomValue(0, 100) < 45) {
+                    effects_.Spark(ventPos, ORANGE, {0.0f, 60.0f});
+                }
             }
         }
     }
@@ -2744,6 +2775,36 @@ void Game::Draw() {
     for (const auto& p : powerups_) p.Draw();
     for (const auto& b : playerBullets_) b.Draw(debug_);
     for (const auto& e : enemies_) e.Draw(debug_);
+    
+    if (bossDeathTimer_ > 0.0f) {
+        float age = 1.6f - bossDeathTimer_;
+        float wobbleScale = 1.0f + age * 1.8f;
+        float wobbleX = std::sin(age * 55.0f) * 2.5f * wobbleScale;
+        float wobbleY = std::cos(age * 48.0f) * 1.5f * wobbleScale;
+        Vector2 drawPos = { bossDeathPos_.x + wobbleX, bossDeathPos_.y + wobbleY };
+        
+        if (GetRandomValue(0, 100) < 55) {
+            float plumeH = 10.0f + std::sin(bossDeathTimer_ * 60.0f) * 4.0f;
+            DrawTriangle({drawPos.x - 24, drawPos.y - 48}, {drawPos.x - 28, drawPos.y - 48 - plumeH}, {drawPos.x - 20, drawPos.y - 48}, ORANGE);
+            DrawTriangle({drawPos.x + 24, drawPos.y - 48}, {drawPos.x + 20, drawPos.y - 48}, {drawPos.x + 28, drawPos.y - 48 - plumeH}, ORANGE);
+        }
+        
+        Color tint = WHITE;
+        if (bossDeathTimer_ < 0.25f) {
+            float whiteFactor = (0.25f - bossDeathTimer_) / 0.25f;
+            tint = Fade(WHITE, 1.0f - whiteFactor);
+            SpriteManager::Instance().Draw(SpriteId::BossDamaged, drawPos, 180.0f, 1.8f, tint);
+            BeginBlendMode(BLEND_ADDITIVE);
+            SpriteManager::Instance().Draw(SpriteId::BossDamaged, drawPos, 180.0f, 1.8f, Fade(WHITE, whiteFactor * 0.95f));
+            EndBlendMode();
+        } else {
+            if ((int)(bossDeathTimer_ * 14.0f) % 2 == 0) {
+                tint = RED;
+            }
+            SpriteManager::Instance().Draw(SpriteId::BossDamaged, drawPos, 180.0f, 1.8f, tint);
+        }
+    }
+
     player_.Draw(debug_ && state_ != State::Title);
     effects_.Draw();
     for (const auto& b : enemyBullets_) b.Draw(debug_);

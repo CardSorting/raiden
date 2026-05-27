@@ -62,6 +62,13 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
             float speedMult = (hp < maxHp / 2) ? 1.6f : 1.0f;
             pos.x = 240.0f + std::sin(age * 0.9f * speedMult) * 105.0f;
         }
+
+        // Structural wobble under damage (instability wobble)
+        if (hp < maxHp / 2) {
+            float damageRatio = 1.0f - (float)hp / (float)maxHp;
+            pos.x += std::sin(age * 35.0f) * 2.8f * damageRatio;
+            pos.y += std::cos(age * 28.0f) * 1.5f * damageRatio;
+        }
         
         bool phase2 = (hp < maxHp / 2);
         if (phaseTimer > 7.5f) { phaseTimer = 0; phase = (phase + 1) % 3; }
