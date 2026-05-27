@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "raylib.h"
 #include <array>
+#include <string>
 #include <vector>
 
 enum class ExplosionSize { Small, Medium, Large };
@@ -142,7 +143,8 @@ private:
     };
 
     std::array<CueBank, CueCount> cues_{};
-    std::array<Sound, 3> music_{};
+    std::array<Music, 3> music_{};
+    std::array<std::string, 3> musicPaths_{};
     MusicTrack currentMusic_ = MusicTrack::None;
     bool ready_ = false;
     bool soundsReady_ = false;
@@ -180,5 +182,5 @@ private:
     float CategoryGain(Category category) const;
     float NextRandom();
     float RandomRange(float lo, float hi);
-    Sound& MusicSound(MusicTrack track);
+    Music& MusicStream(MusicTrack track);
 };

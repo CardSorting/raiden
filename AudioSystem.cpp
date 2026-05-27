@@ -1011,6 +1011,14 @@ float WaveDuration(const Wave& wave) {
     if (wave.sampleRate == 0) return 0.0f;
     return (float)wave.frameCount / (float)wave.sampleRate;
 }
+
+std::filesystem::path RuntimeMusicPath(AudioSystem::MusicTrack track) {
+    const char* name = "none";
+    if (track == AudioSystem::MusicTrack::Title) name = "title";
+    if (track == AudioSystem::MusicTrack::Stage) name = "stage";
+    if (track == AudioSystem::MusicTrack::Boss) name = "boss";
+    return std::filesystem::temp_directory_path() / (std::string("sky_circuit_runtime_music_") + name + ".wav");
+}
 } // namespace
 
 AudioSystem::~AudioSystem() {
@@ -1093,9 +1101,17 @@ void AudioSystem::LoadCues() {
             soundsReady_ = false;
             continue;
         }
-        music_[(size_t)i] = LoadSoundFromWave(w);
+        std::filesystem::path musicPath = RuntimeMusicPath(tracks[(size_t)i]);
+        musicPaths_[(size_t)i] = musicPath.string();
+        bool exported = ExportWave(w, musicPaths_[(size_t)i].c_str());
         UnloadWave(w);
-        if (!IsSoundValid(music_[(size_t)i])) {
+        if (!exported) {
+            soundsReady_ = false;
+            continue;
+        }
+        music_[(size_t)i] = LoadMusicStream(musicPaths_[(size_t)i].c_str());
+        music_[(size_t)i].looping = true;
+        if (!IsMusicValid(music_[(size_t)i])) {
             soundsReady_ = false;
         }
     }
@@ -1117,11 +1133,17 @@ void AudioSystem::UnloadCues() {
         }
         bank.variants.clear();
     }
-    for (Sound& sound : music_) {
-        if (IsSoundValid(sound)) {
-            UnloadSound(sound);
+    for (size_t i = 0; i < music_.size(); ++i) {
+        Music& music = music_[i];
+        if (IsMusicValid(music)) {
+            UnloadMusicStream(music);
         }
-        sound = {};
+        music = {};
+        if (!musicPaths_[i].empty()) {
+            std::error_code ec;
+            std::filesystem::remove(musicPaths_[i], ec);
+            musicPaths_[i].clear();
+        }
     }
 }
 
@@ -1154,9 +1176,10 @@ void AudioSystem::Update() {
     currentMusicGain_ += (targetMusicGain - currentMusicGain_) * 0.12f;
     ApplyMusicVolume();
 
-    Sound& music = MusicSound(currentMusic_);
-    if (!IsSoundPlaying(music)) {
-        PlaySound(music);
+    Music& music = MusicStream(currentMusic_);
+    UpdateMusicStream(music);
+    if (!IsMusicStreamPlaying(music)) {
+        PlayMusicStream(music);
     }
 }
 
@@ -1189,8 +1212,10 @@ void AudioSystem::ApplyVolumes() {
 
 void AudioSystem::ApplyMusicVolume() {
     if (!soundsReady_) return;
-    for (Sound& sound : music_) {
-        SetSoundVolume(sound, masterVolume_ * musicMaster_ * CategoryGain(Category::Music) * currentMusicGain_);
+    for (Music& music : music_) {
+        if (IsMusicValid(music)) {
+            SetMusicVolume(music, masterVolume_ * musicMaster_ * CategoryGain(Category::Music) * currentMusicGain_);
+        }
     }
 }
 
@@ -1417,7 +1442,7 @@ void AudioSystem::PlayCue(Cue cue, float pitch, float gain, float pan) {
     }
 }
 
-Sound& AudioSystem::MusicSound(MusicTrack track) {
+Music& AudioSystem::MusicStream(MusicTrack track) {
     switch (track) {
         case MusicTrack::Title: return music_[0];
         case MusicTrack::Stage: return music_[1];
@@ -1434,11 +1459,11 @@ void AudioSystem::PlayMusic(MusicTrack track) {
     currentMusic_ = track;
     musicManuallyDucked_ = false;
     if (track != MusicTrack::None) {
-        Sound& music = MusicSound(track);
-        SetSoundPitch(music, 1.0f);
+        Music& music = MusicStream(track);
+        SetMusicPitch(music, 1.0f);
         currentMusicGain_ = 1.0f;
         ApplyMusicVolume();
-        PlaySound(music);
+        PlayMusicStream(music);
     }
 }
 
@@ -1447,8 +1472,10 @@ void AudioSystem::StopMusic() {
         currentMusic_ = MusicTrack::None;
         return;
     }
-    for (Sound& sound : music_) {
-        StopSound(sound);
+    for (Music& music : music_) {
+        if (IsMusicValid(music)) {
+            StopMusicStream(music);
+        }
     }
     currentMusic_ = MusicTrack::None;
 }
