@@ -14,7 +14,7 @@ public:
     void Run();
 
 private:
-    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry };
+    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry, ExitConfirm, ClearScoresConfirm };
     static constexpr int ScreenW = 480;
     static constexpr int ScreenH = 640;
 
@@ -26,6 +26,7 @@ private:
 
     State state_ = State::Title;
     State returnFromHowTo_ = State::Title;
+    State returnFromSettings_ = State::Title;
     Player player_;
     std::vector<Bullet> playerBullets_;
     std::vector<Bullet> enemyBullets_;
@@ -37,9 +38,17 @@ private:
     bool shouldExit_ = false;
     int titleSelection_ = 0;
     int pauseSelection_ = 0;
+    int gameOverSelection_ = 0;
+    int exitConfirmSelection_ = 0;
+    int clearScoresSelection_ = 0;
     float stageTime_ = 0.0f;
     int loop_ = 1;
     float clearTimer_ = 0.0f;
+    float gameOverTimer_ = 0.0f;
+
+    enum class InputType { KeyboardGamepad, Mouse };
+    InputType lastInputType_ = InputType::KeyboardGamepad;
+    Vector2 lastMousePos_ = { -1.0f, -1.0f };
     float scrollA_ = 0.0f;
     float scrollB_ = 0.0f;
     bool bossSpawned_ = false;
@@ -105,6 +114,8 @@ private:
     void UpdatePlaying(float dt);
     void UpdateSettings();
     void UpdateNameEntry();
+    void UpdateExitConfirm();
+    void UpdateClearScoresConfirm();
     void Draw();
     void DrawBackground() const;
     void DrawHud() const;
@@ -114,6 +125,8 @@ private:
     void DrawHighScores() const;
     void DrawSettings() const;
     void DrawNameEntry() const;
+    void DrawExitConfirm() const;
+    void DrawClearScoresConfirm() const;
     void HandleCollisions();
     void Cleanup();
     void SpawnDrop(Vector2 pos, EnemyType source);
@@ -123,7 +136,10 @@ private:
 
     // Settings and High Score Persist Helpers
     void LoadSettings();
+    void ApplyVolumeSettings();
     void SaveSettings();
+    void ResetSettingsToDefault();
+    void ClearScores();
     void LoadHighScores();
     void SaveHighScores();
     bool CheckHighScore(int score) const;

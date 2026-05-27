@@ -2,12 +2,38 @@
 
 Sky Circuit is a complete local C++17/raylib vertical arcade shooter. It captures the immediate feel of 1990s cabinet shmups with original procedural vector art, generated arcade tones, readable enemy patterns, powerups, bombs, score pressure, and a looping stage built for quick play sessions.
 
-## Quick Start for Players
+## Onboarding & How to Start the Game
 
-1. Launch the game.
-2. Hover and left-click menu choices to navigate, or use **Up/Down/W/S** and **Enter**.
-3. Adjust volumes by clicking and dragging sliders in the Settings menu.
-4. Hold fire (Z/Space/J), dodge with the tiny red core hitbox, and tap bomb (X/K) when the screen becomes unsafe.
+### 1. Compile the Project
+Before running, compile the codebase using CMake. It will automatically fetch Raylib 5.5 in memory.
+Run the following commands in your project root directory:
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+### 2. Launch the Executable
+Once the build is complete, launch the game binary:
+- **macOS / Linux**:
+  ```bash
+  ./build/sky_circuit
+  ```
+- **Windows**:
+  ```powershell
+  .\\build\\Release\\sky_circuit.exe
+  ```
+
+### 3. Navigate the Title Screen
+When the game starts up, select **Start Mission** to play:
+- **Mouse Navigation**: Hover your cursor over **Start Mission** and **left-click** to select it.
+- **Keyboard Navigation**: Press **Up/Down** or **W/S** to move the cursor pointer `>` and press **Enter** or **Space** to confirm.
+- **Gamepad Navigation**: Press **D-Pad Up/Down** and confirm with the **Down Face Button (A / Cross)**.
+
+### 4. First Flight Controls
+Once the mission starts, a helper banner will appear at the bottom of the playfield showing the active control configuration:
+- **Arrows Layout (Default)**: Move with Arrow Keys, Shoot with Z or Space, Bomb with X.
+- **WASD Layout**: Move with W/A/S/D, Shoot with J or Space, Bomb with K.
+*Note: You can switch control presets, adjust volume sliders, or toggle fullscreen modes inside the **Settings** menu at any time.*
 
 ## Features
 
