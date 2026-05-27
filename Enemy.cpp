@@ -68,6 +68,15 @@ void Enemy::FireRadialGap(std::vector<Bullet>& enemyBullets, int count, float sp
     }
 }
 
+bool Enemy::ReadyToFire(float rate) {
+    if (age < fireDelay) return false;
+    if (maxShots >= 0 && shotsFired >= maxShots) return false;
+    if (fireTimer <= rate) return false;
+    fireTimer = 0.0f;
+    ++shotsFired;
+    return true;
+}
+
 void Enemy::SetBossPhase(BossAttackPhase nextPhase) {
     int next = static_cast<int>(nextPhase);
     if (phase == next) return;
@@ -99,18 +108,83 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
     if (hitFlashTimer > 0.0f) hitFlashTimer -= dt;
 
     if (type == EnemyType::Popcorn) {
-        pos.x += (vel.x + std::sin(age * 4.2f) * drift) * dt;
-        pos.y += vel.y * dt;
-        if (fireTimer > 1.25f - std::min(0.45f, loop * 0.04f) && pos.y > 40 && pos.y < 430) {
-            fireTimer = 0;
-            FireAimed(playerPos, enemyBullets, 145.0f + loop * 12.0f);
+        switch (movePattern) {
+            case EnemyMovePattern::Straight:
+                pos.x += vel.x * dt;
+                pos.y += vel.y * dt;
+                break;
+            case EnemyMovePattern::NeedleSweep:
+                pos.x += (vel.x + std::sin(age * 5.2f + scriptPhase) * 18.0f) * dt;
+                pos.y += vel.y * dt;
+                break;
+            case EnemyMovePattern::DescendingScissors: {
+                float weave = std::sin(age * 2.8f + scriptPhase) * 54.0f;
+                pos.x += (vel.x + weave) * dt;
+                pos.y += (vel.y + std::max(0.0f, age - 1.0f) * 22.0f) * dt;
+                break;
+            }
+            case EnemyMovePattern::CrossLane:
+                pos.x += (vel.x + std::sin(age * 4.4f + scriptPhase) * 10.0f) * dt;
+                pos.y += (vel.y + std::cos(age * 2.0f + scriptPhase) * 20.0f) * dt;
+                break;
+            case EnemyMovePattern::OrbitalDrift:
+                pos.x += (vel.x + std::cos(age * 3.0f + scriptPhase) * 34.0f) * dt;
+                pos.y += (vel.y + std::sin(age * 2.2f + scriptPhase) * 16.0f) * dt;
+                break;
+            case EnemyMovePattern::Pincer:
+                pos.x += (vel.x * (1.0f + std::min(age, 1.6f) * 0.22f)) * dt;
+                pos.y += vel.y * dt;
+                break;
+            case EnemyMovePattern::CollapseRetreat: {
+                float turn = age > 1.35f ? std::min(1.0f, (age - 1.35f) * 1.4f) : 0.0f;
+                pos.x += (vel.x + std::sin(scriptPhase) * 95.0f * turn) * dt;
+                pos.y += (vel.y - 72.0f * turn) * dt;
+                break;
+            }
+            default:
+                pos.x += (vel.x + std::sin(age * 4.2f) * drift) * dt;
+                pos.y += vel.y * dt;
+                break;
+        }
+
+        if (pos.y > 36 && pos.y < 430) {
+            if (firePattern == EnemyFirePattern::Default) {
+                if (ReadyToFire(1.25f - std::min(0.45f, loop * 0.04f))) {
+                    FireAimed(playerPos, enemyBullets, 145.0f + loop * 12.0f);
+                }
+            } else if (firePattern == EnemyFirePattern::AimedSingle) {
+                if (ReadyToFire(0.0f)) FireAimed(playerPos, enemyBullets, 148.0f + loop * 10.0f);
+            } else if (firePattern == EnemyFirePattern::AimedPulse) {
+                float rate = fireRate > 0.0f ? fireRate : 0.82f;
+                if (ReadyToFire(rate)) FireAimed(playerPos, enemyBullets, 152.0f + loop * 11.0f);
+            } else if (firePattern == EnemyFirePattern::FanPulse) {
+                float rate = fireRate > 0.0f ? fireRate : 1.05f;
+                if (ReadyToFire(rate)) {
+                    FireAimedFan(playerPos, enemyBullets, 3, 140.0f + loop * 9.0f, 0.12f, Color{255, 96, 196, 255}, 5.0f);
+                }
+            }
         }
     } else if (type == EnemyType::Turret) {
-        pos.y += vel.y * dt;
-        if (pos.y > 118) vel.y = 15.0f;
-        if (fireTimer > 0.92f - std::min(0.25f, loop * 0.025f) && pos.y > 20 && pos.y < 520) {
-            fireTimer = 0;
-            FireAimed(playerPos, enemyBullets, 170.0f + loop * 9.0f);
+        if (movePattern == EnemyMovePattern::GatePatrol) {
+            pos.y += vel.y * dt;
+            if (pos.y > 84.0f) vel.y = 9.0f;
+            pos.x += std::sin(age * 1.15f + scriptPhase) * 18.0f * dt;
+        } else {
+            pos.y += vel.y * dt;
+            if (pos.y > 118) vel.y = 15.0f;
+        }
+
+        if (pos.y > 20 && pos.y < 520 && firePattern != EnemyFirePattern::Hold) {
+            if (firePattern == EnemyFirePattern::TurretBurst) {
+                float rate = fireRate > 0.0f ? fireRate : 0.38f;
+                if (ReadyToFire(rate)) {
+                    FireAimed(playerPos, enemyBullets, 176.0f + loop * 9.0f);
+                }
+            } else {
+                if (ReadyToFire(0.92f - std::min(0.25f, loop * 0.025f))) {
+                    FireAimed(playerPos, enemyBullets, 170.0f + loop * 9.0f);
+                }
+            }
         }
     } else {
         BossAttackPhase current = BossPhase();
@@ -233,6 +307,13 @@ void Enemy::Draw(bool debug) const {
     Color tint = flash ? Color{ 255, 100, 100, 255 } : WHITE;
 
     if (type == EnemyType::Popcorn) {
+        if (fireDelay > age && fireDelay - age < 0.45f && firePattern != EnemyFirePattern::Hold) {
+            float telegraph = 1.0f - (fireDelay - age) / 0.45f;
+            BeginBlendMode(BLEND_ADDITIVE);
+            DrawCircleLines((int)pos.x, (int)pos.y, 17.0f + telegraph * 6.0f, Fade(Color{90, 210, 255, 255}, 0.45f * telegraph));
+            EndBlendMode();
+        }
+
         // Flickering engine plume at top (moving downwards)
         if ((int)(age * 18) % 2 == 0) {
             float plumeH = 8.0f + std::sin(age * 50.0f) * 3.0f;
@@ -247,6 +328,13 @@ void Enemy::Draw(bool debug) const {
         // Draw Popcorn ship sprite rotated 180 degrees
         SpriteManager::Instance().Draw(SpriteId::Popcorn, pos, 180.0f, 1.8f, tint);
     } else if (type == EnemyType::Turret) {
+        if (fireDelay > age && fireDelay - age < 0.55f && firePattern != EnemyFirePattern::Hold) {
+            float telegraph = 1.0f - (fireDelay - age) / 0.55f;
+            BeginBlendMode(BLEND_ADDITIVE);
+            DrawCircleLines((int)pos.x, (int)pos.y, 22.0f + telegraph * 8.0f, Fade(ORANGE, 0.5f * telegraph));
+            EndBlendMode();
+        }
+
         // Draw Turret Base
         SpriteManager::Instance().Draw(SpriteId::TurretBase, pos, 0.0f, 1.8f, tint);
         // Draw Barrel pointing directly at player (with recoil frame shift if recently fired)

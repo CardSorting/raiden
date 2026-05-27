@@ -9,6 +9,9 @@ public:
     bool ShouldSpawnBoss(float stageTime, bool bossAlive) const;
 
 private:
-    int lastSecond_ = -1;
-    void SpawnPair(std::vector<Enemy>& enemies, float y, int loop, bool inward);
+    int nextCue_ = 0;
+    void SpawnCue(int cue, int loop, std::vector<Enemy>& enemies);
+    void AddEnemy(std::vector<Enemy>& enemies, EnemyType type, Vector2 pos, Vector2 vel, int loop,
+                  int formationId, EnemyMovePattern move, EnemyFirePattern fire,
+                  float fireDelay, float fireRate, int maxShots, float phase);
 };

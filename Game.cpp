@@ -583,7 +583,7 @@ void Game::StartGame() {
     tutorialTimer_ = 4.0f;
     ResetStorySystems();
     missionBriefing_.Begin();
-    for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
+    for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
     state_ = State::Playing;
     
     audio_.SetMusicDucked(false);
@@ -619,7 +619,7 @@ void Game::ReturnToTitle() {
     medalChainTimer_ = 0.0f;
     medalChain_ = 0;
     ResetStorySystems();
-    for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
+    for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
     state_ = State::Title;
     
     audio_.SetMusicDucked(false);
@@ -647,6 +647,7 @@ void Game::NextLoop() {
     medalChain_ = 0;
     ResetStorySystems();
     missionBriefing_.Begin();
+    for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     waves_.Reset();
     player_.bombs = std::min(6, player_.bombs + 1);
@@ -1355,7 +1356,7 @@ void Game::UpdatePlaying(float dt) {
 
     // Auto-detect newly spawned formations
     for (const auto& e : enemies_) {
-        if (e.active && e.formationId > 0 && e.formationId < 10) {
+        if (e.active && e.formationId > 0 && e.formationId < 32) {
             if (formationCount_[e.formationId] == 0) {
                 int count = 0;
                 for (const auto& other : enemies_) {
@@ -2054,7 +2055,7 @@ void Game::HandleCollisions() {
                     audio_.PlayExplosionAt(ExplosionSize::Small, e.pos.x, (float)ScreenW);
                 }
 
-                if (e.formationId > 0 && e.formationId < 10) {
+                if (e.formationId > 0 && e.formationId < 32) {
                     if (formationCount_[e.formationId] > 0) {
                         formationCount_[e.formationId]--;
                         if (formationCount_[e.formationId] == 0) {
@@ -2203,6 +2204,9 @@ void Game::ResetStorySystems() {
     commsFirstWave_ = false;
     commsUpperLane_ = false;
     commsBreakThrough_ = false;
+    commsEncirclement_ = false;
+    commsRecovery_ = false;
+    commsGateApproach_ = false;
     commsLowHealth_ = false;
     commsBombUsed_ = false;
     commsPickup_ = false;
@@ -2302,6 +2306,18 @@ void Game::UpdateCommsEvents(float dt) {
         commsBreakThrough_ = true;
         QueueComms(CommsSpeaker::Shade, "You always pick the locked door.", "Don’t drift admiring it.", 2, 2.7f);
     }
+    if (!commsEncirclement_ && stageTime_ > 25.4f && !bossSpawned_) {
+        commsEncirclement_ = true;
+        QueueComms(CommsSpeaker::Control, "Pincer vectors crossing.", "Find the gap, then push.", 3, 2.5f);
+    }
+    if (!commsRecovery_ && stageTime_ > 34.5f && !bossSpawned_) {
+        commsRecovery_ = true;
+        QueueComms(CommsSpeaker::Wrench, "Lane is open for a second.", "Take the metal, breathe.", 2, 2.5f);
+    }
+    if (!commsGateApproach_ && stageTime_ > 76.8f && !bossSpawned_) {
+        commsGateApproach_ = true;
+        QueueComms(CommsSpeaker::Ace, "Comms are getting thin.", "Something is listening.", 4, 2.8f);
+    }
     if (!commsLowHealth_ && player_.lives <= 1) {
         commsLowHealth_ = true;
         QueueComms(CommsSpeaker::Wrench, "SOLACE is heating fast.", "Ease the frame, Liora.", 4, 3.0f);
@@ -2325,7 +2341,7 @@ void Game::CheckScoreMilestones() {
 void Game::Cleanup() {
     // Disqualify formation score if any member escapes offscreen
     for (const auto& e : enemies_) {
-        if (e.active && e.Offscreen(ScreenH) && e.formationId > 0 && e.formationId < 10) {
+        if (e.active && e.Offscreen(ScreenH) && e.formationId > 0 && e.formationId < 32) {
             formationCount_[e.formationId] = -1;
         }
     }
@@ -2566,7 +2582,8 @@ void Game::DrawBackground() const {
     Color nebulaColor2 = Fade(BLUE, 0.12f);
     Color nebulaColor3 = Fade(VIOLET, 0.10f);
 
-    int beat = (int)stageTime_ % 90;
+    float routeTime = std::fmod(stageTime_, 90.0f);
+    int beat = (int)routeTime;
     if (bossWarningTimer_ > 0.0f) {
         // Red Alert Alert/Warning State
         float alertPulse = 0.5f + 0.5f * std::sin((float)GetTime() * 6.0f);
@@ -2574,24 +2591,36 @@ void Game::DrawBackground() const {
         nebulaColor1 = Fade(RED, 0.22f);
         nebulaColor2 = Fade(MAROON, 0.15f);
         nebulaColor3 = Fade(ORANGE, 0.10f);
-    } else if (beat < 30) {
-        // Phase 1: Orbit Entry (Dark Green/Cyan Space)
+    } else if (routeTime < 23.0f) {
+        // Entry/intercept/sweep: cool orbit lanes with clear silhouettes.
         bgColor = Color{4, 11, 18, 255};
         nebulaColor1 = Color{0, 145, 118, 30};
         nebulaColor2 = Color{0, 70, 105, 22};
         nebulaColor3 = Color{15, 120, 150, 18};
-    } else if (beat < 60) {
-        // Phase 2: Asteroid Storm (Deep Purple/Magenta Nebula)
+    } else if (routeTime < 34.0f) {
+        // Encirclement: warmer magenta pressure while vectors close in.
         bgColor = Color{11, 6, 21, 255};
         nebulaColor1 = Color{112, 0, 145, 27};
         nebulaColor2 = Color{70, 0, 105, 18};
         nebulaColor3 = Color{145, 10, 110, 17};
-    } else {
-        // Phase 3: Industrial Warzone (Deep Amber/Dark Crimson)
+    } else if (routeTime < 42.0f) {
+        // Recovery: desaturated calm before the route climbs again.
+        bgColor = Color{5, 10, 16, 255};
+        nebulaColor1 = Color{0, 120, 150, 18};
+        nebulaColor2 = Color{60, 70, 110, 14};
+        nebulaColor3 = Color{20, 150, 120, 12};
+    } else if (routeTime < 72.0f) {
+        // Escalation: industrial amber searchlight space.
         bgColor = Color{16, 7, 8, 255};
         nebulaColor1 = Color{145, 24, 0, 28};
         nebulaColor2 = Color{100, 15, 0, 18};
         nebulaColor3 = Color{170, 70, 0, 15};
+    } else {
+        // Gate warning: colder, emptier, with the lock shape coming forward.
+        bgColor = Color{8, 6, 13, 255};
+        nebulaColor1 = Color{90, 210, 255, 22};
+        nebulaColor2 = Color{145, 20, 60, 16};
+        nebulaColor3 = Color{255, 120, 30, 12};
     }
 
     ClearBackground(bgColor);
@@ -2605,8 +2634,8 @@ void Game::DrawBackground() const {
     DrawCircleGradient(200, (int)(nY2 - ScreenH), 290, nebulaColor3, Fade(BLACK, 0.0f));
 
     // 1a. Faint orbital gate silhouette: the stage's recurring denial icon.
-    if (bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
-        float gateAlpha = BossAlive() ? 0.18f : 0.11f;
+    if (routeTime > 74.0f || bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
+        float gateAlpha = BossAlive() ? 0.18f : (routeTime > 74.0f ? 0.07f + std::min(0.06f, (routeTime - 74.0f) * 0.008f) : 0.11f);
         float gatePulse = 0.5f + 0.5f * std::sin((float)GetTime() * 1.8f);
         Vector2 gateCenter = {240.0f, 128.0f};
         BeginBlendMode(BLEND_ADDITIVE);

@@ -161,6 +161,9 @@ private:
     bool commsFirstWave_ = false;
     bool commsUpperLane_ = false;
     bool commsBreakThrough_ = false;
+    bool commsEncirclement_ = false;
+    bool commsRecovery_ = false;
+    bool commsGateApproach_ = false;
     bool commsLowHealth_ = false;
     bool commsBombUsed_ = false;
     bool commsPickup_ = false;
@@ -280,7 +283,7 @@ private:
     void DrawCabinetBezel(float rx, float ry, float rw, float rh) const;
 
     // Formation tracking counters
-    int formationCount_[10]{};
+    int formationCount_[32]{};
     int nextScoreMilestone_ = 10000;
     int nextExtraLifeScore_ = 50000;
 
