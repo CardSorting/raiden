@@ -297,6 +297,30 @@ Powerup.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/Powerup.cpp.s
 .PHONY : Powerup.cpp.s
 
+SpriteManager.o: SpriteManager.cpp.o
+.PHONY : SpriteManager.o
+
+# target to build an object file
+SpriteManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o
+.PHONY : SpriteManager.cpp.o
+
+SpriteManager.i: SpriteManager.cpp.i
+.PHONY : SpriteManager.i
+
+# target to preprocess a source file
+SpriteManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/SpriteManager.cpp.i
+.PHONY : SpriteManager.cpp.i
+
+SpriteManager.s: SpriteManager.cpp.s
+.PHONY : SpriteManager.s
+
+# target to generate assembly for a file
+SpriteManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/SpriteManager.cpp.s
+.PHONY : SpriteManager.cpp.s
+
 WaveManager.o: WaveManager.cpp.o
 .PHONY : WaveManager.o
 
@@ -375,6 +399,9 @@ help:
 	@echo "... Powerup.o"
 	@echo "... Powerup.i"
 	@echo "... Powerup.s"
+	@echo "... SpriteManager.o"
+	@echo "... SpriteManager.i"
+	@echo "... SpriteManager.s"
 	@echo "... WaveManager.o"
 	@echo "... WaveManager.i"
 	@echo "... WaveManager.s"

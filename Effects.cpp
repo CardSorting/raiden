@@ -1,17 +1,54 @@
 #include "Effects.h"
+#include "SpriteManager.h"
 #include <algorithm>
 #include <cmath>
 
 void Effects::Update(float dt) {
+    // 1. Update classic particles
     for (auto& p : particles_) {
         p.life -= dt;
         p.pos.x += p.vel.x * dt;
         p.pos.y += p.vel.y * dt;
-        p.vel.x *= 0.985f;
-        p.vel.y *= 0.985f;
+        p.vel.x *= 0.975f;
+        p.vel.y *= 0.975f;
     }
     particles_.erase(std::remove_if(particles_.begin(), particles_.end(), [](const Particle& p){ return p.life <= 0; }), particles_.end());
 
+    // 2. Update animated explosion frames
+    for (auto& ae : animatedExplosions_) {
+        ae.life += dt;
+    }
+    animatedExplosions_.erase(std::remove_if(animatedExplosions_.begin(), animatedExplosions_.end(), [](const AnimatedExplosion& ae){ return ae.life >= ae.maxLife; }), animatedExplosions_.end());
+
+    // 3. Update Shockwaves
+    for (auto& sw : shockwaves_) {
+        sw.radius += sw.speed * dt;
+    }
+    // Erase completed shockwaves
+    auto swIt = std::remove_if(shockwaves_.begin(), shockwaves_.end(), [](const Shockwave& sw){ return sw.radius >= sw.maxRadius; });
+    shockwaves_.erase(swIt, shockwaves_.end());
+
+    // 4. Update Embers
+    for (auto& em : embers_) {
+        em.life -= dt;
+        em.pos.x += em.vel.x * dt;
+        em.pos.y += em.vel.y * dt;
+        em.vel.x *= 0.985f;
+        em.vel.y *= 0.985f;
+    }
+    embers_.erase(std::remove_if(embers_.begin(), embers_.end(), [](const Ember& em){ return em.life <= 0; }), embers_.end());
+
+    // 5. Update physical shrapnel Debris (affected by gravity so it drops downwards)
+    for (auto& d : debris_) {
+        d.life -= dt;
+        d.pos.x += d.vel.x * dt;
+        d.pos.y += d.vel.y * dt;
+        d.vel.y += 135.0f * dt; // gravity pull
+        d.rotation += d.spinSpeed * dt;
+    }
+    debris_.erase(std::remove_if(debris_.begin(), debris_.end(), [](const Debris& d){ return d.life <= 0; }), debris_.end());
+
+    // 6. Update text indicators
     for (auto& tp : textParticles_) {
         tp.life -= dt;
         tp.pos.y -= 25.0f * dt;
@@ -22,21 +59,83 @@ void Effects::Update(float dt) {
 }
 
 void Effects::Draw() const {
-    for (const auto& p : particles_) {
-        float a = p.life / p.maxLife;
-        DrawCircleV(p.pos, p.radius * (0.35f + a), Fade(p.color, a));
+    // 1. Draw animated spritesheet fireballs
+    for (const auto& ae : animatedExplosions_) {
+        if (ae.life < 0.0f) continue; // delayed trigger
+        int frame = (int)(ae.life / ae.maxLife * 8.0f);
+        frame = std::clamp(frame, 0, 7);
+        SpriteId spriteId = static_cast<SpriteId>((int)SpriteId::Explosion0 + frame);
+        SpriteManager::Instance().Draw(spriteId, ae.pos, ae.rotation, ae.scale);
     }
 
+    // 2. Draw additive glowing particles (shockwaves, fire embers)
+    BeginBlendMode(BLEND_ADDITIVE);
+    
+    // Draw expanding shockwave rings
+    for (const auto& sw : shockwaves_) {
+        float ratio = sw.radius / sw.maxRadius;
+        float alpha = 1.0f - ratio;
+        DrawCircleLines((int)sw.pos.x, (int)sw.pos.y, sw.radius, Fade(sw.color, alpha * 0.75f));
+        DrawCircleLines((int)sw.pos.x, (int)sw.pos.y, sw.radius - 2.5f, Fade(sw.color, alpha * 0.35f));
+    }
+    
+    // Draw fire embers
+    for (const auto& em : embers_) {
+        float ratio = em.life / em.maxLife;
+        DrawCircleV(em.pos, em.radius * (0.6f + ratio * 0.8f), Fade(em.color, ratio * 0.9f));
+    }
+    
+    EndBlendMode();
+
+    // 3. Draw physical shrapnel debris chunks (rotated rectangles or custom sprites!)
+    for (const auto& d : debris_) {
+        float ratio = d.life / d.maxLife;
+        if (d.useSprite) {
+            SpriteManager::Instance().Draw(d.spriteId, d.pos, d.rotation, d.size, Fade(WHITE, ratio));
+        } else {
+            Rectangle dest = { d.pos.x, d.pos.y, d.size, d.size };
+            Vector2 origin = { d.size / 2.0f, d.size / 2.0f };
+            DrawRectanglePro(dest, origin, d.rotation, Fade(d.color, ratio));
+        }
+    }
+
+    // 4. Draw classic ash & spark particles
+    for (const auto& p : particles_) {
+        float a = p.life / p.maxLife;
+        Color col = p.color;
+        if (a > 0.82f) {
+            col = WHITE;
+        } else if (a > 0.55f) {
+            col = YELLOW;
+        } else if (a > 0.32f) {
+            col = ORANGE;
+        } else if (a > 0.15f) {
+            col = RED;
+        } else {
+            col = Color{80, 80, 85, 255}; // dark ash gray
+        }
+
+        float sz = p.radius * (0.45f + a * 0.75f);
+        DrawRectangleV({ p.pos.x - sz / 2.0f, p.pos.y - sz / 2.0f }, { sz, sz }, Fade(col, a));
+    }
+
+    // 5. Draw score / event indicators
     for (const auto& tp : textParticles_) {
         float a = tp.life / tp.maxLife;
         int fontSize = 10;
         int tw = MeasureText(tp.text, fontSize);
+        
+        DrawText(tp.text, (int)(tp.pos.x - tw / 2) + 1, (int)tp.pos.y + 1, fontSize, Fade(BLACK, a * 0.65f));
         DrawText(tp.text, (int)(tp.pos.x - tw / 2), (int)tp.pos.y, fontSize, Fade(tp.color, a));
     }
 }
 
 void Effects::Clear() {
     particles_.clear();
+    animatedExplosions_.clear();
+    shockwaves_.clear();
+    embers_.clear();
+    debris_.clear();
     textParticles_.clear();
     shakeTime_ = 0.0f;
     shakeAmount_ = 0.0f;
@@ -45,29 +144,148 @@ void Effects::Clear() {
 void Effects::AddText(Vector2 pos, const char* text, Color color) {
     TextParticle tp;
     tp.pos = pos;
-    // Simple snprintf is safe and clean
     std::snprintf(tp.text, sizeof(tp.text), "%s", text);
     tp.color = color;
     tp.life = tp.maxLife = 0.8f;
     textParticles_.push_back(tp);
 }
 
-void Effects::Explosion(Vector2 pos, Color color, int count) {
-    for (int i = 0; i < count; ++i) {
-        float angle = (float)i / (float)count * 6.2831853f + (float)GetRandomValue(-10, 10) * 0.01f;
-        float speed = (float)GetRandomValue(45, 185);
+void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSprite) {
+    // 1. Trigger animated explosion sprite frame sequences
+    AnimatedExplosion ae;
+    ae.pos = pos;
+    ae.life = 0.0f;
+    ae.maxLife = (count > 50) ? 0.65f : 0.40f; 
+    ae.scale = (count > 50) ? 3.2f : ((count > 15) ? 1.7f : 0.9f);
+    ae.rotation = (float)GetRandomValue(0, 360);
+    animatedExplosions_.push_back(ae);
+
+    // 2. Cluster delayed secondary explosions for large carrier/boss ships
+    if (count > 50) {
+        for (int step = 0; step < 5; ++step) {
+            AnimatedExplosion subAe;
+            subAe.pos = { pos.x + GetRandomValue(-35, 35), pos.y + GetRandomValue(-35, 35) };
+            subAe.life = -0.07f * (float)(step + 1); // delayed trigger times
+            subAe.maxLife = 0.42f;
+            subAe.scale = (float)GetRandomValue(12, 22) / 10.0f;
+            subAe.rotation = (float)GetRandomValue(0, 360);
+            animatedExplosions_.push_back(subAe);
+        }
+    }
+
+    // 3. Trigger Additive Shockwave Rings
+    Shockwave sw;
+    sw.pos = pos;
+    sw.radius = 0.0f;
+    sw.maxRadius = (count > 50) ? 150.0f : ((count > 15) ? 65.0f : 30.0f);
+    sw.speed = (count > 50) ? 240.0f : 160.0f;
+    sw.color = (count > 50) ? VIOLET : ((count > 15) ? ORANGE : GOLD);
+    shockwaves_.push_back(sw);
+
+    // 4. Spawn Additive Embers (bright slow hot sparks)
+    int emberCount = (count > 50) ? 35 : ((count > 15) ? 12 : 3);
+    for (int i = 0; i < emberCount; ++i) {
+        float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+        float speed = (float)GetRandomValue(20, 85);
+        Ember em;
+        em.pos = pos;
+        em.vel = { std::cos(angle) * speed, std::sin(angle) * speed };
+        em.life = em.maxLife = (float)GetRandomValue(45, 95) / 100.0f;
+        em.radius = (float)GetRandomValue(12, 25) / 10.0f;
+        em.color = (GetRandomValue(0, 1) == 0) ? GOLD : ORANGE;
+        embers_.push_back(em);
+    }
+
+    // 5. Spawn Physical Shrapnel Debris (rotated gravity-affected panels or custom components)
+    int debrisCount = (count > 50) ? 18 : ((count > 15) ? 6 : 2);
+    for (int i = 0; i < debrisCount; ++i) {
+        float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+        float speed = (float)GetRandomValue(35, 140);
+        Debris d;
+        d.pos = pos;
+        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - 40.0f }; // slight upward launch bias
+        d.rotation = (float)GetRandomValue(0, 360);
+        d.spinSpeed = (float)GetRandomValue(-240, 240);
+        d.life = d.maxLife = (float)GetRandomValue(50, 110) / 100.0f;
+        
+        if (count > 50) {
+            d.useSprite = true;
+            if (i % 3 == 0) d.spriteId = SpriteId::DebrisBossCore;
+            else if (i % 3 == 1) d.spriteId = SpriteId::DebrisEnemyWing;
+            else d.spriteId = SpriteId::DebrisEnemyThruster;
+            d.size = (float)GetRandomValue(12, 18) / 10.0f;
+        } else if (debrisSprite != SpriteId::AsteroidChunk) {
+            d.spriteId = debrisSprite;
+            d.useSprite = true;
+            d.size = (float)GetRandomValue(10, 15) / 10.0f;
+        } else {
+            d.useSprite = false;
+            d.size = (float)GetRandomValue(2, 5);
+        }
+        
+        d.color = (GetRandomValue(0, 2) == 0) ? Color{110, 110, 115, 255} : Color{150, 45, 45, 255}; // steel grey or burning metal red
+        debris_.push_back(d);
+    }
+
+    // 6. Spawn classic Ash particles
+    int particleCount = (count > 50) ? 35 : count;
+    for (int i = 0; i < particleCount; ++i) {
+        float angle = (float)i / (float)particleCount * 6.2831853f + (float)GetRandomValue(-15, 15) * 0.01f;
+        float speed = (float)GetRandomValue(65, 205);
         Particle p;
         p.pos = pos;
         p.vel = {std::cos(angle) * speed, std::sin(angle) * speed};
-        p.life = p.maxLife = (float)GetRandomValue(25, 70) / 100.0f;
-        p.radius = (float)GetRandomValue(2, 5);
+        p.life = p.maxLife = (float)GetRandomValue(20, 75) / 100.0f;
+        p.radius = (float)GetRandomValue(2, 6);
         p.color = color;
         particles_.push_back(p);
     }
 }
 
 void Effects::Spark(Vector2 pos, Color color) {
-    Explosion(pos, color, 6);
+    // Spark particles
+    int count = 6;
+    for (int i = 0; i < count; ++i) {
+        float angle = (float)i / (float)count * 6.2831853f + (float)GetRandomValue(-40, 40) * 0.01f;
+        float speed = (float)GetRandomValue(95, 185);
+        Particle p;
+        p.pos = pos;
+        p.vel = {std::cos(angle) * speed, std::sin(angle) * speed};
+        p.life = p.maxLife = (float)GetRandomValue(10, 25) / 100.0f;
+        p.radius = (float)GetRandomValue(1, 3);
+        p.color = color;
+        particles_.push_back(p);
+    }
+}
+
+void Effects::EngineExhaust(Vector2 pos, Color color) {
+    Particle p;
+    p.pos = pos;
+    // Launch downwards (between 80 and 100 degrees)
+    float angle = (float)GetRandomValue(80, 100) * DEG2RAD;
+    float speed = (float)GetRandomValue(50, 110);
+    p.vel = { std::cos(angle) * speed, std::sin(angle) * speed };
+    p.life = p.maxLife = (float)GetRandomValue(15, 38) / 100.0f;
+    p.radius = (float)GetRandomValue(12, 28) / 10.0f;
+    p.color = color;
+    particles_.push_back(p);
+}
+
+void Effects::DebrisShower(Vector2 pos, Color color, int count) {
+    for (int i = 0; i < count; ++i) {
+        float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+        float speed = (float)GetRandomValue(50, 200);
+        Debris d;
+        d.pos = pos;
+        // Upward launch bias so it bounces and arcs down
+        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - 50.0f };
+        d.rotation = (float)GetRandomValue(0, 360);
+        d.spinSpeed = (float)GetRandomValue(-360, 360);
+        d.life = d.maxLife = (float)GetRandomValue(70, 160) / 100.0f;
+        d.size = (float)GetRandomValue(4, 9);
+        d.color = color;
+        debris_.push_back(d);
+    }
 }
 
 void Effects::Shake(float amount, float time) {
@@ -79,3 +297,5 @@ Vector2 Effects::ShakeOffset() const {
     if (shakeTime_ <= 0.0f) return {0, 0};
     return {(float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_, (float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_};
 }
+
+

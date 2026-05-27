@@ -13,6 +13,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/sky_circuit.dir/Player.cpp.o.d"
   "CMakeFiles/sky_circuit.dir/Powerup.cpp.o"
   "CMakeFiles/sky_circuit.dir/Powerup.cpp.o.d"
+  "CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o"
+  "CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o.d"
   "CMakeFiles/sky_circuit.dir/WaveManager.cpp.o"
   "CMakeFiles/sky_circuit.dir/WaveManager.cpp.o.d"
   "CMakeFiles/sky_circuit.dir/main.cpp.o"

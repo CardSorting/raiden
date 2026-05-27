@@ -3,6 +3,7 @@
 #include <vector>
 
 struct Bullet;
+class Effects;
 
 enum class EnemyType { Popcorn, Turret, Miniboss };
 
@@ -22,13 +23,15 @@ struct Enemy {
     float drift = 0.0f;
     float hitFlashTimer = 0.0f;
     int formationId = 0;
+    float aimAngle = 0.0f;
+    bool bossPanelsShed = false;  // Has boss shed its wing armor panels?
 
     Enemy() = default;
     Enemy(EnemyType t, Vector2 p, int loop, int formId = 0);
 
     void Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullets, int loop);
     void Draw(bool debug) const;
-    void Hit(int damage);
+    void Hit(int damage, Effects& effects);
     bool Offscreen(int height) const;
     bool IsBoss() const { return type == EnemyType::Miniboss; }
 

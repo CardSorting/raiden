@@ -27,7 +27,9 @@ add_executable(sky_circuit
   Powerup.cpp
   WaveManager.cpp
   Effects.cpp
+  SpriteManager.cpp
 )
+
 
 target_include_directories(sky_circuit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

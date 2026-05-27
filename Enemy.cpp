@@ -1,5 +1,7 @@
 #include "Enemy.h"
 #include "Bullet.h"
+#include "SpriteManager.h"
+#include "Effects.h"
 #include <cmath>
 
 static Vector2 Norm(Vector2 v) {
@@ -8,7 +10,7 @@ static Vector2 Norm(Vector2 v) {
     return {v.x / len, v.y / len};
 }
 
-Enemy::Enemy(EnemyType t, Vector2 p, int loop, int formId) : type(t), pos(p), formationId(formId) {
+Enemy::Enemy(EnemyType t, Vector2 p, int loop, int formId) : type(t), pos(p), formationId(formId), aimAngle(0.0f), bossPanelsShed(false) {
     if (type == EnemyType::Popcorn) {
         radius = 13; hp = maxHp = 2 + loop / 2; scoreValue = 120; vel = {0, 105}; drift = (float)GetRandomValue(-65, 65);
     } else if (type == EnemyType::Turret) {
@@ -86,11 +88,30 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
             }
         }
     }
+
+    // Dynamic rotation angle calculation pointing to player
+    if (type == EnemyType::Turret || type == EnemyType::Miniboss) {
+        float dx = playerPos.x - pos.x;
+        float dy = playerPos.y - pos.y;
+        aimAngle = std::atan2(dy, dx) * 57.29578f + 90.0f; // degrees, facing up as base
+    }
 }
 
-void Enemy::Hit(int damage) {
+void Enemy::Hit(int damage, Effects& effects) {
     hp -= damage;
     hitFlashTimer = 0.08f;
+
+    // Direct impact flash spark burst
+    effects.Spark(pos, WHITE);
+
+    // Boss Phase 2 Armor Shedding transition
+    if (IsBoss() && hp < maxHp / 2 && !bossPanelsShed) {
+        bossPanelsShed = true;
+        effects.DebrisShower(pos, Color{125, 130, 150, 255}, 12);
+        effects.Shake(12.0f, 0.4f);
+        effects.AddText(pos, "ARMOR BREACH", RED);
+    }
+
     if (hp <= 0) active = false;
 }
 
@@ -98,59 +119,91 @@ bool Enemy::Offscreen(int height) const { return pos.y > height + 70 || pos.x < 
 
 void Enemy::Draw(bool debug) const {
     bool flash = hitFlashTimer > 0.0f;
-    Color primaryColor = flash ? WHITE : (type == EnemyType::Popcorn ? RED : (type == EnemyType::Turret ? DARKGRAY : DARKPURPLE));
-    Color secondaryColor = flash ? WHITE : (type == EnemyType::Popcorn ? MAROON : (type == EnemyType::Turret ? ORANGE : VIOLET));
-    Color accentColor = flash ? WHITE : RED;
+    Color tint = flash ? Color{ 255, 100, 100, 255 } : WHITE;
 
     if (type == EnemyType::Popcorn) {
-        // Flickering engine fire at the back
-        if ((int)(age * 16) % 2 == 0) {
-            DrawTriangle({pos.x, pos.y - 18}, {pos.x - 4, pos.y - 10}, {pos.x + 4, pos.y - 10}, flash ? WHITE : ORANGE);
+        // Flickering engine plume at top (moving downwards)
+        if ((int)(age * 18) % 2 == 0) {
+            float plumeH = 8.0f + std::sin(age * 50.0f) * 3.0f;
+            DrawTriangle(
+                {pos.x - 3, pos.y - 12},
+                {pos.x, pos.y - 12 - plumeH},
+                {pos.x + 3, pos.y - 12},
+                ORANGE
+            );
         }
         
-        // Draw Popcorn ship with wings
-        DrawTriangle({pos.x, pos.y + 15}, {pos.x - 14, pos.y - 8}, {pos.x + 14, pos.y - 8}, primaryColor);
-        DrawTriangle({pos.x - 14, pos.y - 8}, {pos.x - 18, pos.y - 4}, {pos.x - 10, pos.y - 8}, secondaryColor);
-        DrawTriangle({pos.x + 14, pos.y - 8}, {pos.x + 10, pos.y - 8}, {pos.x + 18, pos.y - 4}, secondaryColor);
-        DrawCircleV(pos, 6, secondaryColor);
+        // Draw Popcorn ship sprite rotated 180 degrees
+        SpriteManager::Instance().Draw(SpriteId::Popcorn, pos, 180.0f, 1.8f, tint);
     } else if (type == EnemyType::Turret) {
-        // Draw detailed Turret base & gun barrel
-        DrawRectangleRounded({pos.x - 18, pos.y - 14, 36, 28}, 0.25f, 6, primaryColor);
-        DrawCircleV(pos, 11, secondaryColor);
-        // Draw rotating-like indicator
-        float angle = age * 2.5f;
-        Vector2 barrelEnd = { pos.x + std::cos(angle) * 12.0f, pos.y + std::sin(angle) * 12.0f };
-        DrawLineEx(pos, barrelEnd, 4.0f, flash ? WHITE : GRAY);
-        DrawCircleV(barrelEnd, 3, accentColor);
+        // Draw Turret Base
+        SpriteManager::Instance().Draw(SpriteId::TurretBase, pos, 0.0f, 1.8f, tint);
+        // Draw Barrel pointing directly at player (with recoil frame shift if recently fired)
+        SpriteId barrelId = (fireTimer < 0.12f) ? SpriteId::TurretBarrelRecoil : SpriteId::TurretBarrel;
+        SpriteManager::Instance().Draw(barrelId, pos, aimAngle, 1.8f, tint);
     } else {
-        // Draw highly detailed Boss
+        // Draw boss
         bool phase2 = (hp < maxHp / 2);
-        
-        // Left & Right engines firing
-        float flameRate = phase2 ? 18.0f : 12.0f;
+        SpriteId bossSprite = phase2 ? SpriteId::BossDamaged : SpriteId::Boss;
+
+        // Double engine plumes at the top (facing down)
+        float flameRate = phase2 ? 22.0f : 14.0f;
         if ((int)(age * flameRate) % 2 == 0) {
-            DrawTriangle({pos.x - 24, pos.y - 58}, {pos.x - 30, pos.y - 48}, {pos.x - 18, pos.y - 48}, flash ? WHITE : ORANGE);
-            DrawTriangle({pos.x + 24, pos.y - 58}, {pos.x + 18, pos.y - 48}, {pos.x + 30, pos.y - 48}, flash ? WHITE : ORANGE);
+            float plumeH = 15.0f + std::sin(age * 60.0f) * 5.0f;
+            DrawTriangle({pos.x - 24, pos.y - 48}, {pos.x - 28, pos.y - 48 - plumeH}, {pos.x - 20, pos.y - 48}, ORANGE);
+            DrawTriangle({pos.x - 23, pos.y - 48}, {pos.x - 25, pos.y - 48 - (plumeH * 0.6f)}, {pos.x - 21, pos.y - 48}, YELLOW);
+            
+            DrawTriangle({pos.x + 24, pos.y - 48}, {pos.x + 20, pos.y - 48}, {pos.x + 28, pos.y - 48 - plumeH}, ORANGE);
+            DrawTriangle({pos.x + 23, pos.y - 48}, {pos.x + 21, pos.y - 48}, {pos.x + 25, pos.y - 48 - (plumeH * 0.6f)}, YELLOW);
+        }
+
+        // Draw Boss sprite facing down (180 degrees)
+        SpriteManager::Instance().Draw(bossSprite, pos, 180.0f, 1.8f, tint);
+        
+        // Draw the core glowing center (Weak Point Indicator) and emissive wing lights
+        float pulse = 0.5f + 0.5f * std::sin(age * 12.0f);
+        Color coreColor = phase2 ? Color{ 255, 40, 40, 255 } : Color{ 255, 170, 0, 255 };
+        if (flash) coreColor = WHITE;
+        
+        BeginBlendMode(BLEND_ADDITIVE);
+        // Outer glowing core aura
+        DrawCircleV(pos, 8.0f + 4.0f * pulse, Fade(coreColor, 0.65f + 0.35f * pulse));
+        // Inner hot core
+        DrawCircleV(pos, 3.5f, WHITE);
+        
+        // Emissive green wingtip sensors
+        float sensorPulse = 0.6f + 0.4f * std::sin(age * 8.0f);
+        DrawCircleV({ pos.x - 55.0f, pos.y - 4.0f }, 2.5f, Fade(LIME, sensorPulse));
+        DrawCircleV({ pos.x + 55.0f, pos.y - 4.0f }, 2.5f, Fade(LIME, sensorPulse));
+        EndBlendMode();
+
+        // Mechanical damage arcs/sparks from wings
+        if (phase2) {
+            BeginBlendMode(BLEND_ADDITIVE);
+            for (int i = 0; i < 2; ++i) {
+                Vector2 wp = (i == 0) ? Vector2{ pos.x - 30.0f, pos.y - 8.0f } : Vector2{ pos.x + 30.0f, pos.y - 8.0f };
+                if (GetRandomValue(0, 10) < 4) {
+                    float sz = (float)GetRandomValue(3, 7);
+                    DrawCircleV(wp, sz, (GetRandomValue(0, 1) == 0) ? ORANGE : RED);
+                    DrawLineV(wp, { wp.x + GetRandomValue(-12, 12), wp.y + GetRandomValue(8, 24) }, GOLD);
+                }
+            }
+            EndBlendMode();
         }
         
-        // Plating and hull structures
-        DrawCircleV(pos, 47, primaryColor);
-        DrawCircleV({pos.x - 24, pos.y + 8}, 17, secondaryColor);
-        DrawCircleV({pos.x + 24, pos.y + 8}, 17, secondaryColor);
-        
-        // Wing spikes
-        DrawTriangle({pos.x - 47, pos.y - 10}, {pos.x - 65, pos.y + 10}, {pos.x - 40, pos.y + 15}, secondaryColor);
-        DrawTriangle({pos.x + 47, pos.y - 10}, {pos.x + 40, pos.y + 15}, {pos.x + 65, pos.y + 10}, secondaryColor);
-        
-        // Glowing cockpit dome
-        Color cockpitColor = flash ? WHITE : (phase2 ? ((int)(age * 10) % 2 == 0 ? RED : GOLD) : SKYBLUE);
-        DrawCircleV({pos.x, pos.y + 20}, 10, cockpitColor);
-        DrawCircleV({pos.x - 3, pos.y + 17}, 3, flash ? WHITE : Fade(WHITE, 0.7f));
-        
-        // Boss HP Bar
+        // Draw premium arcade Boss HP Bar
         Color hpColor = flash ? WHITE : (phase2 ? RED : LIME);
-        DrawRectangle((int)pos.x - 50, (int)pos.y - 62, 100, 6, flash ? WHITE : DARKGRAY);
-        DrawRectangle((int)pos.x - 50, (int)pos.y - 62, (int)(100.0f * (float)hp / (float)maxHp), 6, hpColor);
+        int barY = (int)pos.y - 68;
+        
+        // Draw HP bar outline bezel
+        DrawRectangle((int)pos.x - 52, barY - 1, 104, 8, DARKGRAY);
+        DrawRectangle((int)pos.x - 51, barY, 102, 6, BLACK);
+        DrawRectangle((int)pos.x - 51, barY, (int)(102.0f * (float)hp / (float)maxHp), 6, hpColor);
+        
+        // "BOSS" text above bar
+        int textW = MeasureText("WARNING: HOSTILE CARRIER", 10);
+        DrawText("WARNING: HOSTILE CARRIER", (int)pos.x - textW / 2, barY - 12, 10, phase2 ? RED : GOLD);
     }
+    
     if (debug) DrawCircleLines((int)pos.x, (int)pos.y, radius, GREEN);
 }

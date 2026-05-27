@@ -4,6 +4,8 @@
 #include "Enemy.h"
 #include <vector>
 
+class Effects;
+
 enum class WeaponType { Vulcan, Plasma, Missile };
 
 class Player {
@@ -22,10 +24,15 @@ public:
     bool triggerBomb_ = false;
     float animationTime = 0.0f;
     int controlLayout = 0;
+    float tilt_ = 0.0f;             // Horizontal banking/tilt animation state
+    float muzzleFlashTimer_ = 0.0f;  // Screen duration timer for weapon fire sparks
+    float recoilOffset_ = 0.0f;      // Recoil shift offset
+    float scaleY_ = 1.0f;            // Squash/stretch recoil scaling factor
+    float heat_ = 0.0f;              // Wing vent heat level for ember particles
 
     void ResetForNewGame();
     void ResetAfterHit();
-    void Update(float dt, const std::vector<Enemy>& enemies = {}, const std::vector<Bullet>& enemyBullets = {});
+    void Update(float dt, Effects& effects, const std::vector<Enemy>& enemies = {}, const std::vector<Bullet>& enemyBullets = {});
     void Draw(bool debug) const;
     void TryShoot(std::vector<Bullet>& playerBullets);
     bool BombPressed() const;
@@ -37,3 +44,4 @@ public:
 private:
     float shootTimer_ = 0.0f;
 };
+

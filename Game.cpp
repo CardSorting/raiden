@@ -1,10 +1,82 @@
 #include "Game.h"
+#include "SpriteManager.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <string>
+
+static const char* VS_CODE = 
+    "#version 330\n"
+    "in vec3 vertexPosition;\n"
+    "in vec2 vertexTexCoord;\n"
+    "in vec4 vertexColor;\n"
+    "out vec2 fragTexCoord;\n"
+    "out vec4 fragColor;\n"
+    "uniform mat4 mvp;\n"
+    "void main() {\n"
+    "    fragTexCoord = vertexTexCoord;\n"
+    "    fragColor = vertexColor;\n"
+    "    gl_Position = mvp * vec4(vertexPosition, 1.0);\n"
+    "}\n";
+
+static const char* FS_CODE = 
+    "#version 330\n"
+    "in vec2 fragTexCoord;\n"
+    "in vec4 fragColor;\n"
+    "out vec4 finalColor;\n"
+    "uniform sampler2D texture0;\n"
+    "uniform vec4 colDiffuse;\n"
+    "\n"
+    "const float curvature = 0.045;\n"
+    "const float scanlineWeight = 0.22;\n"
+    "const float scanlineFreq = 640.0;\n"
+    "const float chromaticOffset = 0.0018;\n"
+    "const float vignetteStrength = 0.12;\n"
+    "const float brightness = 1.18;\n"
+    "\n"
+    "vec2 curve(vec2 uv) {\n"
+    "    uv = uv * 2.0 - 1.0;\n"
+    "    vec2 offset = abs(uv.yx) * curvature;\n"
+    "    uv = uv + uv * offset * offset;\n"
+    "    uv = uv * 0.5 + 0.5;\n"
+    "    return uv;\n"
+    "}\n"
+    "\n"
+    "void main() {\n"
+    "    vec2 uv = curve(fragTexCoord);\n"
+    "    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {\n"
+    "        finalColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
+    "        return;\n"
+    "    }\n"
+    "    vec2 offset = uv - vec2(0.5);\n"
+    "    vec4 col;\n"
+    "    vec2 offRed = offset * chromaticOffset;\n"
+    "    col.r = texture(texture0, uv - offRed).r;\n"
+    "    col.g = texture(texture0, uv).g;\n"
+    "    col.b = texture(texture0, uv + offRed).b;\n"
+    "    col.a = texture(texture0, uv).a;\n"
+    "\n"
+    "    // Phosphor glow bloom bleed simulation\n"
+    "    vec4 bloom = texture(texture0, uv + vec2(-0.001, -0.001)) +\n"
+    "                 texture(texture0, uv + vec2(0.001, -0.001)) +\n"
+    "                 texture(texture0, uv + vec2(-0.001, 0.001)) +\n"
+    "                 texture(texture0, uv + vec2(0.001, 0.001));\n"
+    "    col.rgb = mix(col.rgb, bloom.rgb * 0.25, 0.14);\n"
+    "\n"
+    "    float scanline = sin(uv.y * scanlineFreq * 3.14159265 * 2.0);\n"
+    "    scanline = mix(1.0, (scanline + 1.0) * 0.5, scanlineWeight);\n"
+    "    col.rgb *= scanline;\n"
+    "    float grid = sin(uv.x * 480.0 * 3.14159265 * 2.0);\n"
+    "    grid = mix(1.0, (grid + 1.0) * 0.5, 0.08);\n"
+    "    col.rgb *= grid;\n"
+    "    float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);\n"
+    "    vignette = clamp(pow(16.0 * vignette, vignetteStrength), 0.0, 1.0);\n"
+    "    col.rgb *= vignette;\n"
+    "    col.rgb *= brightness;\n"
+    "    finalColor = col * colDiffuse * fragColor;\n"
+    "}";
 
 static std::string Trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
@@ -25,7 +97,14 @@ Game::Game() {
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
     audio_.Init();
+    
+    // Initialize Pixel Art Sprites, Shaders, and Render Targets
+    SpriteManager::Instance().Init();
+    screenTarget_ = LoadRenderTexture(ScreenW, ScreenH);
+    crtShader_ = LoadShaderFromMemory(VS_CODE, FS_CODE);
+    
     lastMousePos_ = GetMousePosition();
+
     
     // Load high scores and settings
     LoadHighScores();
@@ -51,22 +130,93 @@ Game::Game() {
             stars_[i].color = Fade(RAYWHITE, 0.8f);
         }
     }
+
+    // Populate background asteroids
+    for (int i = 0; i < 8; ++i) {
+        AsteroidInstance ast;
+        ast.pos = { (float)GetRandomValue(0, ScreenW), (float)GetRandomValue(-ScreenH, ScreenH) };
+        ast.speed = (float)GetRandomValue(35, 60);
+        ast.rotation = (float)GetRandomValue(0, 360);
+        ast.spinSpeed = (float)GetRandomValue(-30, 30);
+        ast.scale = (float)GetRandomValue(8, 20) / 10.0f;
+        backgroundAsteroids_.push_back(ast);
+    }
+
+    // Populate background clouds
+    for (int i = 0; i < 5; ++i) {
+        CloudInstance cld;
+        cld.pos = { (float)GetRandomValue(-20, ScreenW - 20), (float)GetRandomValue(-ScreenH, ScreenH) };
+        cld.speed = (float)GetRandomValue(70, 110);
+        cld.scale = (float)GetRandomValue(15, 30) / 10.0f;
+        backgroundClouds_.push_back(cld);
+    }
 }
 
 Game::~Game() {
     audio_.Shutdown();
+    if (crtShader_.id != 0) UnloadShader(crtShader_);
+    UnloadRenderTexture(screenTarget_);
+    SpriteManager::Instance().Cleanup();
     CloseWindow();
 }
 
 void Game::Run() {
     while (!WindowShouldClose() && !shouldExit_) {
         Update(GetFrameTime());
-        BeginDrawing();
+        
+        // 1. Render gameplay at 480x640 to offscreen virtual canvas
+        BeginTextureMode(screenTarget_);
         ClearBackground(BLACK);
         Draw();
+        EndTextureMode();
+        
+        // 2. Render virtual canvas to window viewport with scaling/CRT shaders
+        BeginDrawing();
+        ClearBackground(BLACK);
+        
+        float scale = std::min((float)GetScreenWidth() / ScreenW, (float)GetScreenHeight() / ScreenH);
+        if (aspectMode_ == 1) { // Integer scaling
+            scale = std::max(1.0f, std::floor(scale));
+        }
+        
+        float w = ScreenW * scale;
+        float h = ScreenH * scale;
+        if (aspectMode_ == 2) { // Stretch scaling
+            w = (float)GetScreenWidth();
+            h = (float)GetScreenHeight();
+        }
+        
+        float x = (GetScreenWidth() - w) / 2.0f;
+        float y = (GetScreenHeight() - h) / 2.0f;
+        
+        // Draw bezel cabinet panels if borders exist
+        if (drawBezel_ && aspectMode_ != 2 && (x > 10.0f || y > 10.0f)) {
+            DrawCabinetBezel(x, y, w, h);
+        }
+        
+        // Apply CRT shader
+        if (crtShaderEnabled_ && crtShader_.id != 0) {
+            BeginShaderMode(crtShader_);
+        }
+        
+        // Draw render texture (flipped vertically because raylib textures are flipped in memory)
+        DrawTexturePro(
+            screenTarget_.texture,
+            Rectangle{0, 0, (float)screenTarget_.texture.width, -(float)screenTarget_.texture.height},
+            Rectangle{x, y, w, h},
+            Vector2{0, 0},
+            0.0f,
+            WHITE
+        );
+        
+        if (crtShaderEnabled_ && crtShader_.id != 0) {
+            EndShaderMode();
+        }
+        
         EndDrawing();
     }
 }
+
 
 void Game::StartGame() {
     player_.ResetForNewGame();
@@ -74,6 +224,10 @@ void Game::StartGame() {
     player_.isDemo = demoMode_;
     player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
+    bgLasers_.clear();
+    bgSparks_.clear();
+    spaceStationScrollY_ = 0.0f;
+    screenFlashTimer_ = 0.0f;
     effects_.Clear();
     waves_.Reset();
     stageTime_ = 0.0f;
@@ -222,6 +376,79 @@ void Game::Update(float dt) {
             stars_[i].pos.x = (float)GetRandomValue(0, ScreenW);
         }
     }
+
+    // Scroll parallax background layers
+    nebulaScroll_ += 8.0f * dt;
+    if (nebulaScroll_ > ScreenH) nebulaScroll_ -= ScreenH;
+
+    for (auto& ast : backgroundAsteroids_) {
+        ast.pos.y += ast.speed * dt;
+        ast.rotation += ast.spinSpeed * dt;
+        if (ast.pos.y > ScreenH + 30) {
+            ast.pos.y = -40;
+            ast.pos.x = (float)GetRandomValue(0, ScreenW);
+            ast.rotation = (float)GetRandomValue(0, 360);
+        }
+    }
+
+    for (auto& cld : backgroundClouds_) {
+        cld.pos.y += cld.speed * dt;
+        if (cld.pos.y > ScreenH + 80) {
+            cld.pos.y = -90;
+            cld.pos.x = (float)GetRandomValue(-20, ScreenW - 20);
+        }
+    }
+
+    // Scroll space station walls
+    spaceStationScrollY_ += 35.0f * dt;
+    if (spaceStationScrollY_ > 32.0f) spaceStationScrollY_ -= 32.0f;
+
+    // Update screen flash
+    if (screenFlashTimer_ > 0.0f) {
+        screenFlashTimer_ -= dt;
+    }
+
+    // Update distant battles (bgLasers_ and bgSparks_)
+    for (auto& l : bgLasers_) {
+        l.life -= dt;
+    }
+    bgLasers_.erase(std::remove_if(bgLasers_.begin(), bgLasers_.end(), [](const BackgroundLaser& l) { return l.life <= 0.0f; }), bgLasers_.end());
+
+    for (auto& s : bgSparks_) {
+        s.life -= dt;
+        s.pos.x += s.vel.x * dt;
+        s.pos.y += s.vel.y * dt;
+    }
+    bgSparks_.erase(std::remove_if(bgSparks_.begin(), bgSparks_.end(), [](const BackgroundSpark& s) { return s.life <= 0.0f; }), bgSparks_.end());
+
+    // Spawn new distant lasers & sparks
+    if (state_ == State::Playing && GetRandomValue(0, 100) < 2 && bgLasers_.size() < 3) {
+        BackgroundLaser l;
+        float startY = (float)GetRandomValue(50, ScreenH - 150);
+        float angle = (float)GetRandomValue(-20, 20) * DEG2RAD;
+        bool directionLeft = GetRandomValue(0, 1) == 0;
+        l.start = directionLeft ? Vector2{ 0, startY } : Vector2{ (float)ScreenW, startY };
+        float length = (float)GetRandomValue(150, 300);
+        l.end = { l.start.x + (directionLeft ? 1.0f : -1.0f) * cosf(angle) * length, l.start.y + sinf(angle) * length };
+        l.maxLife = l.life = (float)GetRandomValue(10, 25) / 100.0f; // fast flash
+        l.color = (GetRandomValue(0, 1) == 0) ? RED : LIME;
+        bgLasers_.push_back(l);
+
+        // Spawn background sparks
+        int sparkCount = GetRandomValue(3, 6);
+        Vector2 sparkOrigin = (GetRandomValue(0, 1) == 0) ? l.start : l.end;
+        for (int i = 0; i < sparkCount; ++i) {
+            BackgroundSpark s;
+            s.pos = sparkOrigin;
+            float sAngle = (float)GetRandomValue(0, 360) * DEG2RAD;
+            float speed = (float)GetRandomValue(25, 60);
+            s.vel = { cosf(sAngle) * speed, sinf(sAngle) * speed };
+            s.maxLife = s.life = (float)GetRandomValue(20, 60) / 100.0f;
+            s.color = l.color;
+            bgSparks_.push_back(s);
+        }
+    }
+
     
     effects_.Update(dt);
     if (settingsFeedbackTimer_ > 0.0f) {
@@ -597,17 +824,62 @@ void Game::UpdatePlaying(float dt) {
     if (bossDeathTimer_ > 0.0f) {
         bossDeathTimer_ -= dt;
         bossDeathExplosionTimer_ += dt;
-        if (bossDeathExplosionTimer_ > 0.15f) {
-            bossDeathExplosionTimer_ = 0.0f;
-            Vector2 offset = { (float)GetRandomValue(-40, 40), (float)GetRandomValue(-40, 40) };
-            effects_.Explosion({ bossDeathPos_.x + offset.x, bossDeathPos_.y + offset.y }, ORANGE, 14);
-            effects_.Shake(5.0f, 0.15f);
-            audio_.PlayExplosionAt(ExplosionSize::Small, bossDeathPos_.x + offset.x, (float)ScreenW);
-        }
         
+        // Phase 1: 1.6s - 1.2s (Left/right wing pods rupture - sparks + shrapnel)
+        if (bossDeathTimer_ > 1.2f) {
+            if (bossDeathExplosionTimer_ > 0.06f) {
+                bossDeathExplosionTimer_ = 0.0f;
+                Vector2 wingOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-28.0f, 0.0f} : Vector2{28.0f, 0.0f};
+                Vector2 spawnPos = { bossDeathPos_.x + wingOffset.x + GetRandomValue(-6, 6), bossDeathPos_.y + wingOffset.y + GetRandomValue(-6, 6) };
+                effects_.Spark(spawnPos, GOLD);
+                effects_.Explosion(spawnPos, ORANGE, 10);
+                effects_.DebrisShower(spawnPos, Color{145, 40, 200, 255}, 5); // Purple wing trim
+                effects_.DebrisShower(spawnPos, DARKGRAY, 4);
+                effects_.Shake(4.0f, 0.12f);
+                audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
+            }
+        }
+        // Phase 2: 1.2s - 0.7s (Engines blow out - thick smoke)
+        else if (bossDeathTimer_ > 0.7f) {
+            if (bossDeathExplosionTimer_ > 0.08f) {
+                bossDeathExplosionTimer_ = 0.0f;
+                Vector2 engineOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-16.0f, 22.0f} : Vector2{16.0f, 22.0f};
+                Vector2 spawnPos = { bossDeathPos_.x + engineOffset.x + GetRandomValue(-5, 5), bossDeathPos_.y + engineOffset.y + GetRandomValue(-5, 5) };
+                effects_.Explosion(spawnPos, GRAY, 15);
+                effects_.DebrisShower(spawnPos, Color{80, 80, 85, 255}, 6); // Engine plating parts
+                effects_.Shake(6.0f, 0.15f);
+                audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
+            }
+        }
+        // Phase 3: 0.7s - 0.1s (Core structural fireballs cascade)
+        else if (bossDeathTimer_ > 0.1f) {
+            if (bossDeathExplosionTimer_ > 0.08f) {
+                bossDeathExplosionTimer_ = 0.0f;
+                Vector2 randOffset = { (float)GetRandomValue(-20, 20), (float)GetRandomValue(-20, 20) };
+                Vector2 spawnPos = { bossDeathPos_.x + randOffset.x, bossDeathPos_.y + randOffset.y };
+                effects_.Explosion(spawnPos, ORANGE, 16);
+                effects_.Shake(8.0f, 0.15f);
+                audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
+            }
+        }
+        // Phase 4: 0.1s - 0.0s (Final detonation charging - white sparks)
+        else {
+            if (bossDeathExplosionTimer_ > 0.04f) {
+                bossDeathExplosionTimer_ = 0.0f;
+                effects_.Spark(bossDeathPos_, WHITE);
+            }
+        }
+
         if (bossDeathTimer_ <= 0.0f) {
-            effects_.Explosion(bossDeathPos_, VIOLET, 85);
-            effects_.Shake(14.0f, 0.6f);
+            effects_.Explosion(bossDeathPos_, VIOLET, 95);
+            effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 10); // Gold core shards
+            effects_.DebrisShower(bossDeathPos_, DARKGRAY, 12); // Hull shards
+            effects_.DebrisShower(bossDeathPos_, RED, 8); // Hot core slag
+            effects_.Shake(24.0f, 0.8f);
+            
+            // Trigger full-screen white flash
+            screenFlashTimer_ = 0.15f;
+
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
             audio_.PlayStageClear();
             
@@ -635,7 +907,7 @@ void Game::UpdatePlaying(float dt) {
         medalChainTimer_ -= dt;
         if (medalChainTimer_ <= 0.0f) medalChain_ = 0;
     }
-    player_.Update(dt, enemies_, enemyBullets_);
+    player_.Update(dt, effects_, enemies_, enemyBullets_);
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
     if (playerBullets_.size() > before) {
@@ -645,7 +917,7 @@ void Game::UpdatePlaying(float dt) {
     bool bombRequested = player_.BombPressed();
     if (player_.TryBomb()) {
         enemyBullets_.clear();
-        for (auto& e : enemies_) e.Hit(e.IsBoss() ? 28 : 99);
+        for (auto& e : enemies_) e.Hit(e.IsBoss() ? 28 : 99, effects_);
         effects_.Explosion(player_.pos, SKYBLUE, 58);
         effects_.Shake(10.0f, 0.35f);
         audio_.PlayBomb();
@@ -692,7 +964,13 @@ void Game::UpdatePlaying(float dt) {
         }
     }
 
-    for (auto& b : playerBullets_) b.Update(dt, enemies_);
+    for (auto& b : playerBullets_) {
+        b.Update(dt, enemies_);
+        if (b.homing && GetRandomValue(0, 1) == 0) {
+            // Spawn a light gray smoke particle behind homing missiles
+            effects_.Explosion(b.pos, Color{130, 130, 135, 130}, 1);
+        }
+    }
     for (auto& b : enemyBullets_) b.Update(dt, enemies_);
     size_t beforeBullets = enemyBullets_.size();
     for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_ + (difficulty_ == 1 ? 1 : 0));
@@ -723,6 +1001,16 @@ void Game::UpdatePlaying(float dt) {
             break;
         }
     }
+
+    // Spawn damage smoke particles from damaged boss core
+    for (const auto& e : enemies_) {
+        if (e.active && e.IsBoss() && e.hp < e.maxHp / 2) {
+            if (GetRandomValue(0, 4) == 0) {
+                effects_.Explosion(Vector2{ e.pos.x + (float)GetRandomValue(-24, 24), e.pos.y + (float)GetRandomValue(-24, 24) }, Color{80, 80, 80, 160}, 1);
+            }
+        }
+    }
+
 
     if (bossSpawned_ && !BossAlive() && state_ == State::Playing) {
         bossDeathTimer_ = 1.6f;
@@ -772,9 +1060,9 @@ void Game::UpdateSettings() {
     settingsLastMouse = mousePos;
     
     if (lastInputType_ == InputType::Mouse && mouseMoved) {
-        for (int i = 0; i < 10; ++i) {
-            int y = 145 + i * 30;
-            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+        for (int i = 0; i < 13; ++i) {
+            int y = 125 + i * 25;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 5 && mousePos.y <= y + 18) {
                 if (settingsSelection_ != i) {
                     settingsSelection_ = i;
                     audio_.PlayMenuMove();
@@ -787,8 +1075,8 @@ void Game::UpdateSettings() {
     bool mouseDragging = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     if (mouseDragging) {
         for (int i = 0; i < 3; ++i) {
-            int y = 145 + i * 30;
-            if (mousePos.x >= 270 && mousePos.x <= 390 && mousePos.y >= y - 10 && mousePos.y <= y + 20) {
+            int y = 125 + i * 25;
+            if (mousePos.x >= 270 && mousePos.x <= 390 && mousePos.y >= y - 8 && mousePos.y <= y + 18) {
                 settingsSelection_ = i;
                 int vol = (int)((mousePos.x - 280.0f + 5.0f) / 10.0f);
                 vol = std::clamp(vol, 0, 10);
@@ -814,9 +1102,9 @@ void Game::UpdateSettings() {
     
     // Mouse clicks
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        for (int i = 0; i < 10; ++i) {
-            int y = 145 + i * 30;
-            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+        for (int i = 0; i < 13; ++i) {
+            int y = 125 + i * 25;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 5 && mousePos.y <= y + 18) {
                 settingsSelection_ = i;
                 keyConfirm = true;
             }
@@ -824,11 +1112,11 @@ void Game::UpdateSettings() {
     }
     
     if (keyUp) {
-        settingsSelection_ = (settingsSelection_ + 9) % 10;
+        settingsSelection_ = (settingsSelection_ + 12) % 13;
         audio_.PlayMenuMove();
     }
     if (keyDown) {
-        settingsSelection_ = (settingsSelection_ + 1) % 10;
+        settingsSelection_ = (settingsSelection_ + 1) % 13;
         audio_.PlayMenuMove();
     }
     
@@ -885,19 +1173,41 @@ void Game::UpdateSettings() {
         }
     } else if (settingsSelection_ == 5) {
         if (keyLeft || keyRight || keyConfirm) {
+            crtShaderEnabled_ = !crtShaderEnabled_;
+            changed = true;
+            audio_.PlayMenuConfirm();
+        }
+    } else if (settingsSelection_ == 6) {
+        if (keyLeft || keyConfirm) {
+            aspectMode_ = (aspectMode_ + 2) % 3;
+            changed = true;
+            audio_.PlayMenuConfirm();
+        } else if (keyRight) {
+            aspectMode_ = (aspectMode_ + 1) % 3;
+            changed = true;
+            audio_.PlayMenuConfirm();
+        }
+    } else if (settingsSelection_ == 7) {
+        if (keyLeft || keyRight || keyConfirm) {
+            drawBezel_ = !drawBezel_;
+            changed = true;
+            audio_.PlayMenuConfirm();
+        }
+    } else if (settingsSelection_ == 8) {
+        if (keyLeft || keyRight || keyConfirm) {
             isFullscreen_ = !isFullscreen_;
             ToggleFullscreen();
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 6) {
+    } else if (settingsSelection_ == 9) {
         if (keyLeft || keyRight || keyConfirm) {
             controlLayout_ = (controlLayout_ + 1) % 2;
             player_.controlLayout = controlLayout_;
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 7) {
+    } else if (settingsSelection_ == 10) {
         if (keyConfirm) {
             ResetSettingsToDefault();
             audio_.PlayMenuConfirm();
@@ -905,13 +1215,13 @@ void Game::UpdateSettings() {
             settingsFeedbackText_ = "SETTINGS RESET!";
             settingsFeedbackColor_ = SKYBLUE;
         }
-    } else if (settingsSelection_ == 8) {
+    } else if (settingsSelection_ == 11) {
         if (keyConfirm) {
             clearScoresSelection_ = 0;
             audio_.PlayMenuConfirm();
             StartTransition(State::ClearScoresConfirm);
         }
-    } else if (settingsSelection_ == 9) {
+    } else if (settingsSelection_ == 12) {
         if (keyConfirm || IsKeyPressed(KEY_ESCAPE)) {
             SaveSettings();
             audio_.PlayMenuConfirm();
@@ -941,6 +1251,9 @@ void Game::ResetSettingsToDefault() {
     isFullscreen_ = false;
     controlLayout_ = 0;
     player_.controlLayout = controlLayout_;
+    crtShaderEnabled_ = true;
+    aspectMode_ = 0;
+    drawBezel_ = true;
     
     debug_ = hitboxOverlayEnabled_;
     if (IsWindowFullscreen()) {
@@ -950,6 +1263,7 @@ void Game::ResetSettingsToDefault() {
     ApplyVolumeSettings();
     SaveSettings();
 }
+
 
 void Game::ClearScores() {
     highScores_.clear();
@@ -1243,7 +1557,7 @@ void Game::HandleCollisions() {
         for (auto& e : enemies_) {
             if (!e.active || !CircleHit(b.pos, b.radius, e.pos, e.radius)) continue;
             b.active = false;
-            e.Hit(b.damage);
+            e.Hit(b.damage, effects_);
             effects_.Spark(b.pos, YELLOW);
             if (!e.active) {
                 int scoreAdded = e.scoreValue;
@@ -1254,7 +1568,10 @@ void Game::HandleCollisions() {
                 std::snprintf(scoreText, sizeof(scoreText), "+%d", scoreAdded);
                 effects_.AddText(e.pos, scoreText, YELLOW);
 
-                effects_.Explosion(e.pos, e.IsBoss() ? VIOLET : ORANGE, e.IsBoss() ? 80 : 22);
+                SpriteId debrisSprite = SpriteId::AsteroidChunk;
+                if (e.type == EnemyType::Popcorn) debrisSprite = SpriteId::DebrisEnemyWing;
+                else if (e.type == EnemyType::Turret) debrisSprite = SpriteId::DebrisEnemyThruster;
+                effects_.Explosion(e.pos, e.IsBoss() ? VIOLET : ORANGE, e.IsBoss() ? 80 : 22, debrisSprite);
                 effects_.Shake(e.IsBoss() ? 8.0f : 3.0f, e.IsBoss() ? 0.45f : 0.16f);
                 if (e.IsBoss()) bossDeathPos_ = e.pos;
                 SpawnDrop(e.pos, e.type);
@@ -1294,7 +1611,7 @@ void Game::HandleCollisions() {
             if (b.active && CircleHit(b.pos, b.radius, player_.pos, player_.hitRadius)) {
                 b.active = false;
                 --player_.lives;
-                effects_.Explosion(player_.pos, RED, 38);
+                effects_.Explosion(player_.pos, RED, 38, SpriteId::DebrisPlayerWingLeft);
                 effects_.Shake(8.0f, 0.35f);
                 if (player_.lives <= 0) {
                     audio_.PlayPlayerDeath();
@@ -1319,7 +1636,7 @@ void Game::HandleCollisions() {
         if (e.active && !player_.invulnerable && CircleHit(e.pos, e.radius, player_.pos, player_.hitRadius)) {
             e.active = false;
             --player_.lives;
-            effects_.Explosion(player_.pos, RED, 38);
+            effects_.Explosion(player_.pos, RED, 38, SpriteId::DebrisPlayerWingRight);
             if (player_.lives <= 0) {
                 audio_.PlayPlayerDeath();
                 if (demoMode_) {
@@ -1636,29 +1953,227 @@ void Game::DrawContinue() const {
 }
 
 void Game::DrawBackground() const {
-    ClearBackground({6, 8, 20, 255});
+    // 0. Stage Color Scripting Palette Selection
+    Color bgColor = {6, 8, 20, 255};
+    Color nebulaColor1 = Fade(PURPLE, 0.18f);
+    Color nebulaColor2 = Fade(BLUE, 0.12f);
+    Color nebulaColor3 = Fade(VIOLET, 0.10f);
+
+    int beat = (int)stageTime_ % 90;
+    if (bossWarningTimer_ > 0.0f) {
+        // Red Alert Alert/Warning State
+        float alertPulse = 0.5f + 0.5f * std::sin((float)GetTime() * 6.0f);
+        bgColor = Color{ (unsigned char)(20 + 8 * alertPulse), 5, 8, 255 };
+        nebulaColor1 = Fade(RED, 0.22f);
+        nebulaColor2 = Fade(MAROON, 0.15f);
+        nebulaColor3 = Fade(ORANGE, 0.10f);
+    } else if (beat < 30) {
+        // Phase 1: Orbit Entry (Dark Green/Cyan Space)
+        bgColor = Color{5, 12, 20, 255};
+        nebulaColor1 = Color{0, 160, 120, 35};
+        nebulaColor2 = Color{0, 80, 110, 25};
+        nebulaColor3 = Color{10, 140, 150, 20};
+    } else if (beat < 60) {
+        // Phase 2: Asteroid Storm (Deep Purple/Magenta Nebula)
+        bgColor = Color{12, 6, 22, 255};
+        nebulaColor1 = Color{130, 0, 150, 30};
+        nebulaColor2 = Color{80, 0, 110, 20};
+        nebulaColor3 = Color{160, 10, 120, 20};
+    } else {
+        // Phase 3: Industrial Warzone (Deep Amber/Dark Crimson)
+        bgColor = Color{18, 7, 8, 255};
+        nebulaColor1 = Color{160, 25, 0, 32};
+        nebulaColor2 = Color{110, 15, 0, 22};
+        nebulaColor3 = Color{180, 80, 0, 18};
+    }
+
+    ClearBackground(bgColor);
     
-    // Layer 1: Distant Nebulae / Grids (drawn very faint)
-    for (int y = -ScreenH; y < ScreenH * 2; y += 80) {
-        int yy = (int)(y + scrollB_);
-        DrawRectangle(72, yy, 38, 46, Fade(BLUE, 0.08f));
-        DrawRectangle(352, yy + 28, 52, 32, Fade(SKYBLUE, 0.05f));
+    // 1. Layer 1: Distant Nebulae (rendered via soft circular gradients)
+    float nY1 = nebulaScroll_ - ScreenH / 2.0f;
+    float nY2 = nebulaScroll_ + ScreenH / 2.0f;
+    DrawCircleGradient(120, (int)nY1, 260, nebulaColor1, Fade(BLACK, 0.0f));
+    DrawCircleGradient(360, (int)nY2, 340, nebulaColor2, Fade(BLACK, 0.0f));
+    DrawCircleGradient(200, (int)(nY2 - ScreenH), 290, nebulaColor3, Fade(BLACK, 0.0f));
+
+    // 1b. Layer 1b: Sweeping Background Industrial Searchlights (Stage Phase 3 / Boss Alert)
+    if (beat >= 60 || bossWarningTimer_ > 0.0f || BossAlive()) {
+        float time = (float)GetTime();
+        float angle1 = std::sin(time * 0.45f) * 35.0f - 90.0f;
+        float angle2 = std::cos(time * 0.35f) * 25.0f - 90.0f;
+        
+        BeginBlendMode(BLEND_ADDITIVE);
+        Vector2 sl1 = { 40.0f, (float)ScreenH };
+        DrawTriangle(
+            sl1,
+            { sl1.x + std::cos((angle1 - 7.0f) * DEG2RAD) * 580.0f, sl1.y + std::sin((angle1 - 7.0f) * DEG2RAD) * 580.0f },
+            { sl1.x + std::cos((angle1 + 7.0f) * DEG2RAD) * 580.0f, sl1.y + std::sin((angle1 + 7.0f) * DEG2RAD) * 580.0f },
+            Fade(bgColor.r > bgColor.b ? RED : GOLD, 0.05f)
+        );
+        Vector2 sl2 = { (float)ScreenW - 40.0f, (float)ScreenH };
+        DrawTriangle(
+            sl2,
+            { sl2.x + std::cos((angle2 - 6.0f) * DEG2RAD) * 580.0f, sl2.y + std::sin((angle2 - 6.0f) * DEG2RAD) * 580.0f },
+            { sl2.x + std::cos((angle2 + 6.0f) * DEG2RAD) * 580.0f, sl2.y + std::sin((angle2 + 6.0f) * DEG2RAD) * 580.0f },
+            Fade(bgColor.r > bgColor.b ? ORANGE : SKYBLUE, 0.04f)
+        );
+        EndBlendMode();
     }
     
-    // Layer 2: Parallax Stars (dim & medium speed stars)
+    // 2. Layer 2: Twinkling Parallax Stars with Micro Cross Flares
     for (int i = 0; i < NumStars; ++i) {
-        DrawCircleV(stars_[i].pos, stars_[i].speed > 100 ? 1.5f : 1.0f, stars_[i].color);
+        float sparkle = 0.4f + 0.6f * std::sin((float)GetTime() * 4.5f + stars_[i].pos.x * 0.1f);
+        float size = (stars_[i].speed > 100.0f) ? 1.8f : ((stars_[i].speed > 45.0f) ? 1.2f : 0.8f);
+        DrawCircleV(stars_[i].pos, size, Fade(stars_[i].color, sparkle));
+        
+        // Additive micro flare crosses for foreground stars
+        if (stars_[i].speed > 100.0f && sparkle > 0.78f) {
+            float flareAlpha = (sparkle - 0.78f) * 4.5f;
+            DrawLineV({stars_[i].pos.x - 2, stars_[i].pos.y}, {stars_[i].pos.x + 2, stars_[i].pos.y}, Fade(WHITE, flareAlpha));
+            DrawLineV({stars_[i].pos.x, stars_[i].pos.y - 2}, {stars_[i].pos.x, stars_[i].pos.y + 2}, Fade(WHITE, flareAlpha));
+        }
     }
+
+    // 2b. Layer 2b: Distant Atmospheric Battles (faint lasers and micro-sparks deep in the background)
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (const auto& l : bgLasers_) {
+        float alpha = l.life / l.maxLife;
+        DrawLineEx(l.start, l.end, 1.8f, Fade(l.color, alpha * 0.25f));
+    }
+    for (const auto& s : bgSparks_) {
+        float alpha = s.life / s.maxLife;
+        DrawCircleV(s.pos, 1.2f, Fade(s.color, alpha * 0.38f));
+    }
+    EndBlendMode();
     
-    // Layer 3: Foreground scrolling pipelines / borders (fast)
-    for (int y = -ScreenH; y < ScreenH * 2; y += 48) {
-        int yy = (int)(y + scrollA_);
-        DrawLine(0, yy, ScreenW, yy + 34, Fade(DARKBLUE, 0.28f));
+    // 3. Layer 3: Scrolling asteroid debris chunks (Mid-ground)
+    for (const auto& ast : backgroundAsteroids_) {
+        SpriteManager::Instance().Draw(SpriteId::AsteroidChunk, ast.pos, ast.rotation, ast.scale, Fade(GRAY, 0.40f));
     }
+
+    // 3aa. Layer 3aa: Scrolling playfield base girder lines (very low-contrast mechanical base plates)
+    float gridStartY = spaceStationScrollY_ - 64.0f;
+    for (float y = gridStartY; y < ScreenH + 64.0f; y += 64.0f) {
+        DrawLine(32, (int)y, ScreenW - 32, (int)y, Color{ 14, 16, 26, 255 });
+        DrawLineEx({32.0f, y}, {64.0f, y + 32.0f}, 1.5f, Color{ 14, 16, 26, 255 });
+        DrawLineEx({ScreenW - 32.0f, y}, {ScreenW - 64.0f, y + 32.0f}, 1.5f, Color{ 14, 16, 26, 255 });
+    }
+
+    // 3b. Layer 3b: Space-station terrain superstructures (Left and Right margins)
+    float startY = spaceStationScrollY_ - 32.0f;
+    for (float y = startY; y < ScreenH + 32.0f; y += 32.0f) {
+        int rowIdx = (int)((y - startY) / 32.0f);
+        
+        // Left side tile
+        SpriteId leftSprite = (rowIdx % 4 == 1) ? SpriteId::SpaceStationLeftCore : SpriteId::SpaceStationLeft;
+        Vector2 leftPos = { 16.0f, y };
+        SpriteManager::Instance().Draw(leftSprite, leftPos, 0.0f, 1.0f, Color{ 200, 200, 220, 255 });
+        
+        // Flashing beacon / core for left side core
+        if (leftSprite == SpriteId::SpaceStationLeftCore) {
+            float pulse = 0.5f + 0.5f * sinf(GetTime() * 10.0f);
+            float pulseCyan = 0.5f + 0.5f * sinf(GetTime() * 8.0f);
+            
+            BeginBlendMode(BLEND_ADDITIVE);
+            // Red warning beacon at (x: 10, y: 2) from left edge (left edge is leftPos.x - 16 = 0)
+            DrawCircleV({ leftPos.x - 16.0f + 10.0f, leftPos.y - 16.0f + 2.0f }, 3.0f + 2.0f * pulse, Fade(RED, 0.4f + 0.4f * pulse));
+            // Cyan cores at (x: 15, y: 8) and (x: 15, y: 22) from left edge
+            DrawCircleV({ leftPos.x - 16.0f + 15.0f, leftPos.y - 16.0f + 8.0f }, 4.0f + 2.0f * pulseCyan, Fade(SKYBLUE, 0.3f + 0.2f * pulseCyan));
+            DrawCircleV({ leftPos.x - 16.0f + 15.0f, leftPos.y - 16.0f + 22.0f }, 4.0f + 2.0f * pulseCyan, Fade(SKYBLUE, 0.3f + 0.2f * pulseCyan));
+            EndBlendMode();
+        }
+        
+        // Right side tile
+        SpriteId rightSprite = (rowIdx % 4 == 3) ? SpriteId::SpaceStationRightCore : SpriteId::SpaceStationRight;
+        Vector2 rightPos = { (float)(ScreenW - 16), y };
+        SpriteManager::Instance().Draw(rightSprite, rightPos, 0.0f, 1.0f, Color{ 200, 200, 220, 255 });
+        
+        // Flashing core for right side core
+        if (rightSprite == SpriteId::SpaceStationRightCore) {
+            float pulseCyan = 0.5f + 0.5f * sinf(GetTime() * 8.0f);
+            
+            BeginBlendMode(BLEND_ADDITIVE);
+            // Cyan cores at (x: 15, y: 8) and (x: 15, y: 22) from right edge of sprite (sprite left edge is rightPos.x - 16)
+            DrawCircleV({ rightPos.x - 16.0f + 15.0f, rightPos.y - 16.0f + 8.0f }, 4.0f + 2.0f * pulseCyan, Fade(SKYBLUE, 0.3f + 0.2f * pulseCyan));
+            DrawCircleV({ rightPos.x - 16.0f + 15.0f, rightPos.y - 16.0f + 22.0f }, 4.0f + 2.0f * pulseCyan, Fade(SKYBLUE, 0.3f + 0.2f * pulseCyan));
+            EndBlendMode();
+        }
+    }
+
+    // 4. Layer 4: Foreground scrolling atmospheric clouds
+    for (const auto& cld : backgroundClouds_) {
+        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.14f));
+    }
+
     DrawRectangleLines(8, 8, ScreenW - 16, ScreenH - 16, Fade(SKYBLUE, 0.35f));
 }
 
+void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
+    (void)ry;
+    (void)rh;
+    int screenW = GetScreenWidth();
+    int screenH = GetScreenHeight();
+    
+    // 1. Draw Left Bezel panel space
+    if (rx > 0.0f) {
+        DrawRectangle(0, 0, (int)rx, screenH, Color{24, 25, 30, 255});
+        // Draw separation wood/metal seams
+        DrawLineEx({rx - 5.0f, 0.0f}, {rx - 5.0f, (float)screenH}, 4.0f, Color{45, 45, 52, 255});
+        DrawLineEx({rx - 1.0f, 0.0f}, {rx - 1.0f, (float)screenH}, 1.0f, Color{82, 85, 92, 255});
+        
+        // Draw instructions stickers if bezel width allows
+        if (rx > 105.0f) {
+            int stickerX = 15;
+            int stickerW = (int)rx - 30;
+            DrawRectangle(stickerX, 60, stickerW, 140, Color{15, 15, 18, 255});
+            DrawRectangleLines(stickerX, 60, stickerW, 140, Color{250, 195, 15, 255});
+            
+            DrawText("SKY CIRCUIT", stickerX + 12, 70, 12, GOLD);
+            DrawText("ARCADE SYSTEM v1.5", stickerX + 12, 86, 8, GRAY);
+            DrawText("COIN: PRESS C", stickerX + 12, 105, 9, RAYWHITE);
+            DrawText("START: ENTER", stickerX + 12, 120, 9, RAYWHITE);
+            DrawText("SHOOT: Z or SPACE", stickerX + 12, 135, 9, GOLD);
+            DrawText("BOMB: X KEY", stickerX + 12, 150, 9, PURPLE);
+            DrawText("SLOW: SHIFT", stickerX + 12, 165, 9, SKYBLUE);
+
+            // Draw miniature player ship graphics preview
+            SpriteManager::Instance().Draw(SpriteId::PlayerIdle, Vector2{rx / 2.0f, 260.0f}, 0.0f, 2.0f);
+        }
+    }
+    
+    // 2. Draw Right Bezel panel space
+    if (rx > 0.0f) {
+        float rStart = rx + rw;
+        float rWidth = screenW - rStart;
+        DrawRectangle((int)rStart, 0, (int)rWidth, screenH, Color{24, 25, 30, 255});
+        DrawLineEx({rStart + 1.0f, 0.0f}, {rStart + 1.0f, (float)screenH}, 4.0f, Color{45, 45, 52, 255});
+        DrawLineEx({rStart + 4.0f, 0.0f}, {rStart + 4.0f, (float)screenH}, 1.0f, Color{82, 85, 92, 255});
+        
+        if (rWidth > 105.0f) {
+            int stickerX = (int)rStart + 15;
+            int stickerW = (int)rWidth - 30;
+            
+            // Warnings panel
+            DrawRectangle(stickerX, 60, stickerW, 110, Color{15, 15, 18, 255});
+            DrawRectangleLines(stickerX, 60, stickerW, 110, RED);
+            DrawText("WARNING!", stickerX + 12, 70, 11, RED);
+            DrawText("DO NOT COIN IN", stickerX + 12, 90, 8, RAYWHITE);
+            DrawText("WHILE ATTRACT MODE", stickerX + 12, 105, 8, RAYWHITE);
+            DrawText("IS DEMONSTRATING", stickerX + 12, 120, 8, RAYWHITE);
+            DrawText("FLIGHT SYSTEMS", stickerX + 12, 135, 8, RAYWHITE);
+
+            // High scores cabinet teaser
+            DrawText("TOP PILOTS", stickerX + 12, 210, 11, GOLD);
+            for (size_t i = 0; i < std::min((size_t)5, highScores_.size()); ++i) {
+                int yPos = 230 + (int)i * 20;
+                DrawText(TextFormat("%06d  %s", highScores_[i].score, highScores_[i].initials), stickerX + 12, yPos, 9, SKYBLUE);
+            }
+        }
+    }
+}
+
 void Game::DrawHud() const {
+
     DrawRectangle(0, 0, ScreenW, 36, Fade(BLACK, 0.85f));
     DrawRectangleLines(0, 0, ScreenW, 36, Fade(SKYBLUE, 0.4f));
     
@@ -1681,22 +2196,37 @@ void Game::DrawHud() const {
     // LIVES (Icons)
     int maxDrawLives = std::min(5, player_.lives);
     for (int i = 0; i < maxDrawLives; ++i) {
-        float lx = 145 + i * 16;
-        float ly = 22;
-        DrawTriangle({lx, ly - 6}, {lx - 5, ly + 4}, {lx + 5, ly + 4}, SKYBLUE);
-        DrawCircleV({lx, ly + 1}, 2.0f, RED);
+        float lx = 153.0f + i * 16.0f;
+        float ly = 22.0f;
+        SpriteManager::Instance().Draw(SpriteId::PlayerIdle, {lx, ly}, 0.0f, 0.65f);
     }
     DrawText("LIVES", 145, 4, 10, SKYBLUE);
     
     // BOMBS (Icons)
     int maxDrawBombs = std::min(5, player_.bombs);
     for (int i = 0; i < maxDrawBombs; ++i) {
-        float bx = 215 + i * 12;
-        float by = 22;
-        DrawCircleV({bx, by}, 4.0f, PURPLE);
-        DrawCircleLines(bx, by, 4.0f, WHITE);
+        float bx = 221.0f + i * 12.0f;
+        float by = 22.0f;
+        SpriteManager::Instance().Draw(SpriteId::MiniBombCapsule, {bx, by}, 0.0f, 1.0f);
     }
     DrawText("BOMBS", 215, 4, 10, PURPLE);
+
+    // Flashing Combo Decay Bar
+    if (medalChain_ > 0) {
+        float ratio = medalChainTimer_ / 1.35f;
+        ratio = std::clamp(ratio, 0.0f, 1.0f);
+        
+        bool flash = (medalChainTimer_ > 0.4f) || ((int)(GetTime() * 12.0f) % 2 == 0);
+        Color chainColor = flash ? GOLD : RED;
+        
+        int comboY = 44;
+        DrawRectangle(12, comboY, 80, 16, Fade(BLACK, 0.7f));
+        DrawRectangleLines(12, comboY, 80, 16, Fade(GOLD, 0.4f));
+        
+        DrawText(TextFormat("CHAIN x%d", medalChain_), 16, comboY + 3, 10, flash ? YELLOW : ORANGE);
+        DrawRectangle(16, comboY + 12, 72, 2, Fade(GRAY, 0.5f));
+        DrawRectangle(16, comboY + 12, (int)(72 * ratio), 2, chainColor);
+    }
 
     // Dynamic STAGE Timer / WARNING
     if (stageTime_ < 90.0f) {
@@ -1745,8 +2275,10 @@ void Game::DrawTitleMenu() const {
     for (int i = 0; i < 5; ++i) {
         int y = 220 + i * 32;
         bool selected = titleSelection_ == i;
+        int xOffset = selected ? (int)(5.0f + 4.0f * std::sin((float)GetTime() * 14.0f)) : 0;
+        
         if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(BLUE, 0.45f));
-        DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
+        DrawText(selected ? ">" : " ", 132 + xOffset, y, 16, selected ? GOLD : GRAY);
         
         Color textCol = RAYWHITE;
         if (i == 0) {
@@ -1758,7 +2290,7 @@ void Game::DrawTitleMenu() const {
         } else {
             textCol = selected ? GOLD : RAYWHITE;
         }
-        DrawText(items[i], 158, y, 16, textCol);
+        DrawText(items[i], 158 + xOffset, y, 16, textCol);
     }
 
     float blink = std::sin((float)GetTime() * 10.0f);
@@ -1960,12 +2492,15 @@ void Game::DrawSettings() const {
     int titleW = MeasureText("USER SETTINGS", 24);
     DrawText("USER SETTINGS", ScreenW / 2 - titleW / 2, 85, 24, GOLD);
 
-    const char* options[10] = {
+    const char* options[13] = {
         "Master Volume",
         "SFX Volume",
         "Music Volume",
         "Screen Shake",
         "Hitboxes",
+        "CRT Filter",
+        "Aspect Scaling",
+        "Cabinet Bezel",
         "Fullscreen",
         "Control Layout",
         "Reset to Defaults",
@@ -1973,58 +2508,64 @@ void Game::DrawSettings() const {
         "Save and Return"
     };
 
-    for (int i = 0; i < 10; ++i) {
-        int y = 145 + i * 30;
+    for (int i = 0; i < 13; ++i) {
+        int y = 125 + i * 25;
         bool selected = settingsSelection_ == i;
         
         if (selected) {
-            DrawRectangle(50, y - 6, ScreenW - 100, 26, Fade(BLUE, 0.35f));
-            DrawText(">", 58, y, 15, GOLD);
+            DrawRectangle(50, y - 4, ScreenW - 100, 22, Fade(BLUE, 0.35f));
+            DrawText(">", 58, y, 14, GOLD);
         }
         
-        DrawText(options[i], 78, y, 15, selected ? GOLD : RAYWHITE);
+        DrawText(options[i], 78, y, 14, selected ? GOLD : RAYWHITE);
         
         if (i == 0) {
             DrawLine(280, y + 7, 380, y + 7, GRAY);
             DrawLine(280, y + 7, 280 + masterVolume_ * 10, y + 7, SKYBLUE);
-            DrawCircle(280 + masterVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
-            DrawText(TextFormat("%d", masterVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
+            DrawCircle(280 + masterVolume_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", masterVolume_), 395, y, 14, selected ? GOLD : SKYBLUE);
         } else if (i == 1) {
             DrawLine(280, y + 7, 380, y + 7, GRAY);
             DrawLine(280, y + 7, 280 + sfxVolume_ * 10, y + 7, SKYBLUE);
-            DrawCircle(280 + sfxVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
-            DrawText(TextFormat("%d", sfxVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
+            DrawCircle(280 + sfxVolume_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", sfxVolume_), 395, y, 14, selected ? GOLD : SKYBLUE);
         } else if (i == 2) {
             DrawLine(280, y + 7, 380, y + 7, GRAY);
             DrawLine(280, y + 7, 280 + bgmVolume_ * 10, y + 7, SKYBLUE);
-            DrawCircle(280 + bgmVolume_ * 10, y + 7, 5, selected ? GOLD : WHITE);
-            DrawText(TextFormat("%d", bgmVolume_), 395, y, 15, selected ? GOLD : SKYBLUE);
+            DrawCircle(280 + bgmVolume_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", bgmVolume_), 395, y, 14, selected ? GOLD : SKYBLUE);
         } else if (i == 3) {
-            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 15, screenShakeEnabled_ ? LIME : RED);
+            DrawText(screenShakeEnabled_ ? "ON" : "OFF", 280, y, 14, screenShakeEnabled_ ? LIME : RED);
         } else if (i == 4) {
-            DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 15, hitboxOverlayEnabled_ ? LIME : RED);
+            DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 14, hitboxOverlayEnabled_ ? LIME : RED);
             
             // Draw mini player ship preview next to the option (at x = 355)
-            Vector2 shipPos = { 355.0f, (float)y + 7.0f };
+            Vector2 shipPos = { 355.0f, (float)y + 6.0f };
             float time = (float)GetTime();
             float flameH = 4.0f + std::sin(time * 45.0f) * 1.5f;
-            DrawTriangle({shipPos.x - 2, shipPos.y + 5}, {shipPos.x - 3, shipPos.y + 5 + flameH}, {shipPos.x - 1, shipPos.y + 5}, SKYBLUE);
-            DrawTriangle({shipPos.x + 2, shipPos.y + 5}, {shipPos.x + 1, shipPos.y + 5}, {shipPos.x + 3, shipPos.y + 5 + flameH}, SKYBLUE);
-            DrawTriangle({shipPos.x, shipPos.y - 4}, {shipPos.x - 6, shipPos.y + 2}, {shipPos.x - 2, shipPos.y + 2}, GRAY);
-            DrawTriangle({shipPos.x, shipPos.y - 4}, {shipPos.x + 2, shipPos.y + 2}, {shipPos.x + 6, shipPos.y + 2}, GRAY);
-            DrawTriangle({shipPos.x, shipPos.y - 8}, {shipPos.x - 4, shipPos.y + 5}, {shipPos.x + 4, shipPos.y + 5}, RAYWHITE);
+            DrawTriangle({shipPos.x - 2, shipPos.y + 4}, {shipPos.x - 3, shipPos.y + 4 + flameH}, {shipPos.x - 1, shipPos.y + 4}, SKYBLUE);
+            DrawTriangle({shipPos.x + 2, shipPos.y + 4}, {shipPos.x + 1, shipPos.y + 4}, {shipPos.x + 3, shipPos.y + 4 + flameH}, SKYBLUE);
+            DrawTriangle({shipPos.x, shipPos.y - 4}, {shipPos.x - 6, shipPos.y + 1}, {shipPos.x - 2, shipPos.y + 1}, GRAY);
+            DrawTriangle({shipPos.x, shipPos.y - 4}, {shipPos.x + 2, shipPos.y + 1}, {shipPos.x + 6, shipPos.y + 1}, GRAY);
+            DrawTriangle({shipPos.x, shipPos.y - 8}, {shipPos.x - 4, shipPos.y + 4}, {shipPos.x + 4, shipPos.y + 4}, RAYWHITE);
             
             if (hitboxOverlayEnabled_ || selected) {
                 float corePulse = 1.5f + 1.0f * std::sin(time * 15.0f);
                 DrawCircleV(shipPos, corePulse, RED);
-                DrawCircleLines((int)shipPos.x, (int)shipPos.y, (int)(corePulse + 1.5f), Fade(RED, 0.6f));
             } else {
                 DrawCircleV(shipPos, 1.5f, DARKGRAY);
             }
         } else if (i == 5) {
-            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 15, isFullscreen_ ? LIME : RED);
+            DrawText(crtShaderEnabled_ ? "ON" : "OFF", 280, y, 14, crtShaderEnabled_ ? LIME : RED);
         } else if (i == 6) {
-            DrawText(controlLayout_ == 0 ? "ARROWS" : "WASD", 280, y, 15, controlLayout_ == 0 ? SKYBLUE : GOLD);
+            const char* modeNames[3] = { "FIT SCREEN", "INTEGER 1X", "STRETCH" };
+            DrawText(modeNames[aspectMode_], 280, y, 14, SKYBLUE);
+        } else if (i == 7) {
+            DrawText(drawBezel_ ? "ON" : "OFF", 280, y, 14, drawBezel_ ? LIME : RED);
+        } else if (i == 8) {
+            DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 14, isFullscreen_ ? LIME : RED);
+        } else if (i == 9) {
+            DrawText(controlLayout_ == 0 ? "ARROWS" : "WASD", 280, y, 14, controlLayout_ == 0 ? SKYBLUE : GOLD);
         }
     }
  
@@ -2203,10 +2744,16 @@ void Game::Draw() {
     for (const auto& p : powerups_) p.Draw();
     for (const auto& b : playerBullets_) b.Draw(debug_);
     for (const auto& e : enemies_) e.Draw(debug_);
-    for (const auto& b : enemyBullets_) b.Draw(debug_);
     player_.Draw(debug_ && state_ != State::Title);
     effects_.Draw();
+    for (const auto& b : enemyBullets_) b.Draw(debug_);
     EndMode2D();
+
+    if (screenFlashTimer_ > 0.0f) {
+        float alpha = screenFlashTimer_ / 0.15f;
+        if (alpha > 1.0f) alpha = 1.0f;
+        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(WHITE, alpha));
+    }
 
     DrawHud();
 
@@ -2216,8 +2763,41 @@ void Game::Draw() {
             DrawRectangle(10, 10, ScreenW - 20, ScreenH - 20, Fade(RED, 0.06f));
         }
         
+        // 1. Black backing panel
         DrawRectangle(0, 180, ScreenW, 60, Fade(BLACK, 0.85f));
-        DrawRectangleLines(0, 180, ScreenW, 60, RED);
+        
+        // 2. Caustics (sweeping light sheen)
+        float sheenX = fmodf(GetTime() * 180.0f, (float)(ScreenW + 120)) - 60.0f;
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRectangleGradientH((int)sheenX - 30, 186, 30, 48, Fade(RED, 0.0f), Fade(RED, 0.28f));
+        DrawRectangleGradientH((int)sheenX, 186, 30, 48, Fade(RED, 0.28f), Fade(RED, 0.0f));
+        EndBlendMode();
+        
+        // 3. Scrolling Caution Stripes
+        int stripeOffset = (int)(GetTime() * 50.0f) % 20;
+        for (int sx = -20; sx < ScreenW + 20; sx += 20) {
+            // Top caution stripe band (y: 180 to 186)
+            Vector2 p1 = { (float)(sx + stripeOffset), 180.0f };
+            Vector2 p2 = { (float)(sx + stripeOffset + 10), 180.0f };
+            Vector2 p3 = { (float)(sx + stripeOffset + 5), 186.0f };
+            Vector2 p4 = { (float)(sx + stripeOffset - 5), 186.0f };
+            DrawTriangle(p1, p4, p3, ORANGE);
+            DrawTriangle(p1, p3, p2, ORANGE);
+            
+            // Bottom caution stripe band (y: 234 to 240)
+            Vector2 b1 = { (float)(sx - stripeOffset), 234.0f };
+            Vector2 b2 = { (float)(sx - stripeOffset + 10), 234.0f };
+            Vector2 b3 = { (float)(sx - stripeOffset + 15), 240.0f };
+            Vector2 b4 = { (float)(sx - stripeOffset + 5), 240.0f };
+            DrawTriangle(b1, b4, b3, ORANGE);
+            DrawTriangle(b1, b3, b2, ORANGE);
+        }
+        
+        // Borders
+        DrawLine(0, 180, ScreenW, 180, RED);
+        DrawLine(0, 186, ScreenW, 186, RED);
+        DrawLine(0, 234, ScreenW, 234, RED);
+        DrawLine(0, 240, ScreenW, 240, RED);
         
         Color warnColor = (int)(bossWarningTimer_ * 5) % 2 == 0 ? RED : YELLOW;
         int warnW = MeasureText("WARNING: HOSTILE CARRIER DETECTED", 16);
@@ -2288,9 +2868,11 @@ void Game::Draw() {
         for (int i = 0; i < 4; ++i) {
             int y = 290 + i * 36;
             bool selected = (pauseSelection_ == i);
+            int xOffset = selected ? (int)(5.0f + 4.0f * std::sin((float)GetTime() * 14.0f)) : 0;
+            
             if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(BLUE, 0.45f));
-            DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
-            DrawText(pItems[i], 158, y, 16, selected ? GOLD : RAYWHITE);
+            DrawText(selected ? ">" : " ", 132 + xOffset, y, 16, selected ? GOLD : GRAY);
+            DrawText(pItems[i], 158 + xOffset, y, 16, selected ? GOLD : RAYWHITE);
         }
         
         int tipW = MeasureText("UP/DOWN navigate  |  ENTER/CLICK confirm", 12);
@@ -2360,8 +2942,10 @@ void Game::Draw() {
         for (int i = 0; i < 3; ++i) {
             int y = 290 + i * 36;
             bool selected = (gameOverSelection_ == i);
+            int xOffset = selected ? (int)(5.0f + 4.0f * std::sin((float)GetTime() * 14.0f)) : 0;
+            
             if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(RED, 0.25f));
-            DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
+            DrawText(selected ? ">" : " ", 132 + xOffset, y, 16, selected ? GOLD : GRAY);
             
             Color textCol = RAYWHITE;
             const char* label = goItems[i];
@@ -2380,7 +2964,7 @@ void Game::Draw() {
             } else {
                 textCol = selected ? GOLD : RAYWHITE;
             }
-            DrawText(label, 158, y, 16, textCol);
+            DrawText(label, 158 + xOffset, y, 16, textCol);
         }
         
         int tipW = MeasureText("UP/DOWN navigate  |  ENTER/CLICK confirm", 12);
@@ -2506,6 +3090,9 @@ void Game::LoadSettings() {
     hitboxOverlayEnabled_ = false;
     isFullscreen_ = false;
     controlLayout_ = 0;
+    crtShaderEnabled_ = true;
+    aspectMode_ = 0;
+    drawBezel_ = true;
 
     bool fileExists = false;
     std::ifstream file("settings.cfg");
@@ -2531,6 +3118,9 @@ void Game::LoadSettings() {
                 else if (key == "hitbox") hitboxOverlayEnabled_ = (val != 0);
                 else if (key == "fullscreen") isFullscreen_ = (val != 0);
                 else if (key == "layout") controlLayout_ = std::clamp(val, 0, 1);
+                else if (key == "crt") crtShaderEnabled_ = (val != 0);
+                else if (key == "aspect") aspectMode_ = std::clamp(val, 0, 2);
+                else if (key == "bezel") drawBezel_ = (val != 0);
             } catch (...) {
                 // Ignore malformed values
             }
@@ -2562,9 +3152,13 @@ void Game::SaveSettings() {
         file << "hitbox=" << (hitboxOverlayEnabled_ ? 1 : 0) << "\n";
         file << "fullscreen=" << (isFullscreen_ ? 1 : 0) << "\n";
         file << "layout=" << controlLayout_ << "\n";
+        file << "crt=" << (crtShaderEnabled_ ? 1 : 0) << "\n";
+        file << "aspect=" << aspectMode_ << "\n";
+        file << "bezel=" << (drawBezel_ ? 1 : 0) << "\n";
         file.close();
     }
 }
+
 
 void Game::StartTransition(State target) {
     if (transitioning_) return;

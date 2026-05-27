@@ -757,5 +757,14 @@ CMakeFiles/sky_circuit.dir/main.cpp.o: \
   /Users/bozoegg/Desktop/raiden/Enemy.h \
   /Users/bozoegg/Desktop/raiden/Powerup.h \
   /Users/bozoegg/Desktop/raiden/Effects.h \
+  /Users/bozoegg/Desktop/raiden/SpriteManager.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_map \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/is_transparent.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__hash_table \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/can_extract_key.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/remove_const_ref.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/erase_if_container.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/ranges_iterator_traits.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__node_handle \
   /Users/bozoegg/Desktop/raiden/WaveManager.h \
   /Users/bozoegg/Desktop/raiden/AudioSystem.h

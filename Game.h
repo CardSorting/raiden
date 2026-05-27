@@ -112,12 +112,59 @@ private:
     float medalChainTimer_ = 0.0f;
     int medalChain_ = 0;
 
+    // Visual Scaling, CRT Shader, and Cabinet Bezels
+    bool crtShaderEnabled_ = true;
+    int aspectMode_ = 0; // 0 = Fit, 1 = Integer, 2 = Stretch
+    bool drawBezel_ = true;
+    RenderTexture2D screenTarget_{};
+    Shader crtShader_{};
+
+    // Parallax background asteroid & cloud structures
+    struct AsteroidInstance {
+        Vector2 pos;
+        float speed;
+        float rotation;
+        float spinSpeed;
+        float scale;
+    };
+    struct CloudInstance {
+        Vector2 pos;
+        float speed;
+        float scale;
+    };
+    std::vector<AsteroidInstance> backgroundAsteroids_;
+    std::vector<CloudInstance> backgroundClouds_;
+    float nebulaScroll_ = 0.0f;
+
+    struct BackgroundLaser {
+        Vector2 start;
+        Vector2 end;
+        float life;
+        float maxLife;
+        Color color;
+    };
+    struct BackgroundSpark {
+        Vector2 pos;
+        Vector2 vel;
+        float life;
+        float maxLife;
+        Color color;
+    };
+    std::vector<BackgroundLaser> bgLasers_;
+    std::vector<BackgroundSpark> bgSparks_;
+    float spaceStationScrollY_ = 0.0f;
+    float screenFlashTimer_ = 0.0f;
+
+    void DrawCabinetBezel(float rx, float ry, float rw, float rh) const;
+
     // Formation tracking counters
     int formationCount_[10]{};
     int nextScoreMilestone_ = 10000;
     int nextExtraLifeScore_ = 50000;
 
+
     void StartGame();
+
     void ReturnToTitle();
     void NextLoop();
     void Update(float dt);

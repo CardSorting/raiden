@@ -1,4 +1,6 @@
 #include "Player.h"
+#include "Effects.h"
+#include "SpriteManager.h"
 #include <algorithm>
 #include <cmath>
 
@@ -15,6 +17,10 @@ void Player::ResetForNewGame() {
     isDemo = false;
     triggerBomb_ = false;
     animationTime = 0.0f;
+    tilt_ = 0.0f;
+    muzzleFlashTimer_ = 0.0f;
+    scaleY_ = 1.0f;
+    heat_ = 0.0f;
 }
 
 void Player::ResetAfterHit() {
@@ -23,9 +29,13 @@ void Player::ResetAfterHit() {
     invulnTimer = 2.0f;
     weaponLevel = std::max(1, weaponLevel - 1);
     triggerBomb_ = false;
+    tilt_ = 0.0f;
+    muzzleFlashTimer_ = 0.0f;
+    scaleY_ = 1.0f;
+    heat_ = 0.0f;
 }
 
-void Player::Update(float dt, const std::vector<Enemy>& enemies, const std::vector<Bullet>& enemyBullets) {
+void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemies, const std::vector<Bullet>& enemyBullets) {
     Vector2 dir{0, 0};
     if (isDemo) {
         // Simple AI logic
@@ -122,6 +132,38 @@ void Player::Update(float dt, const std::vector<Enemy>& enemies, const std::vect
         invulnTimer -= dt;
         if (invulnTimer <= 0.0f) { invulnerable = false; invulnTimer = 0.0f; }
     }
+
+    // Dynamic horizontal banking/tilt interpolation (expanded to [-2, 2])
+    if (dir.x < 0.0f) {
+        tilt_ = std::max(-2.0f, tilt_ - 12.0f * dt);
+    } else if (dir.x > 0.0f) {
+        tilt_ = std::min(2.0f, tilt_ + 12.0f * dt);
+    } else {
+        if (tilt_ > 0.0f) tilt_ = std::max(0.0f, tilt_ - 10.0f * dt);
+        else if (tilt_ < 0.0f) tilt_ = std::min(0.0f, tilt_ + 10.0f * dt);
+    }
+
+    if (muzzleFlashTimer_ > 0.0f) {
+        muzzleFlashTimer_ -= dt;
+    }
+
+    // Decay recoil offset and squash-scale
+    recoilOffset_ = std::max(0.0f, recoilOffset_ - 20.0f * dt);
+    scaleY_ += (1.0f - scaleY_) * 14.0f * dt;
+
+    // Decay wing vent heat
+    heat_ = std::max(0.0f, heat_ - 1.8f * dt);
+    if (heat_ > 0.2f && GetRandomValue(0, 100) < (int)(heat_ * 60)) {
+        effects.Spark({ pos.x - 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE);
+        effects.Spark({ pos.x + 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE);
+    }
+
+    // Spawn procedural engine exhaust particles
+    if (GetRandomValue(0, 100) < 65) {
+        Color thrusterColor = focusMode ? SKYBLUE : (GetRandomValue(0, 1) == 0 ? ORANGE : GOLD);
+        effects.EngineExhaust({ pos.x - 6.0f, pos.y + 9.0f }, thrusterColor);
+        effects.EngineExhaust({ pos.x + 6.0f, pos.y + 9.0f }, thrusterColor);
+    }
 }
 
 void Player::TryShoot(std::vector<Bullet>& bullets) {
@@ -137,6 +179,11 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
         }
     }
     if (!shootPressed || shootTimer_ > 0.0f) return;
+    
+    recoilOffset_ = std::min(5.5f, recoilOffset_ + 2.0f);
+    scaleY_ = 0.82f;
+    heat_ = std::min(1.0f, heat_ + 0.16f);
+    muzzleFlashTimer_ = 0.06f; // Trigger muzzle flare sprite timer
     int level = std::clamp(weaponLevel, 1, 4);
     if (weapon == WeaponType::Vulcan) {
         shootTimer_ = 0.105f;
@@ -206,51 +253,144 @@ const char* Player::WeaponName() const {
 
 void Player::Draw(bool debug) const {
     bool blink = invulnerable && ((int)(invulnTimer * 12) % 2 == 0);
-    
-    // Engine thrusters - flickering plume
-    if (!blink) {
-        float flameH = 10.0f + std::sin(animationTime * 45.0f) * 4.0f;
-        DrawTriangle({pos.x - 6, pos.y + 14}, {pos.x - 9, pos.y + 14 + flameH}, {pos.x - 3, pos.y + 14}, SKYBLUE);
-        DrawTriangle({pos.x - 5, pos.y + 14}, {pos.x - 7, pos.y + 14 + (flameH * 0.6f)}, {pos.x - 4, pos.y + 14}, WHITE);
-        
-        DrawTriangle({pos.x + 6, pos.y + 14}, {pos.x + 3, pos.y + 14}, {pos.x + 9, pos.y + 14 + flameH}, SKYBLUE);
-        DrawTriangle({pos.x + 5, pos.y + 14}, {pos.x + 4, pos.y + 14}, {pos.x + 7, pos.y + 14 + (flameH * 0.6f)}, WHITE);
+    Vector2 drawPos = { pos.x, pos.y + recoilOffset_ };
+    Color tint = WHITE;
 
-        // Central main thruster plume
-        float centerFlameH = 15.0f + std::sin(animationTime * 50.0f) * 5.0f;
-        DrawTriangle({pos.x - 3.5f, pos.y + 14}, {pos.x, pos.y + 14 + centerFlameH}, {pos.x + 3.5f, pos.y + 14}, ORANGE);
-        DrawTriangle({pos.x - 2.0f, pos.y + 14}, {pos.x, pos.y + 14 + (centerFlameH * 0.6f)}, {pos.x + 2.0f, pos.y + 14}, YELLOW);
+    if (invulnerable && invulnTimer > 1.2f) {
+        // Glitch state visual offset & red shift
+        drawPos.x += (float)GetRandomValue(-20, 20) / 10.0f;
+        tint = (GetRandomValue(0, 1) == 0) ? Color{255, 60, 60, 255} : Color{255, 255, 255, 120};
     }
     
+    // 1. Engine thrusters plume flickering
     if (!blink) {
-        // Detailed Wings
-        DrawTriangle({pos.x, pos.y - 12}, {pos.x - 18, pos.y + 6}, {pos.x - 6, pos.y + 6}, GRAY);
-        DrawTriangle({pos.x, pos.y - 12}, {pos.x + 6, pos.y + 6}, {pos.x + 18, pos.y + 6}, GRAY);
+        float plumeScale = 1.0f + 0.35f * std::sin(animationTime * 48.0f);
         
-        // Fuselage
-        DrawTriangle({pos.x, pos.y - 22}, {pos.x - 12, pos.y + 14}, {pos.x + 12, pos.y + 14}, RAYWHITE);
-        DrawTriangle({pos.x, pos.y - 12}, {pos.x - 6, pos.y + 10}, {pos.x + 6, pos.y + 10}, BLUE);
-        
-        // Glowing canopy
-        DrawCircleV({pos.x, pos.y - 2}, 4, SKYBLUE);
-        DrawCircleV({pos.x - 1, pos.y - 3}, 1, WHITE);
-        
-        DrawRectangle((int)pos.x - 2, (int)pos.y + 12, 4, 8, ORANGE);
+        // Emissive engine exhaust bloom (additive circular gradients)
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleGradient((int)(drawPos.x - 6.0f), (int)(drawPos.y + 11.0f), 12.0f * plumeScale, Fade(ORANGE, 0.45f), Fade(BLACK, 0.0f));
+        DrawCircleGradient((int)(drawPos.x + 6.0f), (int)(drawPos.y + 11.0f), 12.0f * plumeScale, Fade(ORANGE, 0.45f), Fade(BLACK, 0.0f));
+        EndBlendMode();
+
+        // Draw left nozzle plume
+        DrawTriangle(
+            {drawPos.x - 6.0f, drawPos.y + 11.0f},
+            {drawPos.x - 8.0f, drawPos.y + 11.0f + 14.0f * plumeScale},
+            {drawPos.x - 4.0f, drawPos.y + 11.0f},
+            Color{255, 100, 0, 180}
+        );
+        DrawTriangle(
+            {drawPos.x - 5.5f, drawPos.y + 11.0f},
+            {drawPos.x - 7.0f, drawPos.y + 11.0f + 8.0f * plumeScale},
+            {drawPos.x - 4.5f, drawPos.y + 11.0f},
+            Color{255, 220, 0, 230}
+        );
+
+        // Draw right nozzle plume
+        DrawTriangle(
+            {drawPos.x + 6.0f, drawPos.y + 11.0f},
+            {drawPos.x + 4.0f, drawPos.y + 11.0f},
+            {drawPos.x + 8.0f, drawPos.y + 11.0f + 14.0f * plumeScale},
+            Color{255, 100, 0, 180}
+        );
+        DrawTriangle(
+            {drawPos.x + 5.5f, drawPos.y + 11.0f},
+            {drawPos.x + 4.5f, drawPos.y + 11.0f},
+            {drawPos.x + 7.0f, drawPos.y + 11.0f + 8.0f * plumeScale},
+            Color{255, 220, 0, 230}
+        );
     }
-    DrawCircleV(pos, hitRadius, RED);
     
-    if (invulnerable) {
-        float bubbleRadius = spriteRadius + 4.0f + std::sin(animationTime * 18.0f) * 2.0f;
-        DrawCircleLines((int)pos.x, (int)pos.y, bubbleRadius, Fade(SKYBLUE, 0.75f));
-        float angle = animationTime * 5.0f;
-        Vector2 orb1 = { pos.x + std::cos(angle) * bubbleRadius, pos.y + std::sin(angle) * bubbleRadius };
-        Vector2 orb2 = { pos.x + std::cos(angle + 3.14159f) * bubbleRadius, pos.y + std::sin(angle + 3.14159f) * bubbleRadius };
-        DrawCircleV(orb1, 3.0f, SKYBLUE);
-        DrawCircleV(orb2, 3.0f, SKYBLUE);
+    // 2. Render Player Ship Sprite with 5 Banking States and Recoil Squash
+    if (!blink) {
+        SpriteId spriteId = SpriteId::PlayerIdle;
+        if (tilt_ < -1.1f) spriteId = SpriteId::PlayerLeft;
+        else if (tilt_ < -0.3f) spriteId = SpriteId::PlayerSoftLeft;
+        else if (tilt_ > 1.1f) spriteId = SpriteId::PlayerRight;
+        else if (tilt_ > 0.3f) spriteId = SpriteId::PlayerSoftRight;
+        
+        Texture2D tex = SpriteManager::Instance().GetTexture(spriteId);
+        if (tex.id != 0) {
+            Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+            Rectangle dest = { drawPos.x, drawPos.y, (float)tex.width * 1.5f, (float)tex.height * 1.5f * scaleY_ };
+            Vector2 origin = { (float)tex.width * 1.5f / 2.0f, (float)tex.height * 1.5f * scaleY_ / 2.0f };
+            SpriteManager::Instance().DrawRect(spriteId, src, dest, origin, 0.0f, tint);
+        }
+
+        // Additive glowing canopy cockpit lighting
+        BeginBlendMode(BLEND_ADDITIVE);
+        float pulseCyan = 0.5f + 0.5f * std::sin(animationTime * 12.0f);
+        Vector2 canopyPos = { drawPos.x, drawPos.y - 9.0f * scaleY_ };
+        DrawCircleGradient((int)canopyPos.x, (int)canopyPos.y, 6.0f + 2.5f * pulseCyan, Fade(SKYBLUE, 0.55f * (0.6f + 0.4f * pulseCyan)), Fade(BLACK, 0.0f));
+        DrawCircleV(canopyPos, 2.0f, Fade(WHITE, 0.7f));
+        EndBlendMode();
+
+        // Low-health critical warning pulse
+        if (lives == 1) {
+            float alertPulse = 0.5f + 0.5f * std::sin(animationTime * 16.0f);
+            DrawCircleLines((int)drawPos.x, (int)drawPos.y, 22.0f, Fade(RED, alertPulse * 0.7f));
+        }
     }
+
+    // 3. Render Muzzle Flashes
+    if (muzzleFlashTimer_ > 0.0f) {
+        SpriteId flashId = SpriteId::MuzzleVulcan;
+        if (weapon == WeaponType::Plasma) flashId = SpriteId::MuzzlePlasma;
+        else if (weapon == WeaponType::Missile) flashId = SpriteId::MuzzleMissile;
+
+        int level = std::clamp(weaponLevel, 1, 4);
+        if (weapon == WeaponType::Vulcan) {
+            SpriteManager::Instance().Draw(flashId, {drawPos.x, drawPos.y - 18}, 0.0f, 1.2f);
+            if (level >= 2) {
+                SpriteManager::Instance().Draw(flashId, {drawPos.x - 10, drawPos.y - 10}, -15.0f, 1.0f);
+                SpriteManager::Instance().Draw(flashId, {drawPos.x + 10, drawPos.y - 10}, 15.0f, 1.0f);
+            }
+            if (level >= 4) {
+                SpriteManager::Instance().Draw(flashId, {drawPos.x - 16, drawPos.y}, -30.0f, 1.0f);
+                SpriteManager::Instance().Draw(flashId, {drawPos.x + 16, drawPos.y}, 30.0f, 1.0f);
+            }
+        } else if (weapon == WeaponType::Plasma) {
+            SpriteManager::Instance().Draw(flashId, {drawPos.x, drawPos.y - 20}, 0.0f, 1.4f);
+            if (level >= 2) {
+                SpriteManager::Instance().Draw(flashId, {drawPos.x - 18, drawPos.y - 8}, -20.0f, 1.1f);
+                SpriteManager::Instance().Draw(flashId, {drawPos.x + 18, drawPos.y - 8}, 20.0f, 1.1f);
+            }
+        } else { // Missile
+            SpriteManager::Instance().Draw(flashId, {drawPos.x, drawPos.y - 18}, 0.0f, 1.2f);
+            SpriteManager::Instance().Draw(flashId, {drawPos.x - 15, drawPos.y}, -10.0f, 1.0f);
+            if (level >= 3) {
+                SpriteManager::Instance().Draw(flashId, {drawPos.x + 15, drawPos.y}, 10.0f, 1.0f);
+            }
+        }
+    }
+
+    // 4. Render Invulnerability Shield Bubble (with electric arcing)
+    if (invulnerable) {
+        float scale = 1.35f + 0.12f * std::sin(animationTime * 20.0f);
+        SpriteManager::Instance().Draw(SpriteId::ShieldBubble, drawPos, animationTime * 180.0f, scale, Fade(SKYBLUE, 0.75f));
+        
+        // Additive electric shimmer rings and arcs
+        BeginBlendMode(BLEND_ADDITIVE);
+        float pulseRadius = 14.0f + 16.0f * fmodf(animationTime * 1.5f, 1.0f);
+        DrawCircleLines((int)drawPos.x, (int)drawPos.y, pulseRadius, Fade(SKYBLUE, 1.0f - (pulseRadius - 14.0f) / 16.0f));
+        
+        for (int i = 0; i < 3; ++i) {
+            float angle1 = (float)GetRandomValue(0, 360) * DEG2RAD;
+            float angle2 = angle1 + (float)GetRandomValue(20, 50) * DEG2RAD;
+            float r = spriteRadius * (1.1f + 0.2f * std::sin(animationTime * 35.0f));
+            Vector2 p1 = { drawPos.x + std::cos(angle1) * r, drawPos.y + std::sin(angle1) * r };
+            Vector2 p2 = { drawPos.x + std::cos(angle2) * r, drawPos.y + std::sin(angle2) * r };
+            DrawLineV(p1, p2, Fade(WHITE, 0.75f));
+        }
+        EndBlendMode();
+    }
+    
+    // Always render small visible red hitbox point
+    DrawCircleV(drawPos, hitRadius, RED);
     
     if (debug) {
         DrawCircleLines((int)pos.x, (int)pos.y, spriteRadius, GREEN);
         DrawCircleLines((int)pos.x, (int)pos.y, hitRadius, RED);
     }
 }
+
