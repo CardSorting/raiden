@@ -43,7 +43,7 @@ void Effects::Update(float dt) {
         d.life -= dt;
         d.pos.x += d.vel.x * dt;
         d.pos.y += d.vel.y * dt;
-        d.vel.y += 135.0f * dt; // gravity pull
+        d.vel.y += d.gravity * dt;
         d.rotation += d.spinSpeed * dt;
     }
     debris_.erase(std::remove_if(debris_.begin(), debris_.end(), [](const Debris& d){ return d.life <= 0; }), debris_.end());
@@ -105,6 +105,14 @@ void Effects::Draw() const {
         Color col = p.color;
         
         bool isThruster = (p.color.r == SKYBLUE.r && p.color.g == SKYBLUE.g && p.color.b == SKYBLUE.b);
+        bool isSmoke = (std::abs((int)p.color.r - (int)p.color.g) < 16 &&
+                        std::abs((int)p.color.g - (int)p.color.b) < 16 &&
+                        p.color.r < 135 && p.color.a < 230);
+        if (isSmoke) {
+            float sz = p.radius * (1.0f + (1.0f - a) * 0.9f);
+            DrawCircleV(p.pos, sz, Fade(p.color, a * 0.24f));
+            continue;
+        }
         if (!isThruster) {
             if (a > 0.82f) {
                 col = WHITE;
@@ -121,7 +129,7 @@ void Effects::Draw() const {
 
         float speedSq = p.vel.x * p.vel.x + p.vel.y * p.vel.y;
         if (speedSq > 6000.0f) {
-            float dtOffset = 0.024f;
+            float dtOffset = 0.018f;
             Vector2 tail = { p.pos.x - p.vel.x * dtOffset * a, p.pos.y - p.vel.y * dtOffset * a };
             float thickness = p.radius * (0.4f + a * 0.6f);
             if (thickness < 1.0f) thickness = 1.0f;
@@ -168,8 +176,8 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     AnimatedExplosion ae;
     ae.pos = pos;
     ae.life = 0.0f;
-    ae.maxLife = (count > 50) ? 0.65f : 0.40f; 
-    ae.scale = (count > 50) ? 3.2f : ((count > 15) ? 1.7f : 0.9f);
+    ae.maxLife = (count > 50) ? 0.58f : ((count > 15) ? 0.36f : 0.28f);
+    ae.scale = (count > 50) ? 3.0f : ((count > 15) ? 1.55f : 0.82f);
     ae.rotation = (float)GetRandomValue(0, 360);
     animatedExplosions_.push_back(ae);
 
@@ -179,7 +187,7 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
             AnimatedExplosion subAe;
             subAe.pos = { pos.x + GetRandomValue(-35, 35), pos.y + GetRandomValue(-35, 35) };
             subAe.life = -0.07f * (float)(step + 1); // delayed trigger times
-            subAe.maxLife = 0.42f;
+            subAe.maxLife = 0.34f;
             subAe.scale = (float)GetRandomValue(12, 22) / 10.0f;
             subAe.rotation = (float)GetRandomValue(0, 360);
             animatedExplosions_.push_back(subAe);
@@ -196,14 +204,14 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     shockwaves_.push_back(sw);
 
     // 4. Spawn Additive Embers (bright slow hot sparks)
-    int emberCount = (count > 50) ? 35 : ((count > 15) ? 12 : 3);
+    int emberCount = (count > 50) ? 30 : ((count > 15) ? 10 : 2);
     for (int i = 0; i < emberCount; ++i) {
         float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
         float speed = (float)GetRandomValue(20, 85);
         Ember em;
         em.pos = pos;
         em.vel = { std::cos(angle) * speed, std::sin(angle) * speed };
-        em.life = em.maxLife = (float)GetRandomValue(45, 95) / 100.0f;
+        em.life = em.maxLife = (float)GetRandomValue(35, 78) / 100.0f;
         em.radius = (float)GetRandomValue(12, 25) / 10.0f;
         em.color = (GetRandomValue(0, 1) == 0) ? GOLD : ORANGE;
         embers_.push_back(em);
@@ -216,25 +224,26 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
         float speed = (float)GetRandomValue(35, 140);
         Debris d;
         d.pos = pos;
-        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - 40.0f }; // slight upward launch bias
+        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - (float)GetRandomValue(24, 58) };
         d.rotation = (float)GetRandomValue(0, 360);
         d.spinSpeed = (float)GetRandomValue(-240, 240);
-        d.life = d.maxLife = (float)GetRandomValue(50, 110) / 100.0f;
+        d.gravity = (float)GetRandomValue(105, 185);
+        d.life = d.maxLife = (float)GetRandomValue(45, 100) / 100.0f;
         
         if (count > 50) {
             d.useSprite = true;
             if (i % 3 == 0) d.spriteId = SpriteId::DebrisBossCore;
             else if (i % 3 == 1) d.spriteId = SpriteId::DebrisEnemyWing;
             else d.spriteId = SpriteId::DebrisEnemyThruster;
-            d.size = (float)GetRandomValue(12, 18) / 10.0f;
+            d.size = (float)GetRandomValue(10, 20) / 10.0f;
         } else if (debrisSprite == SpriteId::DebrisPlayerWingLeft || debrisSprite == SpriteId::DebrisPlayerWingRight) {
             d.spriteId = (i % 2 == 0) ? SpriteId::DebrisPlayerWingLeft : SpriteId::DebrisPlayerWingRight;
             d.useSprite = true;
-            d.size = (float)GetRandomValue(10, 15) / 10.0f;
+            d.size = (float)GetRandomValue(9, 16) / 10.0f;
         } else if (debrisSprite != SpriteId::AsteroidChunk) {
             d.spriteId = debrisSprite;
             d.useSprite = true;
-            d.size = (float)GetRandomValue(10, 15) / 10.0f;
+            d.size = (float)GetRandomValue(8, 16) / 10.0f;
         } else {
             d.useSprite = false;
             d.size = (float)GetRandomValue(2, 5);
@@ -252,7 +261,7 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
         Particle p;
         p.pos = pos;
         p.vel = {std::cos(angle) * speed, std::sin(angle) * speed};
-        p.life = p.maxLife = (float)GetRandomValue(20, 75) / 100.0f;
+        p.life = p.maxLife = (float)GetRandomValue(18, 58) / 100.0f;
         p.radius = (float)GetRandomValue(2, 6);
         p.color = color;
         particles_.push_back(p);
@@ -268,7 +277,7 @@ void Effects::Spark(Vector2 pos, Color color, Vector2 biasVel) {
         Particle p;
         p.pos = pos;
         p.vel = { std::cos(angle) * speed + biasVel.x * 0.45f, std::sin(angle) * speed + biasVel.y * 0.45f };
-        p.life = p.maxLife = (float)GetRandomValue(10, 32) / 100.0f;
+        p.life = p.maxLife = (float)GetRandomValue(9, 24) / 100.0f;
         p.radius = (float)GetRandomValue(15, 30) / 10.0f;
         p.color = color;
         particles_.push_back(p);
@@ -282,8 +291,8 @@ void Effects::EngineExhaust(Vector2 pos, Color color, Vector2 biasVel) {
     float angle = (float)GetRandomValue(82, 98) * DEG2RAD;
     float speed = (float)GetRandomValue(60, 120);
     p.vel = { std::cos(angle) * speed + biasVel.x, std::sin(angle) * speed + biasVel.y };
-    p.life = p.maxLife = (float)GetRandomValue(15, 38) / 100.0f;
-    p.radius = (float)GetRandomValue(12, 28) / 10.0f;
+    p.life = p.maxLife = (float)GetRandomValue(12, 28) / 100.0f;
+    p.radius = (float)GetRandomValue(10, 22) / 10.0f;
     p.color = color;
     particles_.push_back(p);
 }
@@ -293,10 +302,10 @@ void Effects::Smoke(Vector2 pos, Color color) {
     p.pos = pos;
     // Slow drifting smoke particles
     float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
-    float speed = (float)GetRandomValue(15, 45);
-    p.vel = { std::cos(angle) * speed, std::sin(angle) * speed + 25.0f }; // slight downward drift from scrolling
-    p.life = p.maxLife = (float)GetRandomValue(45, 95) / 100.0f;
-    p.radius = (float)GetRandomValue(35, 75) / 10.0f; // larger radius
+    float speed = (float)GetRandomValue(10, 32);
+    p.vel = { std::cos(angle) * speed, std::sin(angle) * speed + 20.0f };
+    p.life = p.maxLife = (float)GetRandomValue(34, 72) / 100.0f;
+    p.radius = (float)GetRandomValue(28, 62) / 10.0f;
     p.color = color;
     particles_.push_back(p);
 }
@@ -308,11 +317,12 @@ void Effects::DebrisShower(Vector2 pos, Color color, int count) {
         Debris d;
         d.pos = pos;
         // Upward launch bias so it bounces and arcs down
-        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - 50.0f };
+        d.vel = { std::cos(angle) * speed, std::sin(angle) * speed - (float)GetRandomValue(35, 70) };
         d.rotation = (float)GetRandomValue(0, 360);
         d.spinSpeed = (float)GetRandomValue(-360, 360);
-        d.life = d.maxLife = (float)GetRandomValue(70, 160) / 100.0f;
-        d.size = (float)GetRandomValue(4, 9);
+        d.gravity = (float)GetRandomValue(95, 210);
+        d.life = d.maxLife = (float)GetRandomValue(55, 135) / 100.0f;
+        d.size = (float)GetRandomValue(3, 11);
         d.color = color;
         debris_.push_back(d);
     }
@@ -327,5 +337,4 @@ Vector2 Effects::ShakeOffset() const {
     if (shakeTime_ <= 0.0f) return {0, 0};
     return {(float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_, (float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_};
 }
-
 

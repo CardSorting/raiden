@@ -151,9 +151,10 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
     if (positionCount_ < 8) positionCount_++;
 
     // Momentum-Based Banking (exponential drag interpolation)
-    float targetTilt = dir.x * 2.0f;
-    float tiltSpeed = (dir.x == 0.0f) ? 14.0f : 10.0f; // centers slightly quicker than it banks
-    tilt_ += (targetTilt - tilt_) * tiltSpeed * dt;
+    float targetTilt = dir.x * 2.1f;
+    float tiltSpeed = (dir.x == 0.0f) ? 22.0f : 16.0f;
+    float tiltBlend = 1.0f - std::exp(-tiltSpeed * dt);
+    tilt_ += (targetTilt - tilt_) * tiltBlend;
 
     if (muzzleFlashTimer_ > 0.0f) {
         muzzleFlashTimer_ -= dt;
@@ -161,38 +162,40 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
 
     // Physical Spring-Damper Recoil Physics
     // Recoil offset spring system (target: 0.0f)
-    float recoilK = 220.0f;
-    float recoilDamping = 18.0f;
+    float recoilK = 260.0f;
+    float recoilDamping = 28.0f;
     float recoilForce = -recoilK * recoilOffset_ - recoilDamping * recoilVel_;
     recoilVel_ += recoilForce * dt;
     recoilOffset_ += recoilVel_ * dt;
+    recoilOffset_ = std::min(recoilOffset_, 5.5f);
     if (recoilOffset_ < 0.0f) {
         recoilOffset_ = 0.0f;
         recoilVel_ = 0.0f;
     }
 
     // scaleY_ spring system (target: 1.0f)
-    float scaleK = 380.0f;
-    float scaleDamping = 20.0f;
+    float scaleK = 420.0f;
+    float scaleDamping = 26.0f;
     float scaleForce = -scaleK * (scaleY_ - 1.0f) - scaleDamping * scaleYVel_;
     scaleYVel_ += scaleForce * dt;
     scaleY_ += scaleYVel_ * dt;
+    scaleY_ = std::clamp(scaleY_, 0.88f, 1.08f);
 
     // Decay wing vent heat
     heat_ = std::max(0.0f, heat_ - 1.8f * dt);
-    if (heat_ > 0.2f && GetRandomValue(0, 100) < (int)(heat_ * 60)) {
+    if (heat_ > 0.2f && GetRandomValue(0, 100) < (int)(heat_ * 44)) {
         effects.Spark({ pos.x - 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE, {dir.x * -100.0f, 40.0f});
         effects.Spark({ pos.x + 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE, {dir.x * -100.0f, 40.0f});
     }
 
     // Spawn procedural vectored engine exhaust particles
-    if (GetRandomValue(0, 100) < 65) {
+    if (GetRandomValue(0, 100) < 48) {
         Color thrusterColor = focusMode ? SKYBLUE : (GetRandomValue(0, 1) == 0 ? ORANGE : GOLD);
         
         // Calculate dynamic vectored exhaust direction based on ship movement and roll tilt
         // Plumes tilt opposite to movement direction and banking angle
         float tiltExhaustX = -tilt_ * 30.0f - dir.x * 50.0f;
-        float exhaustY = focusMode ? 40.0f : (dir.y < 0.0f ? 140.0f : 80.0f);
+        float exhaustY = focusMode ? 34.0f : (dir.y < 0.0f ? 118.0f : 70.0f);
         
         // Asymmetric plume speeds depending on left/right banking
         float leftThrustMult = 1.0f;
@@ -222,8 +225,8 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
     
     int level = std::clamp(weaponLevel, 1, 4);
     if (weapon == WeaponType::Vulcan) {
-        recoilVel_ += 130.0f;
-        scaleYVel_ -= 9.0f;
+        recoilVel_ += 95.0f;
+        scaleYVel_ -= 5.5f;
         heat_ = std::min(1.0f, heat_ + 0.05f);
         muzzleFlashTimer_ = 0.04f;
         shootTimer_ = 0.105f;
@@ -237,8 +240,8 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
             bullets.emplace_back(Vector2{pos.x + 16, pos.y}, Vector2{130, -470}, 4, 1, BulletOwner::Player, ORANGE);
         }
     } else if (weapon == WeaponType::Plasma) {
-        recoilVel_ += 360.0f;
-        scaleYVel_ -= 28.0f;
+        recoilVel_ += 300.0f;
+        scaleYVel_ -= 18.0f;
         heat_ = std::min(1.0f, heat_ + 0.20f);
         muzzleFlashTimer_ = 0.08f;
         shootTimer_ = 0.16f;
@@ -248,8 +251,8 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
             bullets.emplace_back(Vector2{pos.x + 18, pos.y - 8}, Vector2{90, -345}, 7, 1, BulletOwner::Player, BLUE);
         }
     } else {
-        recoilVel_ += 210.0f;
-        scaleYVel_ -= 16.0f;
+        recoilVel_ += 180.0f;
+        scaleYVel_ -= 11.0f;
         heat_ = std::min(1.0f, heat_ + 0.12f);
         muzzleFlashTimer_ = 0.06f;
         shootTimer_ = 0.20f;
@@ -388,14 +391,16 @@ void Player::Draw(bool debug) const {
     }
     
     // 1b. Ghost afterimage trails
-    if (!blink && !focusMode && (dx * dx + dy * dy > 0.02f)) {
+    float moveSq = dx * dx + dy * dy;
+    if (!blink && !focusMode && moveSq > 1.2f) {
         BeginBlendMode(BLEND_ADDITIVE);
         for (int i = 1; i < 4; ++i) {
             int idx = i * 2;
             if (idx >= positionCount_) break;
             Vector2 ghostPos = pastPositions_[idx];
             
-            float alpha = 0.38f - (float)i * 0.11f;
+            float speedAlpha = std::clamp(moveSq / 20.0f, 0.35f, 1.0f);
+            float alpha = (0.26f - (float)i * 0.065f) * speedAlpha;
             if (alpha <= 0.0f) continue;
             
             SpriteId spriteId = SpriteId::PlayerIdle;
@@ -508,4 +513,3 @@ void Player::Draw(bool debug) const {
         DrawCircleLines((int)pos.x, (int)pos.y, hitRadius, RED);
     }
 }
-

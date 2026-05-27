@@ -114,6 +114,13 @@ private:
 
     // Visual Scaling, CRT Shader, and Cabinet Bezels
     bool crtShaderEnabled_ = true;
+    bool cleanPixelMode_ = false;
+    int crtCurvature_ = 3;
+    int crtScanline_ = 3;
+    int crtMask_ = 4;
+    int crtBloom_ = 2;
+    int crtVignette_ = 3;
+    int crtGlare_ = 2;
     int aspectMode_ = 0; // 0 = Fit, 1 = Integer, 2 = Stretch
     bool drawBezel_ = true;
     RenderTexture2D screenTarget_{};

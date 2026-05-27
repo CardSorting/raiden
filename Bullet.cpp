@@ -101,16 +101,17 @@ void Bullet::Draw(bool debug) const {
     } else {
         // Enemy bullets: First draw black safety mask for contrast separation!
         for (int i = trailCount_ - 1; i >= 0; --i) {
-            DrawCircleV(trail_[i], radius * (1.4f - (float)i * 0.10f), BLACK);
+            float alpha = 0.66f - (float)i * 0.075f;
+            DrawCircleV(trail_[i], radius * (1.34f - (float)i * 0.08f), Fade(BLACK, std::max(0.18f, alpha)));
         }
-        DrawCircleV(pos, radius * 1.5f, BLACK);
+        DrawCircleV(pos, radius * 1.42f, Fade(BLACK, 0.86f));
 
         // Then draw neon glowing trails additively
         BeginBlendMode(BLEND_ADDITIVE);
         for (int i = 0; i < trailCount_; ++i) {
             float alpha = 1.0f - (float)i / (float)trailCount_;
-            DrawCircleV(trail_[i], radius * (1.3f - (float)i * 0.10f), Fade(color, alpha * 0.65f));
-            DrawCircleV(trail_[i], radius * (0.8f - (float)i * 0.08f), Fade(WHITE, alpha * 0.45f));
+            DrawCircleV(trail_[i], radius * (1.22f - (float)i * 0.09f), Fade(color, alpha * 0.72f));
+            DrawCircleV(trail_[i], radius * (0.68f - (float)i * 0.06f), Fade(WHITE, alpha * 0.50f));
         }
         EndBlendMode();
 

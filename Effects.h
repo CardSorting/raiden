@@ -50,6 +50,7 @@ struct Debris {
     Vector2 vel{};
     float rotation = 0.0f;
     float spinSpeed = 0.0f;
+    float gravity = 135.0f;
     float life = 1.0f;
     float maxLife = 1.0f;
     float size = 3.0f;
@@ -82,5 +83,4 @@ private:
     float shakeTime_ = 0.0f;
     float shakeAmount_ = 0.0f;
 };
-
 

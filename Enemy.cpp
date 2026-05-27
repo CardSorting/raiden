@@ -23,13 +23,13 @@ Enemy::Enemy(EnemyType t, Vector2 p, int loop, int formId) : type(t), pos(p), fo
 void Enemy::FireAimed(Vector2 playerPos, std::vector<Bullet>& enemyBullets, float speed, int damage) const {
     Vector2 d = Norm({playerPos.x - pos.x, playerPos.y - pos.y});
     float size = IsBoss() ? 7.5f : 5.5f;
-    Color c = IsBoss() ? RED : PINK;
+    Color c = IsBoss() ? Color{255, 42, 76, 255} : PINK;
     enemyBullets.emplace_back(pos, Vector2{d.x * speed, d.y * speed}, size, damage, BulletOwner::Enemy, c);
 }
 
 void Enemy::FireRadial(std::vector<Bullet>& enemyBullets, int count, float speed, float angleOffset) const {
     float size = IsBoss() ? 7.0f : 5.0f;
-    Color c = IsBoss() ? ORANGE : MAGENTA;
+    Color c = IsBoss() ? Color{255, 72, 128, 255} : MAGENTA;
     for (int i = 0; i < count; ++i) {
         float a = angleOffset + (float)i / (float)count * 6.2831853f;
         enemyBullets.emplace_back(pos, Vector2{std::cos(a) * speed, std::sin(a) * speed}, size, 1, BulletOwner::Enemy, c);
@@ -66,8 +66,8 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
         // Structural wobble under damage (instability wobble)
         if (hp < maxHp / 2) {
             float damageRatio = 1.0f - (float)hp / (float)maxHp;
-            pos.x += std::sin(age * 35.0f) * 2.8f * damageRatio;
-            pos.y += std::cos(age * 28.0f) * 1.5f * damageRatio;
+            pos.x += std::sin(age * 35.0f) * 3.6f * damageRatio + std::sin(age * 8.0f) * 2.2f;
+            pos.y += std::cos(age * 28.0f) * 2.0f * damageRatio;
         }
         
         bool phase2 = (hp < maxHp / 2);
@@ -114,7 +114,8 @@ void Enemy::Hit(int damage, Effects& effects) {
     // Boss Phase 2 Armor Shedding transition
     if (IsBoss() && hp < maxHp / 2 && !bossPanelsShed) {
         bossPanelsShed = true;
-        effects.DebrisShower(pos, Color{125, 130, 150, 255}, 12);
+        effects.DebrisShower(pos, Color{125, 130, 150, 255}, 16);
+        effects.Explosion(pos, Color{255, 70, 80, 255}, 24, SpriteId::DebrisBossCore);
         effects.Shake(12.0f, 0.4f);
         effects.AddText(pos, "ARMOR BREACH", RED);
     }
@@ -154,9 +155,9 @@ void Enemy::Draw(bool debug) const {
         SpriteId bossSprite = phase2 ? SpriteId::BossDamaged : SpriteId::Boss;
 
         // Double engine plumes at the top (facing down)
-        float flameRate = phase2 ? 22.0f : 14.0f;
+        float flameRate = phase2 ? 28.0f : 14.0f;
         if ((int)(age * flameRate) % 2 == 0) {
-            float plumeH = 15.0f + std::sin(age * 60.0f) * 5.0f;
+            float plumeH = (phase2 ? 22.0f : 15.0f) + std::sin(age * 60.0f) * (phase2 ? 8.0f : 5.0f);
             DrawTriangle({pos.x - 24, pos.y - 48}, {pos.x - 28, pos.y - 48 - plumeH}, {pos.x - 20, pos.y - 48}, ORANGE);
             DrawTriangle({pos.x - 23, pos.y - 48}, {pos.x - 25, pos.y - 48 - (plumeH * 0.6f)}, {pos.x - 21, pos.y - 48}, YELLOW);
             
@@ -174,9 +175,14 @@ void Enemy::Draw(bool debug) const {
         
         BeginBlendMode(BLEND_ADDITIVE);
         // Outer glowing core aura
-        DrawCircleV(pos, 8.0f + 4.0f * pulse, Fade(coreColor, 0.65f + 0.35f * pulse));
+        DrawCircleV(pos, (phase2 ? 13.0f : 8.0f) + 4.0f * pulse, Fade(coreColor, 0.58f + 0.32f * pulse));
         // Inner hot core
-        DrawCircleV(pos, 3.5f, WHITE);
+        DrawCircleV(pos, phase2 ? 5.0f : 3.5f, WHITE);
+        if (phase2) {
+            DrawCircleLines((int)pos.x, (int)pos.y, 18.0f + 3.0f * pulse, Fade(RED, 0.75f));
+            DrawLineEx({pos.x - 17.0f, pos.y - 5.0f}, {pos.x - 7.0f, pos.y + 6.0f}, 1.5f, Fade(ORANGE, 0.8f));
+            DrawLineEx({pos.x + 17.0f, pos.y - 6.0f}, {pos.x + 6.0f, pos.y + 7.0f}, 1.5f, Fade(ORANGE, 0.8f));
+        }
         
         // Emissive green wingtip sensors
         float sensorPulse = 0.6f + 0.4f * std::sin(age * 8.0f);

@@ -29,11 +29,14 @@ static const char* FS_CODE =
     "uniform sampler2D texture0;\n"
     "uniform vec4 colDiffuse;\n"
     "\n"
-    "const float curvature = 0.038;\n"
-    "const float scanlineWeight = 0.16;\n"
+    "uniform float curvature;\n"
+    "uniform float scanlineWeight;\n"
+    "uniform float maskStrength;\n"
+    "uniform float bloomStrength;\n"
+    "uniform float vignetteStrength;\n"
+    "uniform float glareStrength;\n"
     "const float scanlineFreq = 640.0;\n"
     "const float chromaticOffset = 0.0016;\n"
-    "const float vignetteStrength = 0.14;\n"
     "const float brightness = 1.25;\n"
     "\n"
     "vec2 curve(vec2 uv) {\n"
@@ -63,7 +66,7 @@ static const char* FS_CODE =
     "                 texture(texture0, uv + vec2(-0.0008, 0.0)) * 0.35 +\n"
     "                 texture(texture0, uv + vec2(0.0008, 0.0)) * 0.35 +\n"
     "                 texture(texture0, uv + vec2(0.0015, 0.0)) * 0.22;\n"
-    "    col.rgb = mix(col.rgb, bleed.rgb, 0.12);\n"
+    "    col.rgb = mix(col.rgb, bleed.rgb, bloomStrength);\n"
     "\n"
     "    // Curved scanlines\n"
     "    float scanline = sin(uv.y * scanlineFreq * 3.14159265 * 2.0);\n"
@@ -82,9 +85,9 @@ static const char* FS_CODE =
     "\n"
     "    float yMod = mod(maskCoord.y + step(1.5, xMod) * 1.5, 3.0);\n"
     "    if (yMod < 0.6) {\n"
-    "        mRed *= 0.84;\n"
-    "        mGreen *= 0.84;\n"
-    "        mBlue *= 0.84;\n"
+    "        mRed *= maskStrength;\n"
+    "        mGreen *= maskStrength;\n"
+    "        mBlue *= maskStrength;\n"
     "    }\n"
     "    col.r *= mRed;\n"
     "    col.g *= mGreen;\n"
@@ -97,7 +100,7 @@ static const char* FS_CODE =
     "\n"
     "    // Cabinet ambient marquee glare reflection\n"
     "    float glare = 1.0 - length(uv - vec2(0.35, 0.25));\n"
-    "    glare = clamp(pow(glare, 5.0) * 0.035, 0.0, 1.0);\n"
+    "    glare = clamp(pow(glare, 5.0) * glareStrength, 0.0, 1.0);\n"
     "    col.rgb += vec3(glare);\n"
     "\n"
     "    col.rgb *= brightness;\n"
@@ -118,7 +121,12 @@ static bool CircleHit(Vector2 a, float ar, Vector2 b, float br) {
     return dx * dx + dy * dy <= r * r;
 }
 
+static constexpr int SettingsCount = 20;
+static constexpr int VisibleSettingsRows = 11;
+static constexpr float BossDeathDuration = 1.45f;
+
 Game::Game() {
+    SetTraceLogLevel(LOG_WARNING);
     InitWindow(ScreenW, ScreenH, "Sky Circuit - raylib arcade shooter");
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
@@ -127,6 +135,7 @@ Game::Game() {
     // Initialize Pixel Art Sprites, Shaders, and Render Targets
     SpriteManager::Instance().Init();
     screenTarget_ = LoadRenderTexture(ScreenW, ScreenH);
+    SetTextureFilter(screenTarget_.texture, TEXTURE_FILTER_POINT);
     crtShader_ = LoadShaderFromMemory(VS_CODE, FS_CODE);
     
     lastMousePos_ = GetMousePosition();
@@ -216,12 +225,26 @@ void Game::Run() {
         float y = (GetScreenHeight() - h) / 2.0f;
         
         // Draw bezel cabinet panels if borders exist
-        if (drawBezel_ && aspectMode_ != 2 && (x > 10.0f || y > 10.0f)) {
+        if (drawBezel_ && !cleanPixelMode_ && aspectMode_ != 2 && (x > 10.0f || y > 10.0f)) {
             DrawCabinetBezel(x, y, w, h);
         }
         
         // Apply CRT shader
-        if (crtShaderEnabled_ && crtShader_.id != 0) {
+        if (crtShaderEnabled_ && !cleanPixelMode_ && crtShader_.id != 0) {
+            float curvVal = (float)crtCurvature_ * 0.0095f;
+            float scanVal = (float)crtScanline_ * 0.04f;
+            float maskVal = 1.0f - (float)crtMask_ * 0.032f;
+            float bloomVal = (float)crtBloom_ * 0.04f;
+            float vignVal = (float)crtVignette_ * 0.035f;
+            float glareVal = (float)crtGlare_ * 0.011f;
+
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "curvature"), &curvVal, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "scanlineWeight"), &scanVal, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "maskStrength"), &maskVal, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "bloomStrength"), &bloomVal, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "vignetteStrength"), &vignVal, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "glareStrength"), &glareVal, SHADER_UNIFORM_FLOAT);
+
             BeginShaderMode(crtShader_);
         }
         
@@ -235,7 +258,7 @@ void Game::Run() {
             WHITE
         );
         
-        if (crtShaderEnabled_ && crtShader_.id != 0) {
+        if (crtShaderEnabled_ && !cleanPixelMode_ && crtShader_.id != 0) {
             EndShaderMode();
         }
         
@@ -515,7 +538,7 @@ void Game::Update(float dt) {
             lastAttractShimmer = attractShimmer;
             audio_.PlayAttractShimmer();
         }
-        if (titleTimer_ > 15.0f) {
+        if (titleTimer_ > 10.0f) {
             demoMode_ = true;
             titleTimer_ = 0.0f;
             StartGame();
@@ -854,8 +877,8 @@ void Game::UpdatePlaying(float dt) {
         // Slowly drift the boss position down during its death sequence
         bossDeathPos_.y += 15.0f * dt;
         
-        // Phase 1: 1.6s - 1.2s (Left/right wing pods rupture - sparks + shrapnel)
-        if (bossDeathTimer_ > 1.2f) {
+        // Phase 1: wing pods rupture with sparks and shrapnel.
+        if (bossDeathTimer_ > 1.05f) {
             if (bossDeathExplosionTimer_ > 0.06f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 wingOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-35.0f, 0.0f} : Vector2{35.0f, 0.0f};
@@ -868,25 +891,27 @@ void Game::UpdatePlaying(float dt) {
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
-        // Phase 2: 1.2s - 0.7s (Engines blow out - thick smoke)
-        else if (bossDeathTimer_ > 0.7f) {
-            if (bossDeathExplosionTimer_ > 0.08f) {
+        // Phase 2: engines blow out, smoke vents stay behind the core.
+        else if (bossDeathTimer_ > 0.58f) {
+            if (bossDeathExplosionTimer_ > 0.075f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 engineOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-20.0f, 26.0f} : Vector2{20.0f, 26.0f};
                 Vector2 spawnPos = { bossDeathPos_.x + engineOffset.x + GetRandomValue(-5, 5), bossDeathPos_.y + engineOffset.y + GetRandomValue(-5, 5) };
+                effects_.Smoke(spawnPos, Color{55, 55, 60, 170});
                 effects_.Explosion(spawnPos, GRAY, 15, SpriteId::DebrisEnemyThruster);
                 effects_.DebrisShower(spawnPos, Color{80, 80, 85, 255}, 6);
                 effects_.Shake(6.5f, 0.15f);
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
-        // Phase 3: 0.7s - 0.1s (Core structural fireballs cascade)
-        else if (bossDeathTimer_ > 0.1f) {
-            if (bossDeathExplosionTimer_ > 0.08f) {
+        // Phase 3: the exposed core collapses inward before the final blast.
+        else if (bossDeathTimer_ > 0.12f) {
+            if (bossDeathExplosionTimer_ > 0.07f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 randOffset = { (float)GetRandomValue(-25, 25), (float)GetRandomValue(-25, 25) };
                 Vector2 spawnPos = { bossDeathPos_.x + randOffset.x, bossDeathPos_.y + randOffset.y };
                 effects_.Explosion(spawnPos, ORANGE, 18, SpriteId::DebrisBossCore);
+                effects_.Spark(bossDeathPos_, Color{255, 80, 180, 255}, {0.0f, -25.0f});
                 effects_.Shake(9.0f, 0.15f);
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
@@ -900,15 +925,15 @@ void Game::UpdatePlaying(float dt) {
         }
 
         if (bossDeathTimer_ <= 0.0f) {
-            // Catastrophic detonation!
-            effects_.Explosion(bossDeathPos_, VIOLET, 95, SpriteId::DebrisBossCore);
+            effects_.AddText(bossDeathPos_, "CORE COLLAPSE", WHITE);
+            effects_.Explosion(bossDeathPos_, VIOLET, 105, SpriteId::DebrisBossCore);
             effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 16); // Gold core shards
             effects_.DebrisShower(bossDeathPos_, DARKGRAY, 20); // Hull shards
             effects_.DebrisShower(bossDeathPos_, RED, 14); // Hot core slag
-            effects_.Shake(28.0f, 0.9f);
+            effects_.Shake(24.0f, 0.75f);
             
             // Trigger screen white flash
-            screenFlashTimer_ = 0.18f;
+            screenFlashTimer_ = 0.12f;
 
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
             audio_.PlayStageClear();
@@ -1032,10 +1057,10 @@ void Game::UpdatePlaying(float dt) {
     for (const auto& e : enemies_) {
         if (e.active && e.IsBoss() && e.hp < e.maxHp / 2) {
             float damageRatio = 1.0f - (float)e.hp / (float)e.maxHp;
-            if (GetRandomValue(0, 100) < (int)(damageRatio * 55.0f)) {
+            if (GetRandomValue(0, 100) < (int)(damageRatio * 68.0f)) {
                 Vector2 ventPos = { e.pos.x + (float)GetRandomValue(-48, 48), e.pos.y + (float)GetRandomValue(-25, 20) };
-                effects_.Smoke(ventPos, Color{60, 60, 65, 200});
-                if (GetRandomValue(0, 100) < 45) {
+                effects_.Smoke(ventPos, Color{58, 58, 64, 170});
+                if (GetRandomValue(0, 100) < 52) {
                     effects_.Spark(ventPos, ORANGE, {0.0f, 60.0f});
                 }
             }
@@ -1044,7 +1069,7 @@ void Game::UpdatePlaying(float dt) {
 
 
     if (bossSpawned_ && !BossAlive() && state_ == State::Playing) {
-        bossDeathTimer_ = 1.6f;
+        bossDeathTimer_ = BossDeathDuration;
         bossDeathExplosionTimer_ = 0.0f;
         bossDeathPos_ = { 240, 110 };
         for (const auto& e : enemies_) {
@@ -1089,10 +1114,12 @@ void Game::UpdateSettings() {
     static Vector2 settingsLastMouse = { -1.0f, -1.0f };
     bool mouseMoved = (std::abs(mousePos.x - settingsLastMouse.x) > 0.5f || std::abs(mousePos.y - settingsLastMouse.y) > 0.5f);
     settingsLastMouse = mousePos;
+    int startIdx = settingsSelection_ >= VisibleSettingsRows ? settingsSelection_ - (VisibleSettingsRows - 1) : 0;
+    int endIdx = std::min(SettingsCount, startIdx + VisibleSettingsRows);
     
     if (lastInputType_ == InputType::Mouse && mouseMoved) {
-        for (int i = 0; i < 13; ++i) {
-            int y = 125 + i * 25;
+        for (int i = startIdx; i < endIdx; ++i) {
+            int y = 125 + (i - startIdx) * 25;
             if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 5 && mousePos.y <= y + 18) {
                 if (settingsSelection_ != i) {
                     settingsSelection_ = i;
@@ -1105,8 +1132,9 @@ void Game::UpdateSettings() {
     // Mouse dragging sliders
     bool mouseDragging = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     if (mouseDragging) {
-        for (int i = 0; i < 3; ++i) {
-            int y = 125 + i * 25;
+        for (int i = startIdx; i < endIdx; ++i) {
+            if (!((i >= 0 && i <= 2) || (i >= 7 && i <= 12))) continue;
+            int y = 125 + (i - startIdx) * 25;
             if (mousePos.x >= 270 && mousePos.x <= 390 && mousePos.y >= y - 8 && mousePos.y <= y + 18) {
                 settingsSelection_ = i;
                 int vol = (int)((mousePos.x - 280.0f + 5.0f) / 10.0f);
@@ -1126,6 +1154,30 @@ void Game::UpdateSettings() {
                     SaveSettings();
                     ApplyVolumeSettings();
                     audio_.PlaySettingsTick();
+                } else if (i == 7 && crtCurvature_ != vol) {
+                    crtCurvature_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 8 && crtScanline_ != vol) {
+                    crtScanline_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 9 && crtMask_ != vol) {
+                    crtMask_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 10 && crtBloom_ != vol) {
+                    crtBloom_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 11 && crtVignette_ != vol) {
+                    crtVignette_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
+                } else if (i == 12 && crtGlare_ != vol) {
+                    crtGlare_ = vol;
+                    SaveSettings();
+                    audio_.PlaySettingsTick();
                 }
             }
         }
@@ -1133,8 +1185,8 @@ void Game::UpdateSettings() {
     
     // Mouse clicks
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        for (int i = 0; i < 13; ++i) {
-            int y = 125 + i * 25;
+        for (int i = startIdx; i < endIdx; ++i) {
+            int y = 125 + (i - startIdx) * 25;
             if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 5 && mousePos.y <= y + 18) {
                 settingsSelection_ = i;
                 keyConfirm = true;
@@ -1143,11 +1195,11 @@ void Game::UpdateSettings() {
     }
     
     if (keyUp) {
-        settingsSelection_ = (settingsSelection_ + 12) % 13;
+        settingsSelection_ = (settingsSelection_ + SettingsCount - 1) % SettingsCount;
         audio_.PlayMenuMove();
     }
     if (keyDown) {
-        settingsSelection_ = (settingsSelection_ + 1) % 13;
+        settingsSelection_ = (settingsSelection_ + 1) % SettingsCount;
         audio_.PlayMenuMove();
     }
     
@@ -1209,6 +1261,30 @@ void Game::UpdateSettings() {
             audio_.PlayMenuConfirm();
         }
     } else if (settingsSelection_ == 6) {
+        if (keyLeft || keyRight || keyConfirm) {
+            cleanPixelMode_ = !cleanPixelMode_;
+            changed = true;
+            audio_.PlayMenuConfirm();
+        }
+    } else if (settingsSelection_ == 7) {
+        if (keyLeft && crtCurvature_ > 0) { crtCurvature_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtCurvature_ < 10) { crtCurvature_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 8) {
+        if (keyLeft && crtScanline_ > 0) { crtScanline_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtScanline_ < 10) { crtScanline_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 9) {
+        if (keyLeft && crtMask_ > 0) { crtMask_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtMask_ < 10) { crtMask_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 10) {
+        if (keyLeft && crtBloom_ > 0) { crtBloom_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtBloom_ < 10) { crtBloom_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 11) {
+        if (keyLeft && crtVignette_ > 0) { crtVignette_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtVignette_ < 10) { crtVignette_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 12) {
+        if (keyLeft && crtGlare_ > 0) { crtGlare_--; changed = true; triggerBeep = true; }
+        if (keyRight && crtGlare_ < 10) { crtGlare_++; changed = true; triggerBeep = true; }
+    } else if (settingsSelection_ == 13) {
         if (keyLeft || keyConfirm) {
             aspectMode_ = (aspectMode_ + 2) % 3;
             changed = true;
@@ -1218,27 +1294,27 @@ void Game::UpdateSettings() {
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 7) {
+    } else if (settingsSelection_ == 14) {
         if (keyLeft || keyRight || keyConfirm) {
             drawBezel_ = !drawBezel_;
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 8) {
+    } else if (settingsSelection_ == 15) {
         if (keyLeft || keyRight || keyConfirm) {
             isFullscreen_ = !isFullscreen_;
             ToggleFullscreen();
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 9) {
+    } else if (settingsSelection_ == 16) {
         if (keyLeft || keyRight || keyConfirm) {
             controlLayout_ = (controlLayout_ + 1) % 2;
             player_.controlLayout = controlLayout_;
             changed = true;
             audio_.PlayMenuConfirm();
         }
-    } else if (settingsSelection_ == 10) {
+    } else if (settingsSelection_ == 17) {
         if (keyConfirm) {
             ResetSettingsToDefault();
             audio_.PlayMenuConfirm();
@@ -1246,13 +1322,13 @@ void Game::UpdateSettings() {
             settingsFeedbackText_ = "SETTINGS RESET!";
             settingsFeedbackColor_ = SKYBLUE;
         }
-    } else if (settingsSelection_ == 11) {
+    } else if (settingsSelection_ == 18) {
         if (keyConfirm) {
             clearScoresSelection_ = 0;
             audio_.PlayMenuConfirm();
             StartTransition(State::ClearScoresConfirm);
         }
-    } else if (settingsSelection_ == 12) {
+    } else if (settingsSelection_ == 19) {
         if (keyConfirm || IsKeyPressed(KEY_ESCAPE)) {
             SaveSettings();
             audio_.PlayMenuConfirm();
@@ -1283,6 +1359,13 @@ void Game::ResetSettingsToDefault() {
     controlLayout_ = 0;
     player_.controlLayout = controlLayout_;
     crtShaderEnabled_ = true;
+    cleanPixelMode_ = false;
+    crtCurvature_ = 3;
+    crtScanline_ = 3;
+    crtMask_ = 4;
+    crtBloom_ = 2;
+    crtVignette_ = 3;
+    crtGlare_ = 2;
     aspectMode_ = 0;
     drawBezel_ = true;
     
@@ -2053,13 +2136,13 @@ void Game::DrawBackground() const {
     
     // 2. Layer 2: Twinkling Parallax Stars with Micro Cross Flares
     for (int i = 0; i < NumStars; ++i) {
-        float sparkle = 0.4f + 0.6f * std::sin((float)GetTime() * 4.5f + stars_[i].pos.x * 0.1f);
-        float size = (stars_[i].speed > 100.0f) ? 1.8f : ((stars_[i].speed > 45.0f) ? 1.2f : 0.8f);
-        DrawCircleV(stars_[i].pos, size, Fade(stars_[i].color, sparkle));
+        float sparkle = 0.35f + 0.5f * std::sin((float)GetTime() * 4.5f + stars_[i].pos.x * 0.1f);
+        float size = (stars_[i].speed > 100.0f) ? 1.55f : ((stars_[i].speed > 45.0f) ? 1.05f : 0.75f);
+        DrawCircleV(stars_[i].pos, size, Fade(stars_[i].color, sparkle * 0.82f));
         
         // Additive micro flare crosses for foreground stars
-        if (stars_[i].speed > 100.0f && sparkle > 0.78f) {
-            float flareAlpha = (sparkle - 0.78f) * 4.5f;
+        if (stars_[i].speed > 120.0f && sparkle > 0.78f) {
+            float flareAlpha = (sparkle - 0.78f) * 2.8f;
             DrawLineV({stars_[i].pos.x - 2, stars_[i].pos.y}, {stars_[i].pos.x + 2, stars_[i].pos.y}, Fade(WHITE, flareAlpha));
             DrawLineV({stars_[i].pos.x, stars_[i].pos.y - 2}, {stars_[i].pos.x, stars_[i].pos.y + 2}, Fade(WHITE, flareAlpha));
         }
@@ -2069,17 +2152,17 @@ void Game::DrawBackground() const {
     BeginBlendMode(BLEND_ADDITIVE);
     for (const auto& l : bgLasers_) {
         float alpha = l.life / l.maxLife;
-        DrawLineEx(l.start, l.end, 1.8f, Fade(l.color, alpha * 0.25f));
+        DrawLineEx(l.start, l.end, 1.5f, Fade(l.color, alpha * 0.18f));
     }
     for (const auto& s : bgSparks_) {
         float alpha = s.life / s.maxLife;
-        DrawCircleV(s.pos, 1.2f, Fade(s.color, alpha * 0.38f));
+        DrawCircleV(s.pos, 1.0f, Fade(s.color, alpha * 0.28f));
     }
     EndBlendMode();
     
     // 3. Layer 3: Scrolling asteroid debris chunks (Mid-ground)
     for (const auto& ast : backgroundAsteroids_) {
-        SpriteManager::Instance().Draw(SpriteId::AsteroidChunk, ast.pos, ast.rotation, ast.scale, Fade(GRAY, 0.40f));
+        SpriteManager::Instance().Draw(SpriteId::AsteroidChunk, ast.pos, ast.rotation, ast.scale, Fade(GRAY, 0.32f));
     }
 
     // 3aa. Layer 3aa: Scrolling playfield base girder lines (very low-contrast mechanical base plates)
@@ -2133,7 +2216,7 @@ void Game::DrawBackground() const {
 
     // 4. Layer 4: Foreground scrolling atmospheric clouds
     for (const auto& cld : backgroundClouds_) {
-        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.14f));
+        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.10f));
     }
 
     DrawRectangleLines(8, 8, ScreenW - 16, ScreenH - 16, Fade(SKYBLUE, 0.35f));
@@ -2523,13 +2606,20 @@ void Game::DrawSettings() const {
     int titleW = MeasureText("USER SETTINGS", 24);
     DrawText("USER SETTINGS", ScreenW / 2 - titleW / 2, 85, 24, GOLD);
 
-    const char* options[13] = {
+    const char* options[SettingsCount] = {
         "Master Volume",
         "SFX Volume",
         "Music Volume",
         "Screen Shake",
         "Hitboxes",
         "CRT Filter",
+        "Clean Pixel Mode",
+        "CRT Curvature",
+        "CRT Scanlines",
+        "CRT Shadow Mask",
+        "CRT Bloom Bleed",
+        "CRT Vignette",
+        "CRT Screen Glare",
         "Aspect Scaling",
         "Cabinet Bezel",
         "Fullscreen",
@@ -2539,8 +2629,21 @@ void Game::DrawSettings() const {
         "Save and Return"
     };
 
-    for (int i = 0; i < 13; ++i) {
-        int y = 125 + i * 25;
+    int startIdx = 0;
+    if (settingsSelection_ >= VisibleSettingsRows) {
+        startIdx = settingsSelection_ - (VisibleSettingsRows - 1);
+    }
+
+    // Scroll indicators
+    if (startIdx > 0) {
+        DrawTriangle({ScreenW / 2 - 8, 114}, {ScreenW / 2, 108}, {ScreenW / 2 + 8, 114}, GOLD);
+    }
+    if (startIdx + VisibleSettingsRows < SettingsCount) {
+        DrawTriangle({ScreenW / 2 - 8, 396}, {ScreenW / 2 + 8, 396}, {ScreenW / 2, 402}, GOLD);
+    }
+
+    for (int i = startIdx; i < startIdx + VisibleSettingsRows && i < SettingsCount; ++i) {
+        int y = 125 + (i - startIdx) * 25;
         bool selected = settingsSelection_ == i;
         
         if (selected) {
@@ -2570,7 +2673,6 @@ void Game::DrawSettings() const {
         } else if (i == 4) {
             DrawText(hitboxOverlayEnabled_ ? "ON" : "OFF", 280, y, 14, hitboxOverlayEnabled_ ? LIME : RED);
             
-            // Draw mini player ship preview next to the option (at x = 355)
             Vector2 shipPos = { 355.0f, (float)y + 6.0f };
             float time = (float)GetTime();
             float flameH = 4.0f + std::sin(time * 45.0f) * 1.5f;
@@ -2589,13 +2691,46 @@ void Game::DrawSettings() const {
         } else if (i == 5) {
             DrawText(crtShaderEnabled_ ? "ON" : "OFF", 280, y, 14, crtShaderEnabled_ ? LIME : RED);
         } else if (i == 6) {
+            DrawText(cleanPixelMode_ ? "ON" : "OFF", 280, y, 14, cleanPixelMode_ ? LIME : RED);
+            DrawText(cleanPixelMode_ ? "NO CRT" : "CABINET", 335, y, 14, cleanPixelMode_ ? SKYBLUE : GRAY);
+        } else if (i == 7) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtCurvature_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtCurvature_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtCurvature_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 8) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtScanline_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtScanline_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtScanline_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 9) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtMask_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtMask_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtMask_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 10) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtBloom_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtBloom_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtBloom_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 11) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtVignette_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtVignette_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtVignette_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 12) {
+            DrawLine(280, y + 7, 380, y + 7, GRAY);
+            DrawLine(280, y + 7, 280 + crtGlare_ * 10, y + 7, SKYBLUE);
+            DrawCircle(280 + crtGlare_ * 10, y + 7, 4, selected ? GOLD : WHITE);
+            DrawText(TextFormat("%d", crtGlare_), 395, y, 14, selected ? GOLD : SKYBLUE);
+        } else if (i == 13) {
             const char* modeNames[3] = { "FIT SCREEN", "INTEGER 1X", "STRETCH" };
             DrawText(modeNames[aspectMode_], 280, y, 14, SKYBLUE);
-        } else if (i == 7) {
+        } else if (i == 14) {
             DrawText(drawBezel_ ? "ON" : "OFF", 280, y, 14, drawBezel_ ? LIME : RED);
-        } else if (i == 8) {
+        } else if (i == 15) {
             DrawText(isFullscreen_ ? "ON" : "OFF", 280, y, 14, isFullscreen_ ? LIME : RED);
-        } else if (i == 9) {
+        } else if (i == 16) {
             DrawText(controlLayout_ == 0 ? "ARROWS" : "WASD", 280, y, 14, controlLayout_ == 0 ? SKYBLUE : GOLD);
         }
     }
@@ -2777,7 +2912,7 @@ void Game::Draw() {
     for (const auto& e : enemies_) e.Draw(debug_);
     
     if (bossDeathTimer_ > 0.0f) {
-        float age = 1.6f - bossDeathTimer_;
+        float age = BossDeathDuration - bossDeathTimer_;
         float wobbleScale = 1.0f + age * 1.8f;
         float wobbleX = std::sin(age * 55.0f) * 2.5f * wobbleScale;
         float wobbleY = std::cos(age * 48.0f) * 1.5f * wobbleScale;
@@ -2795,6 +2930,9 @@ void Game::Draw() {
             tint = Fade(WHITE, 1.0f - whiteFactor);
             SpriteManager::Instance().Draw(SpriteId::BossDamaged, drawPos, 180.0f, 1.8f, tint);
             BeginBlendMode(BLEND_ADDITIVE);
+            float collapse = 1.0f - bossDeathTimer_ / 0.25f;
+            DrawCircleV(drawPos, 32.0f * collapse, Fade(Color{255, 72, 180, 255}, 0.55f));
+            DrawCircleLines((int)drawPos.x, (int)drawPos.y, 48.0f * collapse, Fade(WHITE, 0.75f));
             SpriteManager::Instance().Draw(SpriteId::BossDamaged, drawPos, 180.0f, 1.8f, Fade(WHITE, whiteFactor * 0.95f));
             EndBlendMode();
         } else {
@@ -2811,7 +2949,7 @@ void Game::Draw() {
     EndMode2D();
 
     if (screenFlashTimer_ > 0.0f) {
-        float alpha = screenFlashTimer_ / 0.15f;
+        float alpha = (screenFlashTimer_ / 0.12f) * 0.55f;
         if (alpha > 1.0f) alpha = 1.0f;
         DrawRectangle(0, 0, ScreenW, ScreenH, Fade(WHITE, alpha));
     }
@@ -3036,22 +3174,22 @@ void Game::Draw() {
         DrawTransition();
     }
 
-    // --- Global CRT Arcade Monitor Filter Pass ---
-    // 1. CRT Scanlines simulation
-    for (int y = 0; y < ScreenH; y += 2) {
-        DrawLine(0, y, ScreenW, y, Fade(BLACK, 0.08f));
+    if (crtShaderEnabled_ && !cleanPixelMode_) {
+        float scanAlpha = 0.018f + (float)crtScanline_ * 0.006f;
+        for (int y = 0; y < ScreenH; y += 2) {
+            DrawLine(0, y, ScreenW, y, Fade(BLACK, scanAlpha));
+        }
+
+        float vignetteAlpha = 0.12f + (float)crtVignette_ * 0.026f;
+        DrawCircleGradient(ScreenW / 2, ScreenH / 2, ScreenH * 0.8f, Fade(WHITE, 0.0f), Fade(BLACK, vignetteAlpha));
+
+        float glareAlpha = 0.015f + (float)crtGlare_ * 0.01f;
+        DrawLine(8, 8, ScreenW - 8, 8, Fade(WHITE, glareAlpha));
+        DrawLine(8, 8, 8, ScreenH - 8, Fade(WHITE, glareAlpha));
+
+        DrawRectangleLinesEx(Rectangle{ 0.0f, 0.0f, (float)ScreenW, (float)ScreenH }, 8.0f, DARKGRAY);
+        DrawRectangleLinesEx(Rectangle{ 8.0f, 8.0f, (float)ScreenW - 16.0f, (float)ScreenH - 16.0f }, 2.0f, BLACK);
     }
-    
-    // 2. Curved glass Vignette screen-space shading
-    DrawCircleGradient(ScreenW / 2, ScreenH / 2, ScreenH * 0.8f, Fade(WHITE, 0.0f), Fade(BLACK, 0.38f));
-    
-    // 3. Screen tube subtle reflections (top and left glass edges)
-    DrawLine(8, 8, ScreenW - 8, 8, Fade(WHITE, 0.05f));
-    DrawLine(8, 8, 8, ScreenH - 8, Fade(WHITE, 0.05f));
-    
-    // 4. Cabinet Bezels / Vertical Monitor frame
-    DrawRectangleLinesEx(Rectangle{ 0.0f, 0.0f, (float)ScreenW, (float)ScreenH }, 8.0f, DARKGRAY);
-    DrawRectangleLinesEx(Rectangle{ 8.0f, 8.0f, (float)ScreenW - 16.0f, (float)ScreenH - 16.0f }, 2.0f, BLACK);
 }
 
 void Game::LoadHighScores() {
@@ -3152,6 +3290,13 @@ void Game::LoadSettings() {
     isFullscreen_ = false;
     controlLayout_ = 0;
     crtShaderEnabled_ = true;
+    cleanPixelMode_ = false;
+    crtCurvature_ = 3;
+    crtScanline_ = 3;
+    crtMask_ = 4;
+    crtBloom_ = 2;
+    crtVignette_ = 3;
+    crtGlare_ = 2;
     aspectMode_ = 0;
     drawBezel_ = true;
 
@@ -3180,6 +3325,13 @@ void Game::LoadSettings() {
                 else if (key == "fullscreen") isFullscreen_ = (val != 0);
                 else if (key == "layout") controlLayout_ = std::clamp(val, 0, 1);
                 else if (key == "crt") crtShaderEnabled_ = (val != 0);
+                else if (key == "cleanPixel") cleanPixelMode_ = (val != 0);
+                else if (key == "crtCurvature") crtCurvature_ = std::clamp(val, 0, 10);
+                else if (key == "crtScanline") crtScanline_ = std::clamp(val, 0, 10);
+                else if (key == "crtMask") crtMask_ = std::clamp(val, 0, 10);
+                else if (key == "crtBloom") crtBloom_ = std::clamp(val, 0, 10);
+                else if (key == "crtVignette") crtVignette_ = std::clamp(val, 0, 10);
+                else if (key == "crtGlare") crtGlare_ = std::clamp(val, 0, 10);
                 else if (key == "aspect") aspectMode_ = std::clamp(val, 0, 2);
                 else if (key == "bezel") drawBezel_ = (val != 0);
             } catch (...) {
@@ -3214,6 +3366,13 @@ void Game::SaveSettings() {
         file << "fullscreen=" << (isFullscreen_ ? 1 : 0) << "\n";
         file << "layout=" << controlLayout_ << "\n";
         file << "crt=" << (crtShaderEnabled_ ? 1 : 0) << "\n";
+        file << "cleanPixel=" << (cleanPixelMode_ ? 1 : 0) << "\n";
+        file << "crtCurvature=" << crtCurvature_ << "\n";
+        file << "crtScanline=" << crtScanline_ << "\n";
+        file << "crtMask=" << crtMask_ << "\n";
+        file << "crtBloom=" << crtBloom_ << "\n";
+        file << "crtVignette=" << crtVignette_ << "\n";
+        file << "crtGlare=" << crtGlare_ << "\n";
         file << "aspect=" << aspectMode_ << "\n";
         file << "bezel=" << (drawBezel_ ? 1 : 0) << "\n";
         file.close();
