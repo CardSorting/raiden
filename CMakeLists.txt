@@ -20,6 +20,7 @@ endif()
 add_executable(sky_circuit
   main.cpp
   Game.cpp
+  AudioSystem.cpp
   Player.cpp
   Enemy.cpp
   Bullet.cpp
@@ -31,8 +32,8 @@ add_executable(sky_circuit
 target_include_directories(sky_circuit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_compile_options(sky_circuit PRIVATE
-  $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall -Wextra -Wpedantic>
-  $<$<CXX_COMPILER_ID:MSVC>:/W4>
+  $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall -Wextra -Wpedantic -Werror>
+  $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
 )
 
 target_link_libraries(sky_circuit PRIVATE raylib)

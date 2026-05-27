@@ -100,10 +100,24 @@ CMakeFiles/sky_circuit.dir/Game.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/sky_circuit.dir/Game.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/bozoegg/Desktop/raiden/Game.cpp -o CMakeFiles/sky_circuit.dir/Game.cpp.s
 
+CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
+CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o: /Users/bozoegg/Desktop/raiden/AudioSystem.cpp
+CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o -MF CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o.d -o CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o -c /Users/bozoegg/Desktop/raiden/AudioSystem.cpp
+
+CMakeFiles/sky_circuit.dir/AudioSystem.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/sky_circuit.dir/AudioSystem.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/bozoegg/Desktop/raiden/AudioSystem.cpp > CMakeFiles/sky_circuit.dir/AudioSystem.cpp.i
+
+CMakeFiles/sky_circuit.dir/AudioSystem.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/sky_circuit.dir/AudioSystem.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/bozoegg/Desktop/raiden/AudioSystem.cpp -o CMakeFiles/sky_circuit.dir/AudioSystem.cpp.s
+
 CMakeFiles/sky_circuit.dir/Player.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Player.cpp.o: /Users/bozoegg/Desktop/raiden/Player.cpp
 CMakeFiles/sky_circuit.dir/Player.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/sky_circuit.dir/Player.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/sky_circuit.dir/Player.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/Player.cpp.o -MF CMakeFiles/sky_circuit.dir/Player.cpp.o.d -o CMakeFiles/sky_circuit.dir/Player.cpp.o -c /Users/bozoegg/Desktop/raiden/Player.cpp
 
 CMakeFiles/sky_circuit.dir/Player.cpp.i: cmake_force
@@ -117,7 +131,7 @@ CMakeFiles/sky_circuit.dir/Player.cpp.s: cmake_force
 CMakeFiles/sky_circuit.dir/Enemy.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Enemy.cpp.o: /Users/bozoegg/Desktop/raiden/Enemy.cpp
 CMakeFiles/sky_circuit.dir/Enemy.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/sky_circuit.dir/Enemy.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/sky_circuit.dir/Enemy.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/Enemy.cpp.o -MF CMakeFiles/sky_circuit.dir/Enemy.cpp.o.d -o CMakeFiles/sky_circuit.dir/Enemy.cpp.o -c /Users/bozoegg/Desktop/raiden/Enemy.cpp
 
 CMakeFiles/sky_circuit.dir/Enemy.cpp.i: cmake_force
@@ -131,7 +145,7 @@ CMakeFiles/sky_circuit.dir/Enemy.cpp.s: cmake_force
 CMakeFiles/sky_circuit.dir/Bullet.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Bullet.cpp.o: /Users/bozoegg/Desktop/raiden/Bullet.cpp
 CMakeFiles/sky_circuit.dir/Bullet.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/sky_circuit.dir/Bullet.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/sky_circuit.dir/Bullet.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/Bullet.cpp.o -MF CMakeFiles/sky_circuit.dir/Bullet.cpp.o.d -o CMakeFiles/sky_circuit.dir/Bullet.cpp.o -c /Users/bozoegg/Desktop/raiden/Bullet.cpp
 
 CMakeFiles/sky_circuit.dir/Bullet.cpp.i: cmake_force
@@ -145,7 +159,7 @@ CMakeFiles/sky_circuit.dir/Bullet.cpp.s: cmake_force
 CMakeFiles/sky_circuit.dir/Powerup.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Powerup.cpp.o: /Users/bozoegg/Desktop/raiden/Powerup.cpp
 CMakeFiles/sky_circuit.dir/Powerup.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/sky_circuit.dir/Powerup.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/sky_circuit.dir/Powerup.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/Powerup.cpp.o -MF CMakeFiles/sky_circuit.dir/Powerup.cpp.o.d -o CMakeFiles/sky_circuit.dir/Powerup.cpp.o -c /Users/bozoegg/Desktop/raiden/Powerup.cpp
 
 CMakeFiles/sky_circuit.dir/Powerup.cpp.i: cmake_force
@@ -159,7 +173,7 @@ CMakeFiles/sky_circuit.dir/Powerup.cpp.s: cmake_force
 CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: /Users/bozoegg/Desktop/raiden/WaveManager.cpp
 CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/sky_circuit.dir/WaveManager.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/sky_circuit.dir/WaveManager.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/WaveManager.cpp.o -MF CMakeFiles/sky_circuit.dir/WaveManager.cpp.o.d -o CMakeFiles/sky_circuit.dir/WaveManager.cpp.o -c /Users/bozoegg/Desktop/raiden/WaveManager.cpp
 
 CMakeFiles/sky_circuit.dir/WaveManager.cpp.i: cmake_force
@@ -173,7 +187,7 @@ CMakeFiles/sky_circuit.dir/WaveManager.cpp.s: cmake_force
 CMakeFiles/sky_circuit.dir/Effects.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Effects.cpp.o: /Users/bozoegg/Desktop/raiden/Effects.cpp
 CMakeFiles/sky_circuit.dir/Effects.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/sky_circuit.dir/Effects.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/sky_circuit.dir/Effects.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/Effects.cpp.o -MF CMakeFiles/sky_circuit.dir/Effects.cpp.o.d -o CMakeFiles/sky_circuit.dir/Effects.cpp.o -c /Users/bozoegg/Desktop/raiden/Effects.cpp
 
 CMakeFiles/sky_circuit.dir/Effects.cpp.i: cmake_force
@@ -188,6 +202,7 @@ CMakeFiles/sky_circuit.dir/Effects.cpp.s: cmake_force
 sky_circuit_OBJECTS = \
 "CMakeFiles/sky_circuit.dir/main.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Game.cpp.o" \
+"CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Player.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Enemy.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Bullet.cpp.o" \
@@ -200,6 +215,7 @@ sky_circuit_EXTERNAL_OBJECTS =
 
 sky_circuit: CMakeFiles/sky_circuit.dir/main.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Game.cpp.o
+sky_circuit: CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Player.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Enemy.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Bullet.cpp.o
@@ -209,7 +225,7 @@ sky_circuit: CMakeFiles/sky_circuit.dir/Effects.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/build.make
 sky_circuit: /opt/homebrew/Cellar/raylib/5.5/lib/libraylib.dylib
 sky_circuit: CMakeFiles/sky_circuit.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking CXX executable sky_circuit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX executable sky_circuit"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/sky_circuit.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

@@ -1,8 +1,6 @@
 #include "Game.h"
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -22,183 +20,18 @@ static bool CircleHit(Vector2 a, float ar, Vector2 b, float br) {
     return dx * dx + dy * dy <= r * r;
 }
 
-static Wave MakeToneSweep(float startHz, float endHz, float seconds) {
-    const int rate = 22050;
-    int frames = (int)(rate * seconds);
-    int16_t* samples = (int16_t*)std::malloc(sizeof(int16_t) * frames);
-    if (!samples) return {};
-    float phase = 0.0f;
-    for (int i = 0; i < frames; ++i) {
-        float t = (float)i / (float)rate;
-        float env = 1.0f - t / seconds;
-        float hz = startHz + (endHz - startHz) * (t / seconds);
-        phase += hz / (float)rate;
-        samples[i] = (int16_t)(std::sin(phase * 6.2831853f) * 9000.0f * env);
-    }
-    Wave w{};
-    w.frameCount = (unsigned int)frames;
-    w.sampleRate = rate;
-    w.sampleSize = 16;
-    w.channels = 1;
-    w.data = samples;
-    return w;
-}
-
-static Wave MakeExplosionTone(float seconds) {
-    const int rate = 22050;
-    int frames = (int)(rate * seconds);
-    int16_t* samples = (int16_t*)std::malloc(sizeof(int16_t) * frames);
-    if (!samples) return {};
-    
-    unsigned int randSeed = 0x12345;
-    auto quickRand = [&randSeed]() {
-        randSeed = randSeed * 1103515245 + 12345;
-        return (float)(randSeed & 0x7FFF) / 32768.0f;
-    };
-    
-    float phase = 0.0f;
-    for (int i = 0; i < frames; ++i) {
-        float t = (float)i / (float)rate;
-        float env = 1.0f - t / seconds;
-        float hz = 140.0f * (1.0f - t / seconds * 0.8f);
-        phase += hz / (float)rate;
-        float sineVal = std::sin(phase * 6.2831853f);
-        float noiseVal = quickRand() * 2.0f - 1.0f;
-        float mixed = sineVal * 0.4f + noiseVal * 0.6f;
-        samples[i] = (int16_t)(mixed * 9500.0f * env * env);
-    }
-    Wave w{};
-    w.frameCount = (unsigned int)frames;
-    w.sampleRate = rate;
-    w.sampleSize = 16;
-    w.channels = 1;
-    w.data = samples;
-    return w;
-}
-
-static Wave MakeChiptuneBGM() {
-    const int sampleRate = 22050;
-    const int totalSteps = 128;
-    const int samplesPerStep = 2756;
-    const int totalSamples = totalSteps * samplesPerStep;
-    
-    int16_t* samples = (int16_t*)std::malloc(sizeof(int16_t) * totalSamples);
-    if (!samples) return {};
-    
-    float bassFreqs[4][4] = {
-        { 110.0f, 130.8f, 164.8f, 220.0f }, // Am
-        { 87.3f, 110.0f, 130.8f, 174.6f },  // F
-        { 65.4f, 82.4f, 98.0f, 130.8f },    // C
-        { 98.0f, 123.5f, 146.8f, 196.0f }   // G
-    };
-    
-    int melNotes[128] = {
-        69, 0, 72, 74, 76, 0, 76, 74,  72, 69, 72, 0,  74, 0, 71, 0,
-        69, 0, 72, 74, 76, 0, 79, 76,  74, 72, 74, 0,  76, 0, 69, 0,
-        65, 0, 69, 72, 72, 0, 72, 69,  65, 62, 65, 0,  69, 0, 67, 0,
-        67, 0, 71, 74, 74, 0, 74, 76,  79, 76, 74, 71, 69, 72, 74, 76,
-        69, 0, 72, 74, 76, 0, 76, 74,  72, 69, 72, 0,  74, 0, 71, 0,
-        69, 0, 72, 74, 76, 0, 79, 76,  74, 72, 74, 0,  76, 0, 79, 0,
-        81, 0, 79, 76, 76, 0, 74, 72,  74, 0, 76, 0,  79, 0, 81, 0,
-        81, 79, 76, 74, 76, 74, 72, 69, 71, 0, 74, 0,  69, 0, 0, 0
-    };
-    
-    float melPhase = 0.0f;
-    float bassPhase = 0.0f;
-    float kickPhase = 0.0f;
-    
-    unsigned int randSeed = 0x12345;
-    auto quickRand = [&randSeed]() {
-        randSeed = randSeed * 1103515245 + 12345;
-        return (float)(randSeed & 0x7FFF) / 32768.0f;
-    };
-    
-    for (int s = 0; s < totalSamples; ++s) {
-        int stepIndex = s / samplesPerStep;
-        int stepOffset = s % samplesPerStep;
-        float stepProgress = (float)stepOffset / (float)samplesPerStep;
-        
-        int chordIdx = (stepIndex / 8) % 4;
-        
-        // 1. Bassline (sawtooth wave arpeggio)
-        int bassPattern[8] = { 0, 2, 0, 3, 1, 2, 1, 3 };
-        int bassNoteIdx = bassPattern[stepIndex % 8];
-        float bassFreq = bassFreqs[chordIdx][bassNoteIdx];
-        
-        bassPhase += bassFreq / (float)sampleRate;
-        if (bassPhase > 1.0f) bassPhase -= 1.0f;
-        float bassVal = 2.0f * bassPhase - 1.0f;
-        float bassEnv = 1.0f - stepProgress;
-        bassVal *= bassEnv * 0.28f;
-        
-        // 2. Melody (Square wave with simple volume decay)
-        float melVal = 0.0f;
-        int note = melNotes[stepIndex];
-        if (note > 0) {
-            float melFreq = 440.0f * std::pow(2.0f, (float)(note - 69) / 12.0f);
-            melPhase += melFreq / (float)sampleRate;
-            if (melPhase > 1.0f) melPhase -= 1.0f;
-            melVal = (melPhase < 0.5f) ? 1.0f : -1.0f;
-            float melEnv = 1.0f - stepProgress;
-            float vib = 1.0f + 0.02f * std::sin((float)stepOffset * 0.005f);
-            melPhase += (melFreq * vib - melFreq) / (float)sampleRate;
-            melVal *= melEnv * 0.20f;
-        }
-        
-        // 3. Drums (Kick & Snare & Hi-hat)
-        float drumVal = 0.0f;
-        int beatStep = stepIndex % 8;
-        
-        if (beatStep == 0 || beatStep == 4) {
-            float kickFreq = 150.0f * (1.0f - stepProgress * 0.85f);
-            kickPhase += kickFreq / (float)sampleRate;
-            float kickS = std::sin(kickPhase * 6.2831853f);
-            float kickEnv = std::max(0.0f, 1.0f - stepProgress * 2.0f);
-            drumVal += kickS * kickEnv * 0.35f;
-        }
-        
-        if (beatStep == 2 || beatStep == 6) {
-            float noise = quickRand() * 2.0f - 1.0f;
-            float snareEnv = std::max(0.0f, 1.0f - stepProgress * 1.5f);
-            drumVal += noise * snareEnv * 0.16f;
-        }
-        
-        if (beatStep % 2 == 1) {
-            float noise = quickRand() * 2.0f - 1.0f;
-            float hatEnv = std::max(0.0f, 1.0f - stepProgress * 4.0f);
-            drumVal += noise * hatEnv * 0.08f;
-        }
-        
-        float mixed = bassVal + melVal + drumVal;
-        mixed = std::clamp(mixed, -1.0f, 1.0f);
-        samples[s] = (int16_t)(mixed * 8000.0f);
-    }
-    
-    Wave w{};
-    w.frameCount = (unsigned int)totalSamples;
-    w.sampleRate = sampleRate;
-    w.sampleSize = 16;
-    w.channels = 1;
-    w.data = samples;
-    return w;
-}
-
 Game::Game() {
     InitWindow(ScreenW, ScreenH, "Sky Circuit - raylib arcade shooter");
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
-    InitAudioDevice();
-    audioReady_ = IsAudioDeviceReady();
+    audio_.Init();
     lastMousePos_ = GetMousePosition();
     
     // Load high scores and settings
     LoadHighScores();
     
-    if (audioReady_) {
-        LoadGeneratedSounds();
-    }
-    
     LoadSettings(); // Loads & applies settings to the audio files
+    audio_.PlayMusic(AudioSystem::MusicTrack::Title);
 
     // Initialize stars parallax
     for (int i = 0; i < NumStars; ++i) {
@@ -220,77 +53,8 @@ Game::Game() {
 }
 
 Game::~Game() {
-    UnloadGeneratedSounds();
-    if (audioReady_) CloseAudioDevice();
+    audio_.Shutdown();
     CloseWindow();
-}
-
-void Game::LoadGeneratedSounds() {
-    Wave shootW = MakeToneSweep(1000, 200, 0.08f);
-    Wave boomW = MakeExplosionTone(0.45f);
-    Wave pickupW = MakeToneSweep(600, 1600, 0.12f);
-    Wave selectW = MakeToneSweep(620, 780, 0.05f);
-    Wave confirmW = MakeToneSweep(520, 1040, 0.15f);
-    Wave hitW = MakeToneSweep(400, 80, 0.40f);
-    Wave overW = MakeToneSweep(300, 60, 0.95f);
-    Wave clearW = MakeToneSweep(520, 1500, 0.60f);
-    Wave bgmW = MakeChiptuneBGM();
-    Wave klaxonW = MakeToneSweep(350, 480, 0.22f);
-    
-    if (!shootW.data || !boomW.data || !pickupW.data || !selectW.data || 
-        !confirmW.data || !hitW.data || !overW.data || !clearW.data || !bgmW.data || !klaxonW.data) {
-        
-        if (shootW.data) UnloadWave(shootW);
-        if (boomW.data) UnloadWave(boomW);
-        if (pickupW.data) UnloadWave(pickupW);
-        if (selectW.data) UnloadWave(selectW);
-        if (confirmW.data) UnloadWave(confirmW);
-        if (hitW.data) UnloadWave(hitW);
-        if (overW.data) UnloadWave(overW);
-        if (clearW.data) UnloadWave(clearW);
-        if (bgmW.data) UnloadWave(bgmW);
-        if (klaxonW.data) UnloadWave(klaxonW);
-        soundsReady_ = false;
-        return;
-    }
-    
-    shootSound_ = LoadSoundFromWave(shootW);
-    boomSound_ = LoadSoundFromWave(boomW);
-    pickupSound_ = LoadSoundFromWave(pickupW);
-    menuSelectSound_ = LoadSoundFromWave(selectW);
-    menuConfirmSound_ = LoadSoundFromWave(confirmW);
-    playerHitSound_ = LoadSoundFromWave(hitW);
-    gameOverSound_ = LoadSoundFromWave(overW);
-    stageClearSound_ = LoadSoundFromWave(clearW);
-    bgmSound_ = LoadSoundFromWave(bgmW);
-    bossKlaxonSound_ = LoadSoundFromWave(klaxonW);
-    
-    soundsReady_ = true;
-    
-    UnloadWave(shootW);
-    UnloadWave(boomW);
-    UnloadWave(pickupW);
-    UnloadWave(selectW);
-    UnloadWave(confirmW);
-    UnloadWave(hitW);
-    UnloadWave(overW);
-    UnloadWave(clearW);
-    UnloadWave(bgmW);
-    UnloadWave(klaxonW);
-}
-
-void Game::UnloadGeneratedSounds() {
-    if (!audioReady_) return;
-    UnloadSound(shootSound_);
-    UnloadSound(boomSound_);
-    UnloadSound(pickupSound_);
-    UnloadSound(menuSelectSound_);
-    UnloadSound(menuConfirmSound_);
-    UnloadSound(playerHitSound_);
-    UnloadSound(gameOverSound_);
-    UnloadSound(stageClearSound_);
-    UnloadSound(bgmSound_);
-    UnloadSound(bossKlaxonSound_);
 }
 
 void Game::Run() {
@@ -305,6 +69,7 @@ void Game::Run() {
 
 void Game::StartGame() {
     player_.ResetForNewGame();
+    player_.lives = (difficulty_ == 0) ? 3 : 2;
     player_.isDemo = demoMode_;
     player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
@@ -314,16 +79,21 @@ void Game::StartGame() {
     clearTimer_ = 0.0f;
     loop_ = 1;
     bossSpawned_ = false;
+    bossPhaseChanged_ = false;
     bossWarningTimer_ = 0.0f;
+    bossWarningKlaxonTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
+    bossDeathExplosionTimer_ = 0.0f;
+    lowLifeAudioTimer_ = 0.0f;
+    enemyShotAudioTimer_ = 0.0f;
+    nextScoreMilestone_ = 10000;
+    nextExtraLifeScore_ = 50000;
     tutorialTimer_ = 4.0f;
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Playing;
     
-    if (audioReady_) {
-        StopSound(bgmSound_);
-        PlaySound(bgmSound_);
-    }
+    audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
+    if (!demoMode_) audio_.PlayStageStart();
 }
 
 void Game::ReturnToTitle() {
@@ -338,16 +108,18 @@ void Game::ReturnToTitle() {
     clearTimer_ = 0.0f;
     loop_ = 1;
     bossSpawned_ = false;
+    bossPhaseChanged_ = false;
     demoMode_ = false;
     bossWarningTimer_ = 0.0f;
+    bossWarningKlaxonTimer_ = 0.0f;
     bossDeathTimer_ = 0.0f;
+    bossDeathExplosionTimer_ = 0.0f;
+    lowLifeAudioTimer_ = 0.0f;
+    enemyShotAudioTimer_ = 0.0f;
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
     state_ = State::Title;
     
-    if (audioReady_) {
-        StopSound(bgmSound_);
-        PlaySound(bgmSound_);
-    }
+    audio_.PlayMusic(AudioSystem::MusicTrack::Title);
 }
 
 void Game::NextLoop() {
@@ -355,19 +127,42 @@ void Game::NextLoop() {
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
     bossSpawned_ = false;
+    bossPhaseChanged_ = false;
+    bossWarningTimer_ = 0.0f;
+    bossWarningKlaxonTimer_ = 0.0f;
+    bossDeathTimer_ = 0.0f;
+    bossDeathExplosionTimer_ = 0.0f;
+    lowLifeAudioTimer_ = 0.0f;
+    enemyShotAudioTimer_ = 0.0f;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     waves_.Reset();
     player_.bombs = std::min(6, player_.bombs + 1);
     state_ = State::Playing;
+    audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
+    audio_.PlayStageStart();
 }
 
 void Game::Update(float dt) {
+    // Coin insertion trigger (C key or Select button on Gamepad)
+    bool coinPressed = IsKeyPressed(KEY_C);
+    if (IsGamepadAvailable(0)) {
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)) coinPressed = true;
+    }
+    if (coinPressed) {
+        if (credits_ < 99) {
+            credits_++;
+            audio_.PlayInsertCoin();
+            effects_.AddText({ 240, 320 }, "CREDIT +1", GOLD);
+        }
+    }
+
     // Detect active input device for hybrid navigation focus
     bool anyKeyboardGamepad = 
         IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) ||
         IsKeyPressed(KEY_W) || IsKeyPressed(KEY_S) || IsKeyPressed(KEY_A) || IsKeyPressed(KEY_D) ||
         IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
-        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K);
+        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K) ||
+        IsKeyPressed(KEY_C);
         
     if (IsGamepadAvailable(0)) {
         for (int b = 0; b < 15; ++b) {
@@ -409,11 +204,11 @@ void Game::Update(float dt) {
     }
     
     effects_.Update(dt);
-    
-    // Play & loop BGM
-    if (audioReady_ && !IsSoundPlaying(bgmSound_) && state_ != State::GameOver) {
-        PlaySound(bgmSound_);
+    if (settingsFeedbackTimer_ > 0.0f) {
+        settingsFeedbackTimer_ -= dt;
     }
+    
+    audio_.Update();
     
     if (transitioning_) {
         UpdateTransition(dt);
@@ -433,7 +228,7 @@ void Game::Update(float dt) {
         }
         if (inputDetected) {
             demoMode_ = false;
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             ReturnToTitle();
             return;
         }
@@ -441,6 +236,12 @@ void Game::Update(float dt) {
     
     if (state_ == State::Title) {
         titleTimer_ += dt;
+        static int lastAttractShimmer = -1;
+        int attractShimmer = (int)(titleTimer_ / 5.0f);
+        if (attractShimmer != lastAttractShimmer) {
+            lastAttractShimmer = attractShimmer;
+            audio_.PlayAttractShimmer();
+        }
         if (titleTimer_ > 15.0f) {
             demoMode_ = true;
             titleTimer_ = 0.0f;
@@ -463,12 +264,12 @@ void Game::Update(float dt) {
             
             if (lastInputType_ == InputType::Mouse && mouseMoved) {
                 for (int i = 0; i < 5; ++i) {
-                    int y = 265 + i * 34;
+                    int y = 220 + i * 32;
                     if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                         if (titleSelection_ != i) {
                             titleSelection_ = i;
                             titleTimer_ = 0.0f;
-                            if (audioReady_) PlaySound(menuSelectSound_);
+                            audio_.PlayMenuMove();
                         }
                     }
                 }
@@ -476,7 +277,7 @@ void Game::Update(float dt) {
             
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 for (int i = 0; i < 5; ++i) {
-                    int y = 265 + i * 34;
+                    int y = 220 + i * 32;
                     if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                         titleSelection_ = i;
                         keyConfirm = true;
@@ -490,8 +291,9 @@ void Game::Update(float dt) {
             }
             
             if (keyEscape) {
-                if (audioReady_) PlaySound(menuConfirmSound_);
+                audio_.PlayMenuConfirm();
                 exitConfirmSelection_ = 0;
+                returnFromExitConfirm_ = State::Title;
                 titleTimer_ = 0.0f;
                 StartTransition(State::ExitConfirm);
             }
@@ -499,31 +301,46 @@ void Game::Update(float dt) {
             if (keyUp) {
                 titleSelection_ = (titleSelection_ + 4) % 5;
                 titleTimer_ = 0.0f;
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayMenuMove();
             }
             if (keyDown) {
                 titleSelection_ = (titleSelection_ + 1) % 5;
                 titleTimer_ = 0.0f;
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayMenuMove();
             }
             
             if (keyConfirm) {
                 titleTimer_ = 0.0f;
-                if (audioReady_) PlaySound(menuConfirmSound_);
                 if (titleSelection_ == 0) {
-                    demoMode_ = false;
-                    StartTransition(State::Playing);
-                } else if (titleSelection_ == 1) {
-                    StartTransition(State::HighScores);
-                } else if (titleSelection_ == 2) {
-                    returnFromSettings_ = State::Title;
-                    StartTransition(State::Settings);
-                } else if (titleSelection_ == 3) {
-                    returnFromHowTo_ = State::Title;
-                    StartTransition(State::HowTo);
+                    if (credits_ > 0 || demoMode_) {
+                        audio_.PlayPressStart();
+                        difficultySelection_ = 0;
+                        if (demoMode_) {
+                            difficulty_ = 0;
+                            StartTransition(State::Playing);
+                        } else {
+                            StartTransition(State::DifficultySelect);
+                        }
+                    } else {
+                        audio_.PlayDenied();
+                        effects_.AddText({ 240, 215 }, "INSERT COIN!", RED);
+                    }
                 } else {
-                    exitConfirmSelection_ = 0;
-                    StartTransition(State::ExitConfirm);
+                    audio_.PlayMenuConfirm();
+                    if (titleSelection_ == 1) {
+                        returnFromHowTo_ = State::Title;
+                        StartTransition(State::HowTo);
+                    } else if (titleSelection_ == 2) {
+                        returnFromSettings_ = State::Title;
+                        isFullscreen_ = IsWindowFullscreen();
+                        StartTransition(State::Settings);
+                    } else if (titleSelection_ == 3) {
+                        StartTransition(State::HighScores);
+                    } else {
+                        exitConfirmSelection_ = 0;
+                        returnFromExitConfirm_ = State::Title;
+                        StartTransition(State::ExitConfirm);
+                    }
                 }
             }
         }
@@ -541,11 +358,15 @@ void Game::Update(float dt) {
             }
         }
         if (backPressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             StartTransition(State::Title);
         }
     } else if (state_ == State::Settings) {
         UpdateSettings();
+    } else if (state_ == State::DifficultySelect) {
+        UpdateDifficultySelect();
+    } else if (state_ == State::Continue) {
+        UpdateContinue(dt);
     } else if (state_ == State::ExitConfirm) {
         UpdateExitConfirm();
     } else if (state_ == State::ClearScoresConfirm) {
@@ -566,7 +387,7 @@ void Game::Update(float dt) {
             }
         }
         if (backPressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             StartTransition(returnFromHowTo_);
         }
     } else if (state_ == State::Playing) {
@@ -577,7 +398,7 @@ void Game::Update(float dt) {
             }
         }
         if (pausePressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayPause();
             pauseSelection_ = 0;
             state_ = State::Paused;
         } else {
@@ -608,7 +429,7 @@ void Game::Update(float dt) {
                 if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                     if (pauseSelection_ != i) {
                         pauseSelection_ = i;
-                        if (audioReady_) PlaySound(menuSelectSound_);
+                        audio_.PlayMenuMove();
                     }
                 }
             }
@@ -626,15 +447,16 @@ void Game::Update(float dt) {
         
         if (keyUp) {
             pauseSelection_ = (pauseSelection_ + 3) % 4;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayMenuMove();
         }
         if (keyDown) {
             pauseSelection_ = (pauseSelection_ + 1) % 4;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayMenuMove();
         }
         
         if (keyConfirm) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            if (pauseSelection_ == 0) audio_.PlayResume();
+            else audio_.PlayMenuConfirm();
             if (pauseSelection_ == 0) {
                 state_ = State::Playing;
             } else if (pauseSelection_ == 1) {
@@ -642,13 +464,15 @@ void Game::Update(float dt) {
                 StartTransition(State::HowTo);
             } else if (pauseSelection_ == 2) {
                 returnFromSettings_ = State::Paused;
+                isFullscreen_ = IsWindowFullscreen();
                 StartTransition(State::Settings);
             } else {
-                demoMode_ = false;
-                StartTransition(State::Title);
+                exitConfirmSelection_ = 0;
+                returnFromExitConfirm_ = State::Paused;
+                StartTransition(State::ExitConfirm);
             }
         } else if (keyBack) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayResume();
             state_ = State::Playing;
         }
     } else if (state_ == State::StageClear) {
@@ -658,7 +482,7 @@ void Game::Update(float dt) {
             if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) skipPressed = true;
         }
         if (clearTimer_ > 8.0f || skipPressed) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             NextLoop();
         }
     } else if (state_ == State::GameOver) {
@@ -683,7 +507,7 @@ void Game::Update(float dt) {
                 if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                     if (gameOverSelection_ != i) {
                         gameOverSelection_ = i;
-                        if (audioReady_) PlaySound(menuSelectSound_);
+                        audio_.PlayMenuMove();
                     }
                 }
             }
@@ -701,24 +525,34 @@ void Game::Update(float dt) {
         
         if (keyUp) {
             gameOverSelection_ = (gameOverSelection_ + 2) % 3;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayMenuMove();
         }
         if (keyDown) {
             gameOverSelection_ = (gameOverSelection_ + 1) % 3;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayMenuMove();
         }
         
         if (keyConfirm) {
-            if (audioReady_) PlaySound(menuConfirmSound_);
             if (gameOverSelection_ == 0) {
-                demoMode_ = false;
-                StartTransition(State::Playing);
+                if (credits_ > 0 || demoMode_) {
+                    audio_.PlayPressStart();
+                    if (!demoMode_) credits_--;
+                    StartTransition(State::Playing);
+                } else {
+                    audio_.PlayDenied();
+                    effects_.Shake(4.0f, 0.15f);
+                    effects_.AddText({ 240, 215 }, "INSERT COIN!", RED);
+                }
             } else if (gameOverSelection_ == 1) {
+                audio_.PlayMenuConfirm();
                 returnFromSettings_ = State::GameOver;
+                isFullscreen_ = IsWindowFullscreen();
                 StartTransition(State::Settings);
             } else {
-                demoMode_ = false;
-                StartTransition(State::Title);
+                audio_.PlayMenuConfirm();
+                exitConfirmSelection_ = 0;
+                returnFromExitConfirm_ = State::GameOver;
+                StartTransition(State::ExitConfirm);
             }
         }
         
@@ -734,25 +568,30 @@ void Game::Update(float dt) {
 void Game::UpdatePlaying(float dt) {
     if (bossDeathTimer_ > 0.0f) {
         bossDeathTimer_ -= dt;
-        static float explosionDelay = 0.0f;
-        explosionDelay += dt;
-        if (explosionDelay > 0.15f) {
-            explosionDelay = 0.0f;
+        bossDeathExplosionTimer_ += dt;
+        if (bossDeathExplosionTimer_ > 0.15f) {
+            bossDeathExplosionTimer_ = 0.0f;
             Vector2 offset = { (float)GetRandomValue(-40, 40), (float)GetRandomValue(-40, 40) };
             effects_.Explosion({ bossDeathPos_.x + offset.x, bossDeathPos_.y + offset.y }, ORANGE, 14);
             effects_.Shake(5.0f, 0.15f);
-            if (audioReady_) PlaySound(boomSound_);
+            audio_.PlayExplosion(ExplosionSize::Small);
         }
         
         if (bossDeathTimer_ <= 0.0f) {
             effects_.Explosion(bossDeathPos_, VIOLET, 85);
             effects_.Shake(14.0f, 0.6f);
-            if (audioReady_) PlaySound(boomSound_);
-            if (audioReady_) PlaySound(stageClearSound_);
+            audio_.PlayExplosion(ExplosionSize::Large);
+            audio_.PlayStageClear();
             
             state_ = State::StageClear;
             clearTimer_ = 0.0f;
-            player_.score += (2000 + player_.lives * 500 + player_.bombs * 200) * loop_;
+            int baseBonus = 2000;
+            int livesBonus = player_.lives * 500;
+            int bombsBonus = player_.bombs * 200;
+            int stageBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
+            if (difficulty_ == 1) stageBonus = (stageBonus * 3) / 2;
+            player_.score += stageBonus;
+            CheckScoreMilestones();
         }
         
         enemyBullets_.clear();
@@ -764,15 +603,8 @@ void Game::UpdatePlaying(float dt) {
     player_.Update(dt, enemies_, enemyBullets_);
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
-    if (audioReady_ && playerBullets_.size() > before) {
-        if (player_.weapon == WeaponType::Vulcan) {
-            SetSoundPitch(shootSound_, 1.0f);
-        } else if (player_.weapon == WeaponType::Plasma) {
-            SetSoundPitch(shootSound_, 0.65f);
-        } else {
-            SetSoundPitch(shootSound_, 1.45f);
-        }
-        PlaySound(shootSound_);
+    if (playerBullets_.size() > before) {
+        audio_.PlayPlayerShot(player_.weapon);
     }
 
     if (player_.TryBomb()) {
@@ -780,28 +612,30 @@ void Game::UpdatePlaying(float dt) {
         for (auto& e : enemies_) e.Hit(e.IsBoss() ? 28 : 99);
         effects_.Explosion(player_.pos, SKYBLUE, 58);
         effects_.Shake(10.0f, 0.35f);
-        if (audioReady_) PlaySound(boomSound_);
+        audio_.PlayBomb();
     }
 
     // Boss warning klaxon timer loop
     if (bossWarningTimer_ > 0.0f) {
         bossWarningTimer_ -= dt;
-        static float klaxonRepeatTimer = 0.0f;
-        klaxonRepeatTimer += dt;
-        if (klaxonRepeatTimer > 0.8f) {
-            klaxonRepeatTimer = 0.0f;
-            if (audioReady_ && bossWarningTimer_ > 0.5f) PlaySound(bossKlaxonSound_);
+        bossWarningKlaxonTimer_ += dt;
+        if (bossWarningKlaxonTimer_ > 0.8f) {
+            bossWarningKlaxonTimer_ = 0.0f;
+            if (bossWarningTimer_ > 0.5f) audio_.PlayBossWarning();
         }
     }
 
-    waves_.Update(stageTime_, loop_, enemies_);
+    waves_.Update(stageTime_, loop_ + (difficulty_ == 1 ? 1 : 0), enemies_);
     if (!bossSpawned_ && waves_.ShouldSpawnBoss(stageTime_, BossAlive())) {
-        enemies_.emplace_back(EnemyType::Miniboss, Vector2{240, -70}, loop_, 0);
+        enemies_.emplace_back(EnemyType::Miniboss, Vector2{240, -70}, loop_ + (difficulty_ == 1 ? 1 : 0), 0);
         bossSpawned_ = true;
         enemyBullets_.clear();
         
         bossWarningTimer_ = 3.0f;
-        if (audioReady_) PlaySound(bossKlaxonSound_);
+        bossWarningKlaxonTimer_ = 0.8f;
+        audio_.PlayMusic(AudioSystem::MusicTrack::Boss);
+        audio_.PlayBossEntrance();
+        audio_.PlayBossWarning();
     }
 
     // Auto-detect newly spawned formations
@@ -821,14 +655,32 @@ void Game::UpdatePlaying(float dt) {
 
     for (auto& b : playerBullets_) b.Update(dt, enemies_);
     for (auto& b : enemyBullets_) b.Update(dt, enemies_);
-    for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_);
+    size_t beforeBullets = enemyBullets_.size();
+    for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_ + (difficulty_ == 1 ? 1 : 0));
+    if (enemyBullets_.size() > beforeBullets) {
+        enemyShotAudioTimer_ -= dt;
+        if (enemyShotAudioTimer_ <= 0.0f) {
+            audio_.PlayEnemyShot(BossAlive() ? EnemyShotType::Strong : EnemyShotType::Basic);
+            enemyShotAudioTimer_ = 0.07f;
+        }
+    }
     for (auto& p : powerups_) p.Update(dt);
 
     HandleCollisions();
+    CheckScoreMilestones();
     Cleanup();
+
+    for (const auto& e : enemies_) {
+        if (e.active && e.IsBoss() && !bossPhaseChanged_ && e.hp < e.maxHp / 2) {
+            bossPhaseChanged_ = true;
+            audio_.PlayBossPhaseChange();
+            break;
+        }
+    }
 
     if (bossSpawned_ && !BossAlive() && state_ == State::Playing) {
         bossDeathTimer_ = 1.6f;
+        bossDeathExplosionTimer_ = 0.0f;
         bossDeathPos_ = { 240, 110 };
         for (const auto& e : enemies_) {
             if (e.IsBoss()) {
@@ -837,7 +689,19 @@ void Game::UpdatePlaying(float dt) {
             }
         }
         enemyBullets_.clear();
+        audio_.PlayBossDefeat();
         effects_.AddText(bossDeathPos_, "BOSS DEFEATED!", GOLD);
+    }
+
+    // Low-life ticking audio warning while the player is in danger.
+    if (player_.lives <= 1 && !demoMode_ && state_ == State::Playing) {
+        lowLifeAudioTimer_ += dt;
+        if (lowLifeAudioTimer_ > 1.0f) {
+            lowLifeAudioTimer_ = 0.0f;
+            audio_.PlayLowLifeWarning();
+        }
+    } else {
+        lowLifeAudioTimer_ = 0.0f;
     }
 }
 
@@ -867,7 +731,7 @@ void Game::UpdateSettings() {
             if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
                 if (settingsSelection_ != i) {
                     settingsSelection_ = i;
-                    if (audioReady_) PlaySound(menuSelectSound_);
+                    audio_.PlayMenuMove();
                 }
             }
         }
@@ -886,10 +750,7 @@ void Game::UpdateSettings() {
                     sfxVolume_ = vol;
                     SaveSettings();
                     ApplyVolumeSettings();
-                    if (audioReady_) {
-                        SetSoundPitch(shootSound_, 1.0f);
-                        PlaySound(shootSound_);
-                    }
+                    audio_.PlaySettingsTick();
                 } else if (i == 1 && bgmVolume_ != vol) {
                     bgmVolume_ = vol;
                     SaveSettings();
@@ -912,11 +773,11 @@ void Game::UpdateSettings() {
     
     if (keyUp) {
         settingsSelection_ = (settingsSelection_ + 8) % 9;
-        if (audioReady_) PlaySound(menuSelectSound_);
+        audio_.PlayMenuMove();
     }
     if (keyDown) {
         settingsSelection_ = (settingsSelection_ + 1) % 9;
-        if (audioReady_) PlaySound(menuSelectSound_);
+        audio_.PlayMenuMove();
     }
     
     bool changed = false;
@@ -947,7 +808,7 @@ void Game::UpdateSettings() {
         if (keyLeft || keyRight || keyConfirm) {
             screenShakeEnabled_ = !screenShakeEnabled_;
             changed = true;
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             if (screenShakeEnabled_) {
                 effects_.Shake(8.0f, 0.25f);
             }
@@ -957,26 +818,29 @@ void Game::UpdateSettings() {
             hitboxOverlayEnabled_ = !hitboxOverlayEnabled_;
             debug_ = hitboxOverlayEnabled_;
             changed = true;
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
         }
     } else if (settingsSelection_ == 4) {
         if (keyLeft || keyRight || keyConfirm) {
             isFullscreen_ = !isFullscreen_;
             ToggleFullscreen();
             changed = true;
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
         }
     } else if (settingsSelection_ == 5) {
         if (keyLeft || keyRight || keyConfirm) {
             controlLayout_ = (controlLayout_ + 1) % 2;
+            player_.controlLayout = controlLayout_;
             changed = true;
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
         }
     } else if (settingsSelection_ == 6) {
         if (keyConfirm) {
             ResetSettingsToDefault();
-            if (audioReady_) PlaySound(menuConfirmSound_);
-            effects_.AddText({ 240, 325 }, "SETTINGS RESET!", SKYBLUE);
+            audio_.PlayMenuConfirm();
+            settingsFeedbackTimer_ = 2.0f;
+            settingsFeedbackText_ = "SETTINGS RESET!";
+            settingsFeedbackColor_ = SKYBLUE;
         }
     } else if (settingsSelection_ == 7) {
         if (keyConfirm) {
@@ -986,7 +850,7 @@ void Game::UpdateSettings() {
     } else if (settingsSelection_ == 8) {
         if (keyConfirm || IsKeyPressed(KEY_ESCAPE)) {
             SaveSettings();
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             StartTransition(returnFromSettings_);
         }
     }
@@ -994,15 +858,12 @@ void Game::UpdateSettings() {
     if (changed) {
         SaveSettings();
         ApplyVolumeSettings();
-        if (triggerBeep && audioReady_) {
-            SetSoundPitch(shootSound_, 1.0f);
-            PlaySound(shootSound_);
-        }
+        if (triggerBeep) audio_.PlaySettingsTick();
     }
     
     if (IsKeyPressed(KEY_ESCAPE)) {
         SaveSettings();
-        if (audioReady_) PlaySound(menuConfirmSound_);
+        audio_.PlayMenuConfirm();
         StartTransition(returnFromSettings_);
     }
 }
@@ -1014,27 +875,14 @@ void Game::ResetSettingsToDefault() {
     hitboxOverlayEnabled_ = false;
     isFullscreen_ = false;
     controlLayout_ = 0;
+    player_.controlLayout = controlLayout_;
     
     debug_ = hitboxOverlayEnabled_;
     if (IsWindowFullscreen()) {
         ToggleFullscreen();
     }
     
-    float sVol = ((float)sfxVolume_ / 10.0f) * ((float)sfxVolume_ / 10.0f);
-    float mVol = ((float)bgmVolume_ / 10.0f) * ((float)bgmVolume_ / 10.0f);
-    
-    if (soundsReady_) {
-        SetSoundVolume(shootSound_, sVol);
-        SetSoundVolume(boomSound_, sVol * 0.8f);
-        SetSoundVolume(pickupSound_, sVol);
-        SetSoundVolume(menuSelectSound_, sVol * 0.7f);
-        SetSoundVolume(menuConfirmSound_, sVol * 0.8f);
-        SetSoundVolume(playerHitSound_, sVol * 0.9f);
-        SetSoundVolume(gameOverSound_, sVol * 0.9f);
-        SetSoundVolume(stageClearSound_, sVol * 0.8f);
-        SetSoundVolume(bgmSound_, mVol * 0.5f);
-        SetSoundVolume(bossKlaxonSound_, sVol * 0.7f);
-    }
+    ApplyVolumeSettings();
     SaveSettings();
 }
 
@@ -1051,7 +899,9 @@ void Game::ClearScores() {
         highScores_.push_back(defaults[i]);
     }
     SaveHighScores();
-    effects_.AddText({ 240, 355 }, "SCORES Wiped!", RED);
+    settingsFeedbackTimer_ = 2.0f;
+    settingsFeedbackText_ = "HIGH SCORES WIPED!";
+    settingsFeedbackColor_ = RED;
 }
 
 void Game::UpdateNameEntry() {
@@ -1080,7 +930,7 @@ void Game::UpdateNameEntry() {
             // Hover slot box
             if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y && mousePos.y <= y + 50) {
                 nameEntryIndex_ = i;
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayHighScoreTick();
             }
             
             // Hover Up Arrow
@@ -1088,7 +938,7 @@ void Game::UpdateNameEntry() {
                 nameEntryIndex_ = i;
                 nameEntryBuf_[i]++;
                 if (nameEntryBuf_[i] > 'Z') nameEntryBuf_[i] = 'A';
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayHighScoreTick();
             }
             
             // Hover Down Arrow
@@ -1096,7 +946,7 @@ void Game::UpdateNameEntry() {
                 nameEntryIndex_ = i;
                 nameEntryBuf_[i]--;
                 if (nameEntryBuf_[i] < 'A') nameEntryBuf_[i] = 'Z';
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayHighScoreTick();
             }
         }
         
@@ -1114,7 +964,7 @@ void Game::UpdateNameEntry() {
         if (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 440 && mousePos.y <= 476) {
             if (nameEntryIndex_ != 3) {
                 nameEntryIndex_ = 3;
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayHighScoreTick();
             }
         } else {
             for (int i = 0; i < 3; ++i) {
@@ -1123,7 +973,7 @@ void Game::UpdateNameEntry() {
                 if (mousePos.x >= x && mousePos.x <= x + 40 && mousePos.y >= y - 18 && mousePos.y <= y + 68) {
                     if (nameEntryIndex_ != i) {
                         nameEntryIndex_ = i;
-                        if (audioReady_) PlaySound(menuSelectSound_);
+                        audio_.PlayHighScoreTick();
                     }
                 }
             }
@@ -1133,16 +983,16 @@ void Game::UpdateNameEntry() {
     if (keyBack) {
         if (nameEntryIndex_ > 0) {
             nameEntryIndex_--;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         }
     } else {
         if (keyLeft && nameEntryIndex_ > 0) {
             nameEntryIndex_--;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         }
         if (keyRight && nameEntryIndex_ < 3) {
             nameEntryIndex_++;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         }
     }
     
@@ -1152,20 +1002,20 @@ void Game::UpdateNameEntry() {
             curChar++;
             if (curChar > 'Z') curChar = 'A';
             nameEntryBuf_[nameEntryIndex_] = curChar;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         }
         if (keyDown) {
             curChar--;
             if (curChar < 'A') curChar = 'Z';
             nameEntryBuf_[nameEntryIndex_] = curChar;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         }
         
         // Direct characters
         for (int key = KEY_A; key <= KEY_Z; ++key) {
             if (IsKeyPressed(key)) {
                 nameEntryBuf_[nameEntryIndex_] = (char)('A' + (key - KEY_A));
-                if (audioReady_) PlaySound(menuSelectSound_);
+                audio_.PlayHighScoreTick();
                 nameEntryIndex_++; // Auto advance to next slot/confirm button
                 break;
             }
@@ -1175,12 +1025,12 @@ void Game::UpdateNameEntry() {
     if (keyConfirm) {
         if (nameEntryIndex_ < 3) {
             nameEntryIndex_++;
-            if (audioReady_) PlaySound(menuSelectSound_);
+            audio_.PlayHighScoreTick();
         } else {
             nameEntryBuf_[3] = '\0';
             InsertHighScore(nameEntryBuf_, player_.score, loop_);
             SaveHighScores();
-            if (audioReady_) PlaySound(menuConfirmSound_);
+            audio_.PlayMenuConfirm();
             StartTransition(State::HighScores);
         }
     }
@@ -1209,12 +1059,12 @@ void Game::UpdateExitConfirm() {
             if (mousePos.x >= 100 && mousePos.x <= 220) {
                 if (exitConfirmSelection_ != 0) {
                     exitConfirmSelection_ = 0;
-                    if (audioReady_) PlaySound(menuSelectSound_);
+                    audio_.PlayMenuMove();
                 }
             } else if (mousePos.x >= 260 && mousePos.x <= 380) {
                 if (exitConfirmSelection_ != 1) {
                     exitConfirmSelection_ = 1;
-                    if (audioReady_) PlaySound(menuSelectSound_);
+                    audio_.PlayMenuMove();
                 }
             }
         }
@@ -1234,19 +1084,25 @@ void Game::UpdateExitConfirm() {
     
     if (keyLeft || keyRight) {
         exitConfirmSelection_ = 1 - exitConfirmSelection_;
-        if (audioReady_) PlaySound(menuSelectSound_);
+        audio_.PlayMenuMove();
     }
     
     if (keyConfirm) {
-        if (audioReady_) PlaySound(menuConfirmSound_);
         if (exitConfirmSelection_ == 0) {
-            StartTransition(State::Title);
+            audio_.PlayMenuCancel();
+            StartTransition(returnFromExitConfirm_);
         } else {
-            shouldExit_ = true;
+            audio_.PlayMenuConfirm();
+            if (returnFromExitConfirm_ == State::Title) {
+                shouldExit_ = true;
+            } else {
+                demoMode_ = false;
+                StartTransition(State::Title);
+            }
         }
     } else if (keyBack) {
-        if (audioReady_) PlaySound(menuConfirmSound_);
-        StartTransition(State::Title);
+        audio_.PlayMenuCancel();
+        StartTransition(returnFromExitConfirm_);
     }
 }
 
@@ -1273,12 +1129,12 @@ void Game::UpdateClearScoresConfirm() {
             if (mousePos.x >= 100 && mousePos.x <= 220) {
                 if (clearScoresSelection_ != 0) {
                     clearScoresSelection_ = 0;
-                    if (audioReady_) PlaySound(menuSelectSound_);
+                    audio_.PlayMenuMove();
                 }
             } else if (mousePos.x >= 260 && mousePos.x <= 380) {
                 if (clearScoresSelection_ != 1) {
                     clearScoresSelection_ = 1;
-                    if (audioReady_) PlaySound(menuSelectSound_);
+                    audio_.PlayMenuMove();
                 }
             }
         }
@@ -1298,19 +1154,20 @@ void Game::UpdateClearScoresConfirm() {
     
     if (keyLeft || keyRight) {
         clearScoresSelection_ = 1 - clearScoresSelection_;
-        if (audioReady_) PlaySound(menuSelectSound_);
+        audio_.PlayMenuMove();
     }
     
     if (keyConfirm) {
-        if (audioReady_) PlaySound(menuConfirmSound_);
         if (clearScoresSelection_ == 0) {
+            audio_.PlayMenuCancel();
             StartTransition(State::Settings);
         } else {
+            audio_.PlayMenuConfirm();
             ClearScores();
             StartTransition(State::Settings);
         }
     } else if (keyBack) {
-        if (audioReady_) PlaySound(menuConfirmSound_);
+        audio_.PlayMenuCancel();
         StartTransition(State::Settings);
     }
 }
@@ -1324,27 +1181,44 @@ void Game::HandleCollisions() {
             e.Hit(b.damage);
             effects_.Spark(b.pos, YELLOW);
             if (!e.active) {
-                player_.score += e.scoreValue;
+                int scoreAdded = e.scoreValue;
+                if (difficulty_ == 1) scoreAdded = (scoreAdded * 3) / 2;
+                player_.score += scoreAdded;
                 
                 char scoreText[16];
-                std::snprintf(scoreText, sizeof(scoreText), "+%d", e.scoreValue);
+                std::snprintf(scoreText, sizeof(scoreText), "+%d", scoreAdded);
                 effects_.AddText(e.pos, scoreText, YELLOW);
 
                 effects_.Explosion(e.pos, e.IsBoss() ? VIOLET : ORANGE, e.IsBoss() ? 80 : 22);
                 effects_.Shake(e.IsBoss() ? 8.0f : 3.0f, e.IsBoss() ? 0.45f : 0.16f);
+                if (e.IsBoss()) bossDeathPos_ = e.pos;
                 SpawnDrop(e.pos, e.type);
+
+                if (e.IsBoss()) {
+                    audio_.PlayExplosion(ExplosionSize::Large);
+                } else if (e.type == EnemyType::Turret) {
+                    audio_.PlayExplosion(ExplosionSize::Medium);
+                } else {
+                    audio_.PlayExplosion(ExplosionSize::Small);
+                }
 
                 if (e.formationId > 0 && e.formationId < 10) {
                     if (formationCount_[e.formationId] > 0) {
                         formationCount_[e.formationId]--;
                         if (formationCount_[e.formationId] == 0) {
-                            player_.score += 1000;
-                            effects_.AddText(e.pos, "FORMATION BONUS! +1000", GOLD);
+                            int bonus = 1000;
+                            if (difficulty_ == 1) bonus = (bonus * 3) / 2;
+                            player_.score += bonus;
+                            effects_.AddText(e.pos, TextFormat("FORMATION BONUS! +%d", bonus), GOLD);
                             powerups_.emplace_back(PowerupType::Medal, e.pos);
-                            if (audioReady_) PlaySound(pickupSound_);
+                            audio_.PlayPickup(PowerupType::Medal);
                         }
                     }
                 }
+            } else if (e.IsBoss()) {
+                audio_.PlayBossDamage();
+            } else if (e.type == EnemyType::Turret) {
+                audio_.PlayBossDamage();
             }
             break;
         }
@@ -1358,17 +1232,18 @@ void Game::HandleCollisions() {
                 effects_.Explosion(player_.pos, RED, 38);
                 effects_.Shake(8.0f, 0.35f);
                 if (player_.lives <= 0) {
-                    if (audioReady_) PlaySound(gameOverSound_);
-                    if (!demoMode_ && CheckHighScore(player_.score)) {
-                        nameEntryBuf_[0] = 'A'; nameEntryBuf_[1] = 'A'; nameEntryBuf_[2] = 'A'; nameEntryBuf_[3] = '\0';
-                        nameEntryIndex_ = 0;
-                        StartTransition(State::NameEntry);
-                    } else {
+                    audio_.PlayPlayerDeath();
+                    if (demoMode_) {
+                        audio_.PlayGameOver();
                         StartTransition(State::GameOver);
+                    } else {
+                        continueTimer_ = 9.9f;
+                        StartTransition(State::Continue);
                     }
                 } else {
-                    if (audioReady_) PlaySound(playerHitSound_);
+                    audio_.PlayPlayerHit();
                     player_.ResetAfterHit();
+                    audio_.PlayRespawn();
                 }
                 break;
             }
@@ -1381,17 +1256,18 @@ void Game::HandleCollisions() {
             --player_.lives;
             effects_.Explosion(player_.pos, RED, 38);
             if (player_.lives <= 0) {
-                if (audioReady_) PlaySound(gameOverSound_);
-                if (!demoMode_ && CheckHighScore(player_.score)) {
-                    nameEntryBuf_[0] = 'A'; nameEntryBuf_[1] = 'A'; nameEntryBuf_[2] = 'A'; nameEntryBuf_[3] = '\0';
-                    nameEntryIndex_ = 0;
-                    StartTransition(State::NameEntry);
-                } else {
+                audio_.PlayPlayerDeath();
+                if (demoMode_) {
+                    audio_.PlayGameOver();
                     StartTransition(State::GameOver);
+                } else {
+                    continueTimer_ = 9.9f;
+                    StartTransition(State::Continue);
                 }
             } else {
-                if (audioReady_) PlaySound(playerHitSound_);
+                audio_.PlayPlayerHit();
                 player_.ResetAfterHit();
+                audio_.PlayRespawn();
             }
         }
     }
@@ -1399,6 +1275,7 @@ void Game::HandleCollisions() {
     for (auto& p : powerups_) {
         if (!p.active || !CircleHit(p.pos, p.radius, player_.pos, player_.spriteRadius)) continue;
         p.active = false;
+        bool isMedal = false;
         if (p.type == PowerupType::WeaponChange) {
             player_.NextWeapon();
             effects_.AddText(player_.pos, "WEAPON SWAP!", SKYBLUE);
@@ -1412,10 +1289,12 @@ void Game::HandleCollisions() {
             effects_.AddText(player_.pos, "BOMB +1", PURPLE);
         }
         else {
-            player_.score += 500;
-            effects_.AddText(p.pos, "+500", GOLD);
+            int scoreGain = (difficulty_ == 1) ? 750 : 500;
+            player_.score += scoreGain;
+            effects_.AddText(p.pos, TextFormat("+%d", scoreGain), GOLD);
+            isMedal = true;
         }
-        if (audioReady_) PlaySound(pickupSound_);
+        audio_.PlayPickup(isMedal ? PowerupType::Medal : p.type);
     }
 }
 
@@ -1437,6 +1316,20 @@ bool Game::BossAlive() const {
     return false;
 }
 
+void Game::CheckScoreMilestones() {
+    if (demoMode_) return;
+    while (player_.score >= nextScoreMilestone_) {
+        audio_.PlayScoreMilestone();
+        nextScoreMilestone_ += 10000;
+    }
+    while (player_.score >= nextExtraLifeScore_) {
+        player_.lives = std::min(player_.lives + 1, 6);
+        effects_.AddText(player_.pos, "EXTRA LIFE!", LIME);
+        audio_.PlayExtraLife();
+        nextExtraLifeScore_ += 50000;
+    }
+}
+
 void Game::Cleanup() {
     // Disqualify formation score if any member escapes offscreen
     for (const auto& e : enemies_) {
@@ -1452,6 +1345,226 @@ void Game::Cleanup() {
     eraseBullets(enemyBullets_, ScreenW, ScreenH);
     enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(), [](const Enemy& e){ return !e.active || e.Offscreen(ScreenH); }), enemies_.end());
     powerups_.erase(std::remove_if(powerups_.begin(), powerups_.end(), [](const Powerup& p){ return !p.active || p.Offscreen(ScreenH); }), powerups_.end());
+}
+
+void Game::UpdateDifficultySelect() {
+    bool keyUp = IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W);
+    bool keyDown = IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S);
+    bool keyConfirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
+    bool keyBack = IsKeyPressed(KEY_ESCAPE);
+    
+    if (IsGamepadAvailable(0)) {
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_UP)) keyUp = true;
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN)) keyDown = true;
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) keyBack = true;
+    }
+    
+    Vector2 mousePos = GetMousePosition();
+    static Vector2 dsLastMouse = { -1.0f, -1.0f };
+    bool mouseMoved = (std::abs(mousePos.x - dsLastMouse.x) > 0.5f || std::abs(mousePos.y - dsLastMouse.y) > 0.5f);
+    dsLastMouse = mousePos;
+    
+    if (lastInputType_ == InputType::Mouse && mouseMoved) {
+        for (int i = 0; i < 2; ++i) {
+            int y = 220 + i * 130;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 10 && mousePos.y <= y + 100) {
+                if (difficultySelection_ != i) {
+                    difficultySelection_ = i;
+                    audio_.PlayMenuMove();
+                }
+            }
+        }
+    }
+    
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        for (int i = 0; i < 2; ++i) {
+            int y = 220 + i * 130;
+            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 10 && mousePos.y <= y + 100) {
+                difficultySelection_ = i;
+                keyConfirm = true;
+            }
+        }
+    }
+    
+    if (keyUp || keyDown) {
+        difficultySelection_ = 1 - difficultySelection_;
+        audio_.PlayMenuMove();
+    }
+    
+    if (keyConfirm) {
+        audio_.PlayPressStart();
+        difficulty_ = difficultySelection_;
+        if (credits_ > 0) credits_--;
+        demoMode_ = false;
+        StartTransition(State::Playing);
+    } else if (keyBack) {
+        audio_.PlayMenuConfirm();
+        StartTransition(State::Title);
+    }
+}
+
+void Game::DrawDifficultySelect() const {
+    DrawRectangle(30, 100, ScreenW - 60, ScreenH - 200, Fade(BLACK, 0.85f));
+    DrawRectangleLines(30, 100, ScreenW - 60, ScreenH - 200, Fade(SKYBLUE, 0.8f));
+    
+    int titleW = MeasureText("SELECT DIFFICULTY", 24);
+    DrawText("SELECT DIFFICULTY", ScreenW / 2 - titleW / 2, 130, 24, GOLD);
+    
+    DrawLine(50, 175, ScreenW - 50, 175, Fade(SKYBLUE, 0.4f));
+    
+    const char* diffTitles[2] = { "NORMAL MODE", "ACE MODE (HARD)" };
+    const char* diffDescs[2] = { 
+        "Standard difficulty loop. Highly recommended for newcomers.", 
+        "Hyper-aggressive enemies and faster bullets. 1.5x score multiplier!" 
+    };
+    const char* pilotClasses[2] = { "CLASS: CADET PATROLLER", "CLASS: ACE INTERCEPTOR" };
+    Color diffColors[2] = { LIME, RED };
+
+    auto drawStatBar = [](int x, int y, const char* label, int filled, Color col) {
+        DrawText(label, x, y, 9, GRAY);
+        for (int b = 0; b < 5; ++b) {
+            Color barCol = (b < filled) ? col : DARKGRAY;
+            DrawRectangle(x + 28 + b * 9, y + 1, 7, 7, barCol);
+        }
+    };
+
+    auto drawSelectShip = [](float x, float y, Color color, bool selected) {
+        float time = (float)GetTime();
+        if (selected) {
+            float flameH = 6.0f + std::sin(time * 35.0f) * 2.5f;
+            DrawTriangle({x - 3, y + 6}, {x - 4, y + 6 + flameH}, {x - 2, y + 6}, ORANGE);
+            DrawTriangle({x + 3, y + 6}, {x + 2, y + 6}, {x + 4, y + 6 + flameH}, ORANGE);
+        }
+        DrawTriangle({x, y - 5}, {x - 10, y + 3}, {x - 2, y + 3}, DARKGRAY);
+        DrawTriangle({x, y - 5}, {x + 2, y + 3}, {x + 10, y + 3}, DARKGRAY);
+        DrawTriangle({x, y - 10}, {x - 5, y + 6}, {x + 5, y + 6}, color);
+        DrawCircleV({x, y - 1}, 2.0f, SKYBLUE);
+    };
+    
+    for (int i = 0; i < 2; ++i) {
+        int y = 220 + i * 130;
+        bool selected = (difficultySelection_ == i);
+        
+        if (selected) {
+            DrawRectangle(50, y - 10, ScreenW - 100, 110, Fade(BLUE, 0.35f));
+            DrawRectangleLines(50, y - 10, ScreenW - 100, 110, Fade(GOLD, 0.7f));
+        } else {
+            DrawRectangle(50, y - 10, ScreenW - 100, 110, Fade(DARKGRAY, 0.12f));
+            DrawRectangleLines(50, y - 10, ScreenW - 100, 110, Fade(GRAY, 0.25f));
+        }
+        
+        // Draw Fighter ship preview on the left inside the card
+        drawSelectShip(85.0f, (float)y + 35.0f, diffColors[i], selected);
+
+        // Text labels
+        DrawText(diffTitles[i], 125, y, 16, selected ? GOLD : diffColors[i]);
+        DrawText(diffDescs[i], 125, y + 22, 10, RAYWHITE);
+        DrawText(pilotClasses[i], 125, y + 38, 10, selected ? GOLD : GRAY);
+
+        // Stat meters
+        drawStatBar(125, y + 54, "SPD", i == 0 ? 3 : 5, SKYBLUE);
+        drawStatBar(220, y + 54, "ARM", i == 0 ? 5 : 2, LIME);
+        drawStatBar(315, y + 54, "THT", i == 0 ? 2 : 5, RED);
+    }
+    
+    DrawText("UP/DOWN navigate  |  ENTER/CLICK select", ScreenW / 2 - MeasureText("UP/DOWN navigate  |  ENTER/CLICK select", 12) / 2, 480, 12, GRAY);
+}
+
+void Game::UpdateContinue(float dt) {
+    float oldTimer = continueTimer_;
+    continueTimer_ -= dt;
+    if (std::ceil(oldTimer) != std::ceil(continueTimer_)) {
+        if (continueTimer_ > 0.0f) audio_.PlayContinueTick();
+    }
+    
+    bool startPressed = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
+    if (IsGamepadAvailable(0)) {
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
+            startPressed = true;
+        }
+    }
+    
+    if (startPressed) {
+        if (credits_ > 0) {
+            credits_--;
+            audio_.PlayPressStart();
+            
+            player_.lives = (difficulty_ == 0) ? 3 : 2;
+            player_.bombs = 3;
+            player_.invulnerable = true;
+            player_.invulnTimer = 3.0f;
+            player_.pos = {240, 560};
+            audio_.PlayRespawn();
+            
+            enemyBullets_.clear();
+            
+            // Go straight back to playing
+            state_ = State::Playing;
+            return;
+        } else {
+            audio_.PlayDenied();
+            effects_.Shake(4.0f, 0.15f);
+            effects_.AddText({ 240, 380 }, "INSERT COIN!", RED);
+        }
+    }
+    
+    if (continueTimer_ <= 0.0f) {
+        if (CheckHighScore(player_.score)) {
+            nameEntryBuf_[0] = 'A'; nameEntryBuf_[1] = 'A'; nameEntryBuf_[2] = 'A'; nameEntryBuf_[3] = '\0';
+            nameEntryIndex_ = 0;
+            audio_.PlayHighScoreEntry();
+            StartTransition(State::NameEntry);
+        } else {
+            audio_.PlayGameOver();
+            StartTransition(State::GameOver);
+        }
+    }
+}
+
+void Game::DrawContinue() const {
+    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.75f));
+    
+    int cy = ScreenH / 2 - 130;
+    
+    int textW = MeasureText("CONTINUE?", 32);
+    Color pulseCol = (int)(GetTime() * 4.0f) % 2 == 0 ? GOLD : RAYWHITE;
+    DrawText("CONTINUE?", ScreenW / 2 - textW / 2, cy, 32, pulseCol);
+    
+    int sec = (int)std::ceil(continueTimer_);
+    sec = std::max(0, std::min(9, sec));
+    const char* timerStr = TextFormat("%d", sec);
+    int timerW = MeasureText(timerStr, 80);
+    DrawText(timerStr, ScreenW / 2 - timerW / 2, cy + 45, 80, RED);
+    
+    int scW = MeasureText(TextFormat("CURRENT SCORE: %08d", player_.score), 15);
+    DrawText(TextFormat("CURRENT SCORE: %08d", player_.score), ScreenW / 2 - scW / 2, cy + 145, 15, SKYBLUE);
+    
+    float blink = std::sin((float)GetTime() * 10.0f);
+    if (credits_ > 0) {
+        if (blink > 0.0f) {
+            int prW = MeasureText("PRESS START TO CONTINUE", 16);
+            DrawText("PRESS START TO CONTINUE", ScreenW / 2 - prW / 2, cy + 185, 16, LIME);
+        }
+        int crW = MeasureText(TextFormat("CREDITS: %02d (1 USED)", credits_), 14);
+        DrawText(TextFormat("CREDITS: %02d (1 USED)", credits_), ScreenW / 2 - crW / 2, cy + 212, 14, SKYBLUE);
+    } else {
+        if (blink > 0.0f) {
+            int prW = MeasureText("INSERT COIN [C]", 16);
+            DrawText("INSERT COIN [C]", ScreenW / 2 - prW / 2, cy + 185, 16, RED);
+        }
+        int crW = MeasureText("NO CREDITS AVAILABLE", 13);
+        DrawText("NO CREDITS AVAILABLE", ScreenW / 2 - crW / 2, cy + 212, 13, GRAY);
+    }
+
+    // Glowing Coin Door graphic on Continue screen
+    int doorX = ScreenW / 2 - 40;
+    int doorY = cy + 242;
+    DrawRectangle(doorX, doorY, 80, 50, BLACK);
+    DrawRectangleLines(doorX, doorY, 80, 50, GRAY);
+    DrawRectangle(doorX + 32, doorY + 10, 16, 22, DARKGRAY);
+    DrawRectangle(doorX + 38, doorY + 12, 4, 18, (credits_ == 0 && (int)(GetTime() * 3.0f) % 2 == 0) ? RED : ORANGE);
+    DrawText("COIN", doorX + 26, doorY + 36, 9, GRAY);
 }
 
 void Game::DrawBackground() const {
@@ -1478,20 +1591,69 @@ void Game::DrawBackground() const {
 }
 
 void Game::DrawHud() const {
-    DrawRectangle(0, 0, ScreenW, 34, Fade(BLACK, 0.72f));
-    DrawText(TextFormat("SCORE %08d", player_.score), 12, 10, 14, RAYWHITE);
-    DrawText(TextFormat("LIVES %d", std::max(0, player_.lives)), 178, 10, 14, RAYWHITE);
-    DrawText(TextFormat("BOMBS %d", player_.bombs), 258, 10, 14, RAYWHITE);
-    DrawText(TextFormat("%s LV%d", player_.WeaponName(), player_.weaponLevel), 350, 10, 14, RAYWHITE);
-    if (debug_) DrawText("F1 HITBOX", 12, 42, 12, LIME);
-    if (stageTime_ < 90.0f) DrawText(TextFormat("STAGE %02d", 90 - (int)stageTime_), 390, 42, 12, GRAY);
-    else DrawText("WARNING", 396, 42, 12, RED);
+    DrawRectangle(0, 0, ScreenW, 36, Fade(BLACK, 0.85f));
+    DrawRectangleLines(0, 0, ScreenW, 36, Fade(SKYBLUE, 0.4f));
     
+    // SCORE
+    DrawText("1P", 12, 4, 10, LIME);
+    DrawText(TextFormat("%08d", player_.score), 12, 16, 13, RAYWHITE);
+    
+    // HI-SCORE
+    int hiScore = 25000;
+    if (!highScores_.empty()) {
+        hiScore = highScores_[0].score;
+    }
+    DrawText("HI-SCORE", ScreenW / 2 - MeasureText("HI-SCORE", 10) / 2, 4, 10, RED);
+    DrawText(TextFormat("%08d", std::max(hiScore, player_.score)), ScreenW / 2 - MeasureText(TextFormat("%08d", std::max(hiScore, player_.score)), 13) / 2, 16, 13, GOLD);
+    
+    // WEAPON
+    DrawText("WEAPON", 280, 4, 10, SKYBLUE);
+    DrawText(TextFormat("%s LV%d", player_.WeaponName(), player_.weaponLevel), 280, 16, 13, RAYWHITE);
+    
+    // LIVES (Icons)
+    int maxDrawLives = std::min(5, player_.lives);
+    for (int i = 0; i < maxDrawLives; ++i) {
+        float lx = 145 + i * 16;
+        float ly = 22;
+        DrawTriangle({lx, ly - 6}, {lx - 5, ly + 4}, {lx + 5, ly + 4}, SKYBLUE);
+        DrawCircleV({lx, ly + 1}, 2.0f, RED);
+    }
+    DrawText("LIVES", 145, 4, 10, SKYBLUE);
+    
+    // BOMBS (Icons)
+    int maxDrawBombs = std::min(5, player_.bombs);
+    for (int i = 0; i < maxDrawBombs; ++i) {
+        float bx = 215 + i * 12;
+        float by = 22;
+        DrawCircleV({bx, by}, 4.0f, PURPLE);
+        DrawCircleLines(bx, by, 4.0f, WHITE);
+    }
+    DrawText("BOMBS", 215, 4, 10, PURPLE);
+
+    // Dynamic STAGE Timer / WARNING
+    if (stageTime_ < 90.0f) {
+        DrawText(TextFormat("TIME %02d", 90 - (int)stageTime_), 395, 4, 10, GRAY);
+        DrawText(TextFormat("LOOP %d", loop_), 395, 16, 12, SKYBLUE);
+    } else {
+        DrawText("WARNING", 395, 4, 10, RED);
+        DrawText("BOSS ALIVE", 395, 16, 12, RED);
+    }
+    
+    if (state_ == State::Playing) {
+        DrawRectangle(0, ScreenH - 24, ScreenW, 24, Fade(BLACK, 0.75f));
+        DrawText(TextFormat("CREDIT %02d", credits_), 12, ScreenH - 18, 12, SKYBLUE);
+        if (difficulty_ == 1) {
+            DrawText("ACE DIFFICULTY (1.5x)", ScreenW - MeasureText("ACE DIFFICULTY (1.5x)", 12) - 12, ScreenH - 18, 12, RED);
+        } else {
+            DrawText("NORMAL DIFFICULTY", ScreenW - MeasureText("NORMAL DIFFICULTY", 12) - 12, ScreenH - 18, 12, LIME);
+        }
+    }
+
     if (demoMode_) {
         Color demoColor = (int)(GetTime() * 2) % 2 == 0 ? Fade(RED, 0.8f) : Fade(YELLOW, 0.8f);
         int demoW = MeasureText("DEMO PLAY - PRESS ANY KEY", 16);
-        DrawRectangle(0, ScreenH - 42, ScreenW, 42, Fade(BLACK, 0.82f));
-        DrawText("DEMO PLAY - PRESS ANY KEY", ScreenW / 2 - demoW / 2, ScreenH - 28, 16, demoColor);
+        DrawRectangle(0, ScreenH - 46, ScreenW, 46, Fade(BLACK, 0.85f));
+        DrawText("DEMO PLAY - PRESS ANY KEY", ScreenW / 2 - demoW / 2, ScreenH - 30, 16, demoColor);
     }
 }
 
@@ -1503,63 +1665,103 @@ void Game::DrawCenteredText(const char* title, const char* subtitle) const {
 }
 
 void Game::DrawTitleMenu() const {
-    DrawRectangle(42, 160, ScreenW - 84, 320, Fade(BLACK, 0.75f));
-    DrawRectangleLines(42, 160, ScreenW - 84, 320, Fade(SKYBLUE, 0.75f));
+    DrawRectangle(42, 120, ScreenW - 84, 305, Fade(BLACK, 0.85f));
+    DrawRectangleLines(42, 120, ScreenW - 84, 305, Fade(SKYBLUE, 0.8f));
     
-    int titleW = MeasureText("SKY CIRCUIT", 36);
-    DrawText("SKY CIRCUIT", ScreenW / 2 - titleW / 2, 185, 36, RAYWHITE);
-    DrawText("A local vertical arcade shooter", ScreenW / 2 - MeasureText("A local vertical arcade shooter", 14) / 2, 228, 14, SKYBLUE);
+    int titleW = MeasureText("SKY CIRCUIT", 38);
+    Color titleCol = (int)(GetTime() * 3.0f) % 2 == 0 ? GOLD : YELLOW;
+    DrawText("SKY CIRCUIT", ScreenW / 2 - titleW / 2, 140, 38, titleCol);
+    DrawText("REAL ARCADE CABINET EDITION", ScreenW / 2 - MeasureText("REAL ARCADE CABINET EDITION", 11) / 2, 185, 11, SKYBLUE);
 
-    const char* items[5] = {"Start Mission", "High Scores", "Settings", "How To Play", "Exit"};
+    const char* items[5] = {"1 PLAYER START", "HOW TO PLAY", "SETTINGS", "LEADERBOARD", "SHUT DOWN CABINET"};
     for (int i = 0; i < 5; ++i) {
-        int y = 265 + i * 34;
+        int y = 220 + i * 32;
         bool selected = titleSelection_ == i;
         if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(BLUE, 0.45f));
         DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
-        DrawText(items[i], 158, y, 16, selected ? GOLD : RAYWHITE);
+        
+        Color textCol = RAYWHITE;
+        if (i == 0) {
+            if (credits_ == 0) {
+                textCol = selected ? RED : GRAY;
+            } else {
+                textCol = selected ? GOLD : LIME;
+            }
+        } else {
+            textCol = selected ? GOLD : RAYWHITE;
+        }
+        DrawText(items[i], 158, y, 16, textCol);
     }
 
-    DrawText("UP/DOWN choose  ENTER confirm", ScreenW / 2 - MeasureText("UP/DOWN choose  ENTER confirm", 13) / 2, 442, 13, GRAY);
-    DrawText("Procedural vector art & chiptunes", ScreenW / 2 - MeasureText("Procedural vector art & chiptunes", 13) / 2, 498, 13, DARKGRAY);
+    float blink = std::sin((float)GetTime() * 10.0f);
+    if (blink > 0.0f) {
+        if (credits_ == 0) {
+            int insW = MeasureText("INSERT COIN TO PLAY", 16);
+            DrawText("INSERT COIN TO PLAY", ScreenW / 2 - insW / 2, 382, 16, RED);
+        } else {
+            int stW = MeasureText("PRESS START (1P ACTIVE)", 16);
+            DrawText("PRESS START (1P ACTIVE)", ScreenW / 2 - stW / 2, 382, 16, LIME);
+        }
+    }
+
+    // Glowing Coin Door Slot Graphic
+    int slotX = ScreenW / 2 - 60;
+    int slotY = 440;
+    DrawRectangle(slotX, slotY, 120, 40, BLACK);
+    DrawRectangleLines(slotX, slotY, 120, 40, (credits_ == 0 && (int)(GetTime() * 2) % 2 == 0) ? RED : DARKGRAY);
+    
+    // Coin insert entry path
+    DrawRectangle(slotX + 52, slotY + 8, 16, 24, DARKGRAY);
+    DrawRectangle(slotX + 58, slotY + 10, 4, 20, (credits_ == 0 && (int)(GetTime() * 2) % 2 == 0) ? RED : ORANGE);
+    
+    DrawText("COIN", slotX + 12, slotY + 15, 9, GRAY);
+    DrawText("25c", slotX + 85, slotY + 15, 9, GOLD);
+
+    // Large LED Credits Panel
+    DrawRectangle(ScreenW / 2 - 65, 498, 130, 28, Fade(DARKGRAY, 0.4f));
+    DrawRectangleLines(ScreenW / 2 - 65, 498, 130, 28, Fade(SKYBLUE, 0.4f));
+    
+    Color ledColor = credits_ > 0 ? LIME : RED;
+    const char* creditsStr = TextFormat("CREDITS: %02d", credits_);
+    int credW = MeasureText(creditsStr, 16);
+    DrawText(creditsStr, ScreenW / 2 - credW / 2, 504, 16, ledColor);
+
+    // Large readable cabinet guidelines
+    const char* instructStr = "PRESS [C] TO INSERT COIN  |  PRESS [ENTER] TO START";
+    int instW = MeasureText(instructStr, 11);
+    DrawText(instructStr, ScreenW / 2 - instW / 2, 545, 11, GRAY);
 }
 
 void Game::DrawHowTo() const {
     DrawRectangle(30, 56, ScreenW - 60, ScreenH - 112, Fade(BLACK, 0.85f));
     DrawRectangleLines(30, 56, ScreenW - 60, ScreenH - 112, Fade(SKYBLUE, 0.8f));
-    DrawText("HOW TO PLAY", 148, 82, 28, RAYWHITE);
+    DrawText("HOW TO PLAY", ScreenW / 2 - MeasureText("HOW TO PLAY", 26) / 2, 78, 26, RAYWHITE);
     
-    // Visual Hitbox ship reference (top right)
-    Vector2 shipPos = { 390.0f, 138.0f };
+    // Mini ship with hitbox preview (top right)
+    Vector2 shipPos = { 395.0f, 122.0f };
     float time = (float)GetTime();
     float flameH = 6.0f + std::sin(time * 45.0f) * 2.0f;
-    DrawTriangle({shipPos.x - 3, shipPos.y + 7}, {shipPos.x - 4, shipPos.y + 7 + flameH}, {shipPos.x - 2, shipPos.y + 7}, SKYBLUE);
-    DrawTriangle({shipPos.x + 3, shipPos.y + 7}, {shipPos.x + 2, shipPos.y + 7}, {shipPos.x + 4, shipPos.y + 7 + flameH}, SKYBLUE);
-    DrawTriangle({shipPos.x, shipPos.y - 6}, {shipPos.x - 9, shipPos.y + 3}, {shipPos.x - 3, shipPos.y + 3}, GRAY);
-    DrawTriangle({shipPos.x, shipPos.y - 6}, {shipPos.x + 3, shipPos.y + 3}, {shipPos.x + 9, shipPos.y + 3}, GRAY);
-    DrawTriangle({shipPos.x, shipPos.y - 11}, {shipPos.x - 6, shipPos.y + 7}, {shipPos.x + 6, shipPos.y + 7}, RAYWHITE);
+    DrawTriangle({shipPos.x - 3, shipPos.y + 6}, {shipPos.x - 4, shipPos.y + 6 + flameH}, {shipPos.x - 2, shipPos.y + 6}, SKYBLUE);
+    DrawTriangle({shipPos.x + 3, shipPos.y + 6}, {shipPos.x + 2, shipPos.y + 6}, {shipPos.x + 4, shipPos.y + 6 + flameH}, SKYBLUE);
+    DrawTriangle({shipPos.x, shipPos.y - 5}, {shipPos.x - 8, shipPos.y + 3}, {shipPos.x - 3, shipPos.y + 3}, GRAY);
+    DrawTriangle({shipPos.x, shipPos.y - 5}, {shipPos.x + 3, shipPos.y + 3}, {shipPos.x + 8, shipPos.y + 3}, GRAY);
+    DrawTriangle({shipPos.x, shipPos.y - 10}, {shipPos.x - 5, shipPos.y + 6}, {shipPos.x + 5, shipPos.y + 6}, RAYWHITE);
     float corePulse = 2.0f + 1.2f * std::sin(time * 15.0f);
     DrawCircleV(shipPos, corePulse, RED);
     DrawCircleLines((int)shipPos.x, (int)shipPos.y, (int)(corePulse + 2.0f), Fade(RED, 0.6f));
-    DrawText("HITBOX", shipPos.x - 16, shipPos.y + 14, 9, RED);
+    DrawText("HITBOX", shipPos.x - 16, shipPos.y + 12, 8, RED);
 
-    DrawText("Objective", 58, 132, 18, GOLD);
-    DrawText("Survive the 90-second route, defeat the carrier,", 58, 156, 14, RAYWHITE);
-    DrawText("then loop into a faster, harder stage.", 58, 176, 14, RAYWHITE);
+    // Objective Section
+    DrawText("MISSION OBJECTIVE", 50, 114, 15, GOLD);
+    DrawText("Defeat the enemy Carrier boss before the 90s timer runs out.", 50, 134, 12, RAYWHITE);
+    DrawText("Only your fighter's red core is vulnerable to bullet impacts.", 50, 150, 12, RAYWHITE);
 
-    DrawText("Controls", 58, 218, 18, GOLD);
-    DrawText("Move: Arrow keys / WASD | Gamepad Left Stick", 58, 242, 14, RAYWHITE);
-    DrawText("Shoot: Hold Z / Space | Gamepad Down Face Button", 58, 264, 14, RAYWHITE);
-    DrawText("Bomb: X | Gamepad Right Face Button", 58, 286, 14, RAYWHITE);
-    DrawText("Pause: P | Gamepad Menu button", 58, 308, 14, RAYWHITE);
-
-    DrawText("Pickups", 58, 350, 18, GOLD);
-    DrawText("W changes weapon, P upgrades, B adds bomb,", 58, 374, 14, RAYWHITE);
-    DrawText("medals add score. Your red core is the hitbox.", 58, 394, 14, RAYWHITE);
+    // Powerups Grid Section
+    DrawText("POWERUP COLLECTIBLES", 50, 178, 15, GOLD);
     
-    // Draw vector powerup icons
     auto drawPowerupPreview = [](Vector2 pos, Color c, const char* label, float radius) {
         float time = (float)GetTime();
-        float pulse = 1.0f + 1.2f * std::sin(time * 12.0f);
+        float pulse = 1.0f + 1.0f * std::sin(time * 12.0f);
         DrawCircleLines((int)pos.x, (int)pos.y, (int)(radius + 2.0f + pulse), Fade(c, 0.45f));
         DrawCircleLines((int)pos.x, (int)pos.y, (int)radius, Fade(WHITE, 0.7f));
         float angle = time * 2.8f;
@@ -1568,23 +1770,82 @@ void Game::DrawHowTo() const {
         Vector2 p2 = { pos.x + std::cos(angle + 1.57079f) * dRadius, pos.y + std::sin(angle + 1.57079f) * dRadius };
         Vector2 p3 = { pos.x + std::cos(angle + 3.14159f) * dRadius, pos.y + std::sin(angle + 3.14159f) * dRadius };
         Vector2 p4 = { pos.x + std::cos(angle + 4.71239f) * dRadius, pos.y + std::sin(angle + 4.71239f) * dRadius };
-        DrawLineEx(p1, p2, 1.2f, c);
-        DrawLineEx(p2, p3, 1.2f, c);
-        DrawLineEx(p3, p4, 1.2f, c);
-        DrawLineEx(p4, p1, 1.2f, c);
+        DrawLineEx(p1, p2, 1.0f, c);
+        DrawLineEx(p2, p3, 1.0f, c);
+        DrawLineEx(p3, p4, 1.0f, c);
+        DrawLineEx(p4, p1, 1.0f, c);
         int w = MeasureText(label, 10);
         DrawText(label, (int)(pos.x - w / 2), (int)(pos.y - 5), 10, RAYWHITE);
     };
-    
-    drawPowerupPreview({330, 358}, SKYBLUE, "W", 9.0f);
-    drawPowerupPreview({356, 358}, ORANGE, "P", 9.0f);
-    drawPowerupPreview({382, 358}, PURPLE, "B", 9.0f);
-    drawPowerupPreview({408, 358}, GOLD, "$", 8.0f);
 
-    DrawText("Tips", 58, 436, 18, GOLD);
-    DrawText("Hold fire, tap bombs before panic, and use focus", 58, 460, 14, RAYWHITE);
-    DrawText("movement (Shift / Gamepad L1/R1) when lanes tighten.", 58, 480, 14, RAYWHITE);
+    drawPowerupPreview({65, 212}, SKYBLUE, "W", 10.0f);
+    DrawText("Weapon Swap", 84, 206, 11, SKYBLUE);
     
+    drawPowerupPreview({175, 212}, ORANGE, "P", 10.0f);
+    DrawText("Upgrade", 194, 206, 11, ORANGE);
+    
+    drawPowerupPreview({270, 212}, PURPLE, "B", 10.0f);
+    DrawText("Add Bomb", 289, 206, 11, PURPLE);
+    
+    drawPowerupPreview({365, 212}, GOLD, "$", 9.0f);
+    DrawText("Medal (Pts)", 384, 206, 11, GOLD);
+
+    // Cabinet Controls Panel Section
+    DrawText("CABINET CONTROL PANEL", 50, 238, 15, GOLD);
+    
+    // Draw Metal Bezel Panel
+    DrawRectangle(46, 260, ScreenW - 92, 116, DARKGRAY);
+    DrawRectangleLines(46, 260, ScreenW - 92, 116, GRAY);
+    DrawRectangle(50, 264, ScreenW - 100, 108, BLACK);
+    
+    // Draw Joystick
+    int joyX = 100;
+    int joyY = 322;
+    DrawEllipse(joyX, joyY + 12, 18, 6, DARKGRAY);
+    DrawEllipse(joyX, joyY + 12, 14, 4, BLACK);
+    DrawLineEx({(float)joyX, (float)joyY + 12}, {(float)joyX - 6, (float)joyY - 14}, 4.0f, LIGHTGRAY);
+    DrawCircle(joyX - 6, joyY - 14, 9, RED);
+    DrawCircleLines(joyX - 6, joyY - 14, 9, MAROON);
+    DrawCircle(joyX - 9, joyY - 17, 3, Fade(WHITE, 0.6f)); // specular highlight
+    DrawText("JOYSTICK", joyX - MeasureText("JOYSTICK", 9) / 2, joyY + 22, 9, GRAY);
+    DrawText("(MOVE)", joyX - MeasureText("(MOVE)", 8) / 2, joyY + 34, 8, GRAY);
+
+    // Draw Buttons
+    int btnY = 312;
+    // Shoot Button (RED)
+    DrawCircle(195, btnY, 13, RED);
+    DrawCircleLines(195, btnY, 13, MAROON);
+    DrawCircle(195, btnY, 11, Fade(BLACK, 0.2f));
+    DrawText("FIRE", 195 - MeasureText("FIRE", 9) / 2, btnY - 4, 9, RAYWHITE);
+    DrawText("[Z / Space]", 195 - MeasureText("[Z / Space]", 8) / 2, btnY + 18, 8, GRAY);
+
+    // Bomb Button (BLUE)
+    DrawCircle(250, btnY, 13, BLUE);
+    DrawCircleLines(250, btnY, 13, DARKBLUE);
+    DrawCircle(250, btnY, 11, Fade(BLACK, 0.2f));
+    DrawText("BOMB", 250 - MeasureText("BOMB", 9) / 2, btnY - 4, 9, RAYWHITE);
+    DrawText("[X]", 250 - MeasureText("[X]", 8) / 2, btnY + 18, 8, GRAY);
+
+    // 1P Start Button (WHITE)
+    DrawCircle(305, btnY - 10, 10, RAYWHITE);
+    DrawCircleLines(305, btnY - 10, 10, GRAY);
+    DrawText("START", 305 - MeasureText("START", 8) / 2, btnY - 14, 8, BLACK);
+    DrawText("[ENTER]", 305 - MeasureText("[ENTER]", 8) / 2, btnY + 4, 8, GRAY);
+
+    // Coin Button (ORANGE)
+    DrawCircle(355, btnY - 10, 10, ORANGE);
+    DrawCircleLines(355, btnY - 10, 10, MAROON);
+    DrawText("COIN", 355 - MeasureText("COIN", 8) / 2, btnY - 14, 8, BLACK);
+    DrawText("[C]", 355 - MeasureText("[C]", 8) / 2, btnY + 4, 8, GRAY);
+
+    // Cabinet Guidelines & Info
+    DrawText("TACTICAL GUIDELINES", 50, 390, 15, GOLD);
+    DrawText("- Hold FIRE button to continuous shoot.", 50, 410, 12, RAYWHITE);
+    DrawText("- Deploy BOMB to clear bullets and deal screen-wide damage.", 50, 426, 12, RAYWHITE);
+    DrawText("- Gamepad equivalents: Left Stick moves | Button Down shoots.", 50, 442, 12, GRAY);
+    DrawText("- ACE Mode features scaled up enemy speeds and 1.5x points.", 50, 458, 12, RED);
+
+    // Back to menu action
     Vector2 mousePos = GetMousePosition();
     bool hovered = (mousePos.x >= 140 && mousePos.x <= 340 && mousePos.y >= 520 && mousePos.y <= 556);
     DrawRectangleRounded({ 140, 520, 200, 36 }, 0.25f, 4, hovered ? Fade(BLUE, 0.45f) : Fade(DARKGRAY, 0.3f));
@@ -1729,6 +1990,15 @@ void Game::DrawSettings() const {
     
     int promptW = MeasureText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", 13);
     DrawText("UP/DOWN navigate  |  LEFT/RIGHT or DRAG adjust", ScreenW / 2 - promptW / 2, 545, 13, GRAY);
+    
+    if (settingsFeedbackTimer_ > 0.0f) {
+        float alpha = std::min(1.0f, settingsFeedbackTimer_ / 0.4f);
+        int tw = MeasureText(settingsFeedbackText_, 14);
+        int bxBg = ScreenW / 2 - tw / 2 - 15;
+        DrawRectangleRounded({ (float)bxBg, 510.0f, (float)tw + 30, 24.0f }, 0.4f, 4, Fade(BLACK, 0.9f * alpha));
+        DrawRectangleRoundedLines({ (float)bxBg, 510.0f, (float)tw + 30, 24.0f }, 0.4f, 4, Fade(settingsFeedbackColor_, 0.6f * alpha));
+        DrawText(settingsFeedbackText_, ScreenW / 2 - tw / 2, 515, 14, Fade(settingsFeedbackColor_, alpha));
+    }
 }
 
 void Game::DrawNameEntry() const {
@@ -1789,11 +2059,15 @@ void Game::DrawExitConfirm() const {
     DrawRectangle(cx, cy, 320, 180, Fade(BLACK, 0.92f));
     DrawRectangleLines(cx, cy, 320, 180, Fade(SKYBLUE, 0.8f));
     
-    int titleW = MeasureText("EXIT MISSION?", 20);
-    DrawText("EXIT MISSION?", ScreenW / 2 - titleW / 2, cy + 30, 20, GOLD);
+    bool isFromTitle = (returnFromExitConfirm_ == State::Title);
+    const char* titleText = isFromTitle ? "EXIT GAME?" : "ABANDON MISSION?";
+    const char* subText = isFromTitle ? "Are you sure you want to quit?" : "Return to Title screen?";
     
-    int subW = MeasureText("Are you sure you want to quit?", 14);
-    DrawText("Are you sure you want to quit?", ScreenW / 2 - subW / 2, cy + 68, 14, RAYWHITE);
+    int titleW = MeasureText(titleText, 20);
+    DrawText(titleText, ScreenW / 2 - titleW / 2, cy + 30, 20, GOLD);
+    
+    int subW = MeasureText(subText, 14);
+    DrawText(subText, ScreenW / 2 - subW / 2, cy + 68, 14, RAYWHITE);
     
     // Draw buttons
     // Button NO
@@ -1807,8 +2081,10 @@ void Game::DrawExitConfirm() const {
     bool yesSel = (exitConfirmSelection_ == 1);
     DrawRectangleRounded({ (float)cx + 180, (float)cy + 110, 120, 36 }, 0.2f, 4, yesSel ? Fade(RED, 0.4f) : Fade(DARKGRAY, 0.3f));
     DrawRectangleRoundedLines({ (float)cx + 180, (float)cy + 110, 120, 36 }, 0.2f, 4, yesSel ? RED : GRAY);
-    int yesTextW = MeasureText("YES, QUIT", 13);
-    DrawText("YES, QUIT", cx + 240 - yesTextW / 2, cy + 122, 13, yesSel ? RED : RAYWHITE);
+    
+    const char* yesLabel = isFromTitle ? "YES, QUIT" : "YES, ABANDON";
+    int yesTextW = MeasureText(yesLabel, 13);
+    DrawText(yesLabel, cx + 240 - yesTextW / 2, cy + 122, 13, yesSel ? RED : RAYWHITE);
 }
 
 void Game::DrawClearScoresConfirm() const {
@@ -1897,6 +2173,10 @@ void Game::Draw() {
 
     if (state_ == State::Title) {
         DrawTitleMenu();
+    } else if (state_ == State::DifficultySelect) {
+        DrawDifficultySelect();
+    } else if (state_ == State::Continue) {
+        DrawContinue();
     } else if (state_ == State::HowTo) {
         DrawHowTo();
     } else if (state_ == State::HighScores) {
@@ -1914,6 +2194,18 @@ void Game::Draw() {
         DrawRectangle(42, 190, ScreenW - 84, 270, Fade(BLACK, 0.8f));
         DrawRectangleLines(42, 190, ScreenW - 84, 270, Fade(SKYBLUE, 0.75f));
         
+        // Caution stripes (diagonal yellow/black) at top and bottom
+        int stripY = 190;
+        DrawRectangle(42, stripY, ScreenW - 84, 8, GOLD);
+        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
+            DrawLineEx({(float)sx, (float)stripY}, {(float)sx + 8, (float)stripY + 8}, 3.0f, BLACK);
+        }
+        int stripY2 = 452;
+        DrawRectangle(42, stripY2, ScreenW - 84, 8, GOLD);
+        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
+            DrawLineEx({(float)sx, (float)stripY2}, {(float)sx + 8, (float)stripY2 + 8}, 3.0f, BLACK);
+        }
+
         int pTitleW = MeasureText("PAUSED", 28);
         DrawText("PAUSED", ScreenW / 2 - pTitleW / 2, 215, 28, RAYWHITE);
         DrawLine(60, 255, ScreenW - 60, 255, Fade(SKYBLUE, 0.4f));
@@ -1969,6 +2261,18 @@ void Game::Draw() {
         DrawRectangle(42, 190, ScreenW - 84, 250, Fade(BLACK, 0.8f));
         DrawRectangleLines(42, 190, ScreenW - 84, 250, Fade(RED, 0.75f));
         
+        // Warning stripes (diagonal red/black) at top and bottom
+        int stripY = 190;
+        DrawRectangle(42, stripY, ScreenW - 84, 8, RED);
+        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
+            DrawLineEx({(float)sx, (float)stripY}, {(float)sx + 8, (float)stripY + 8}, 3.0f, BLACK);
+        }
+        int stripY2 = 432;
+        DrawRectangle(42, stripY2, ScreenW - 84, 8, RED);
+        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
+            DrawLineEx({(float)sx, (float)stripY2}, {(float)sx + 8, (float)stripY2 + 8}, 3.0f, BLACK);
+        }
+
         int goTitleW = MeasureText("GAME OVER", 28);
         DrawText("GAME OVER", ScreenW / 2 - goTitleW / 2, 215, 28, RED);
         DrawLine(60, 255, ScreenW - 60, 255, Fade(RED, 0.4f));
@@ -1979,7 +2283,25 @@ void Game::Draw() {
             bool selected = (gameOverSelection_ == i);
             if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(RED, 0.25f));
             DrawText(selected ? ">" : " ", 132, y, 16, selected ? GOLD : GRAY);
-            DrawText(goItems[i], 158, y, 16, selected ? GOLD : RAYWHITE);
+            
+            Color textCol = RAYWHITE;
+            const char* label = goItems[i];
+            if (i == 0) {
+                if (demoMode_) {
+                    textCol = selected ? GOLD : RAYWHITE;
+                } else {
+                    if (credits_ == 0) {
+                        textCol = selected ? RED : GRAY;
+                        label = "Insert Coin to Restart";
+                    } else {
+                        textCol = selected ? GOLD : LIME;
+                        label = "Restart Mission (-1)";
+                    }
+                }
+            } else {
+                textCol = selected ? GOLD : RAYWHITE;
+            }
+            DrawText(label, 158, y, 16, textCol);
         }
         
         int tipW = MeasureText("UP/DOWN navigate  |  ENTER/CLICK confirm", 12);
@@ -1989,6 +2311,23 @@ void Game::Draw() {
     if (transitioning_) {
         DrawTransition();
     }
+
+    // --- Global CRT Arcade Monitor Filter Pass ---
+    // 1. CRT Scanlines simulation
+    for (int y = 0; y < ScreenH; y += 2) {
+        DrawLine(0, y, ScreenW, y, Fade(BLACK, 0.08f));
+    }
+    
+    // 2. Curved glass Vignette screen-space shading
+    DrawCircleGradient(ScreenW / 2, ScreenH / 2, ScreenH * 0.8f, Fade(WHITE, 0.0f), Fade(BLACK, 0.38f));
+    
+    // 3. Screen tube subtle reflections (top and left glass edges)
+    DrawLine(8, 8, ScreenW - 8, 8, Fade(WHITE, 0.05f));
+    DrawLine(8, 8, 8, ScreenH - 8, Fade(WHITE, 0.05f));
+    
+    // 4. Cabinet Bezels / Vertical Monitor frame
+    DrawRectangleLinesEx(Rectangle{ 0.0f, 0.0f, (float)ScreenW, (float)ScreenH }, 8.0f, DARKGRAY);
+    DrawRectangleLinesEx(Rectangle{ 8.0f, 8.0f, (float)ScreenW - 16.0f, (float)ScreenH - 16.0f }, 2.0f, BLACK);
 }
 
 void Game::LoadHighScores() {
@@ -2001,6 +2340,7 @@ void Game::LoadHighScores() {
         { "AAA", 5000, 1 }
     };
     
+    bool loadedFromFile = false;
     std::ifstream file("highscores.txt");
     if (file.is_open()) {
         std::string line;
@@ -2016,18 +2356,31 @@ void Game::LoadHighScores() {
                 entry.score = score;
                 entry.loop = loop;
                 highScores_.push_back(entry);
+                loadedFromFile = true;
             }
         }
         file.close();
     }
     
-    while (highScores_.size() < 5) {
-        highScores_.push_back(defaults[highScores_.size()]);
+    if (!loadedFromFile) {
+        highScores_.clear();
+        for (int i = 0; i < 5; ++i) {
+            highScores_.push_back(defaults[i]);
+        }
+        SaveHighScores();
+    } else {
+        while (highScores_.size() < 5) {
+            highScores_.push_back(defaults[highScores_.size()]);
+        }
     }
     
     std::sort(highScores_.begin(), highScores_.end(), [](const HighScoreEntry& a, const HighScoreEntry& b) {
         return a.score > b.score;
     });
+    
+    if (highScores_.size() > 5) {
+        highScores_.resize(5);
+    }
 }
 
 void Game::SaveHighScores() {
@@ -2062,22 +2415,7 @@ void Game::InsertHighScore(const char* initials, int score, int loop) {
 }
 
 void Game::ApplyVolumeSettings() {
-    // Quadratic volume scaling for natural hearing curve
-    float sVol = ((float)sfxVolume_ / 10.0f) * ((float)sfxVolume_ / 10.0f);
-    float mVol = ((float)bgmVolume_ / 10.0f) * ((float)bgmVolume_ / 10.0f);
-    
-    if (soundsReady_) {
-        SetSoundVolume(shootSound_, sVol);
-        SetSoundVolume(boomSound_, sVol * 0.8f);
-        SetSoundVolume(pickupSound_, sVol);
-        SetSoundVolume(menuSelectSound_, sVol * 0.7f);
-        SetSoundVolume(menuConfirmSound_, sVol * 0.8f);
-        SetSoundVolume(playerHitSound_, sVol * 0.9f);
-        SetSoundVolume(gameOverSound_, sVol * 0.9f);
-        SetSoundVolume(stageClearSound_, sVol * 0.8f);
-        SetSoundVolume(bgmSound_, mVol * 0.5f);
-        SetSoundVolume(bossKlaxonSound_, sVol * 0.7f);
-    }
+    audio_.SetVolumes(sfxVolume_, bgmVolume_);
 }
 
 void Game::LoadSettings() {
@@ -2088,8 +2426,10 @@ void Game::LoadSettings() {
     isFullscreen_ = false;
     controlLayout_ = 0;
 
+    bool fileExists = false;
     std::ifstream file("settings.cfg");
     if (file.is_open()) {
+        fileExists = true;
         std::string line;
         while (std::getline(file, line)) {
             line = Trim(line);
@@ -2116,6 +2456,10 @@ void Game::LoadSettings() {
         file.close();
     }
     
+    if (!fileExists) {
+        SaveSettings();
+    }
+    
     debug_ = hitboxOverlayEnabled_;
     
     if (isFullscreen_ && !IsWindowFullscreen()) {
@@ -2123,6 +2467,7 @@ void Game::LoadSettings() {
     }
     
     ApplyVolumeSettings();
+    player_.controlLayout = controlLayout_;
 }
 
 void Game::SaveSettings() {
@@ -2147,6 +2492,8 @@ void Game::StartTransition(State target) {
     if (target == State::GameOver) {
         gameOverTimer_ = 0.0f;
         gameOverSelection_ = 0;
+    } else if (target == State::Continue) {
+        audio_.PlayContinueTick();
     }
 }
 

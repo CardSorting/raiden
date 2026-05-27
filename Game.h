@@ -5,6 +5,7 @@
 #include "Powerup.h"
 #include "Effects.h"
 #include "WaveManager.h"
+#include "AudioSystem.h"
 #include <vector>
 
 class Game {
@@ -14,7 +15,7 @@ public:
     void Run();
 
 private:
-    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry, ExitConfirm, ClearScoresConfirm };
+    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry, ExitConfirm, ClearScoresConfirm, DifficultySelect, Continue };
     static constexpr int ScreenW = 480;
     static constexpr int ScreenH = 640;
 
@@ -27,6 +28,7 @@ private:
     State state_ = State::Title;
     State returnFromHowTo_ = State::Title;
     State returnFromSettings_ = State::Title;
+    State returnFromExitConfirm_ = State::Title;
     Player player_;
     std::vector<Bullet> playerBullets_;
     std::vector<Bullet> enemyBullets_;
@@ -45,6 +47,10 @@ private:
     int loop_ = 1;
     float clearTimer_ = 0.0f;
     float gameOverTimer_ = 0.0f;
+    int credits_ = 0;
+    int difficulty_ = 0; // 0 = Normal, 1 = Ace
+    float continueTimer_ = 0.0f;
+    int difficultySelection_ = 0;
 
     enum class InputType { KeyboardGamepad, Mouse };
     InputType lastInputType_ = InputType::KeyboardGamepad;
@@ -52,20 +58,9 @@ private:
     float scrollA_ = 0.0f;
     float scrollB_ = 0.0f;
     bool bossSpawned_ = false;
+    bool bossPhaseChanged_ = false;
 
-    // Generated Sounds
-    Sound shootSound_{};
-    Sound boomSound_{};
-    Sound pickupSound_{};
-    Sound menuSelectSound_{};
-    Sound menuConfirmSound_{};
-    Sound playerHitSound_{};
-    Sound gameOverSound_{};
-    Sound stageClearSound_{};
-    Sound bgmSound_{};
-    Sound bossKlaxonSound_{};
-    bool audioReady_ = false;
-    bool soundsReady_ = false;
+    AudioSystem audio_;
 
     // Settings
     int sfxVolume_ = 8;
@@ -89,6 +84,9 @@ private:
     float transitionTimer_ = 0.0f;
     State transitionTarget_ = State::Title;
     float tutorialTimer_ = 0.0f;
+    float settingsFeedbackTimer_ = 0.0f;
+    const char* settingsFeedbackText_ = nullptr;
+    Color settingsFeedbackColor_ = WHITE;
 
     // Starfield Parallax Data
     struct Star {
@@ -101,11 +99,17 @@ private:
 
     // Boss Warning & Death Sequence state fields
     float bossWarningTimer_ = 0.0f;
+    float bossWarningKlaxonTimer_ = 0.0f;
     float bossDeathTimer_ = 0.0f;
+    float bossDeathExplosionTimer_ = 0.0f;
     Vector2 bossDeathPos_{};
+    float lowLifeAudioTimer_ = 0.0f;
+    float enemyShotAudioTimer_ = 0.0f;
 
     // Formation tracking counters
     int formationCount_[10]{};
+    int nextScoreMilestone_ = 10000;
+    int nextExtraLifeScore_ = 50000;
 
     void StartGame();
     void ReturnToTitle();
@@ -116,6 +120,8 @@ private:
     void UpdateNameEntry();
     void UpdateExitConfirm();
     void UpdateClearScoresConfirm();
+    void UpdateDifficultySelect();
+    void UpdateContinue(float dt);
     void Draw();
     void DrawBackground() const;
     void DrawHud() const;
@@ -127,13 +133,13 @@ private:
     void DrawNameEntry() const;
     void DrawExitConfirm() const;
     void DrawClearScoresConfirm() const;
+    void DrawDifficultySelect() const;
+    void DrawContinue() const;
     void HandleCollisions();
     void Cleanup();
     void SpawnDrop(Vector2 pos, EnemyType source);
     bool BossAlive() const;
-    void LoadGeneratedSounds();
-    void UnloadGeneratedSounds();
-
+    void CheckScoreMilestones();
     // Settings and High Score Persist Helpers
     void LoadSettings();
     void ApplyVolumeSettings();
@@ -150,4 +156,3 @@ private:
     void UpdateTransition(float dt);
     void DrawTransition() const;
 };
-

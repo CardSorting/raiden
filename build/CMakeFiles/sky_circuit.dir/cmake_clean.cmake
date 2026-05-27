@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o"
+  "CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o.d"
   "CMakeFiles/sky_circuit.dir/Bullet.cpp.o"
   "CMakeFiles/sky_circuit.dir/Bullet.cpp.o.d"
   "CMakeFiles/sky_circuit.dir/Effects.cpp.o"

@@ -129,6 +129,30 @@ sky_circuit/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/build
 .PHONY : sky_circuit/fast
 
+AudioSystem.o: AudioSystem.cpp.o
+.PHONY : AudioSystem.o
+
+# target to build an object file
+AudioSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/AudioSystem.cpp.o
+.PHONY : AudioSystem.cpp.o
+
+AudioSystem.i: AudioSystem.cpp.i
+.PHONY : AudioSystem.i
+
+# target to preprocess a source file
+AudioSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/AudioSystem.cpp.i
+.PHONY : AudioSystem.cpp.i
+
+AudioSystem.s: AudioSystem.cpp.s
+.PHONY : AudioSystem.s
+
+# target to generate assembly for a file
+AudioSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/AudioSystem.cpp.s
+.PHONY : AudioSystem.cpp.s
+
 Bullet.o: Bullet.cpp.o
 .PHONY : Bullet.o
 
@@ -330,6 +354,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... sky_circuit"
+	@echo "... AudioSystem.o"
+	@echo "... AudioSystem.i"
+	@echo "... AudioSystem.s"
 	@echo "... Bullet.o"
 	@echo "... Bullet.i"
 	@echo "... Bullet.s"

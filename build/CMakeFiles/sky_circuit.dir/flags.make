@@ -6,7 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/Users/bozoegg/Desktop/raiden -isystem /opt/homebrew/Cellar/raylib/5.5/include
 
-CXX_FLAGSarm64 = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wpedantic -I/opt/homebrew/Cellar/raylib/5.5/include
-
-CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wpedantic -I/opt/homebrew/Cellar/raylib/5.5/include
+CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -Wall -Wextra -Wpedantic -Werror -I/opt/homebrew/Cellar/raylib/5.5/include
 
