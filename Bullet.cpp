@@ -63,8 +63,8 @@ void Bullet::Draw(bool debug) const {
             for (int i = 0; i < trailCount_; ++i) {
                 float alpha = 1.0f - (float)i / 6.0f;
                 // Add green/orange exhaust plumes
-                DrawCircleV(trail_[i], radius * (1.2f - (float)i / 6.0f), Fade(ORANGE, alpha * 0.65f));
-                DrawCircleV(trail_[i], radius * (0.6f - (float)i / 8.0f), Fade(YELLOW, alpha * 0.55f));
+                DrawCircleV(trail_[i], radius * (1.1f - (float)i / 7.0f), Fade(ORANGE, alpha * 0.48f));
+                DrawCircleV(trail_[i], radius * (0.55f - (float)i / 9.0f), Fade(YELLOW, alpha * 0.42f));
             }
             EndBlendMode();
             SpriteManager::Instance().Draw(SpriteId::BulletMissile, pos, angle, 1.4f);
@@ -79,8 +79,8 @@ void Bullet::Draw(bool debug) const {
                 BeginBlendMode(BLEND_ADDITIVE);
                 for (int i = 0; i < trailCount_; ++i) {
                     float alpha = 1.0f - (float)i / (float)trailCount_;
-                    DrawCircleV(trail_[i], radius * (1.3f - (float)i * 0.15f), Fade(color, alpha * 0.6f));
-                    DrawCircleV(trail_[i], radius * (0.8f - (float)i * 0.1f), Fade(WHITE, alpha * 0.4f));
+                DrawCircleV(trail_[i], radius * (1.22f - (float)i * 0.13f), Fade(color, alpha * 0.48f));
+                DrawCircleV(trail_[i], radius * (0.72f - (float)i * 0.09f), Fade(WHITE, alpha * 0.32f));
                 }
                 EndBlendMode();
                 SpriteManager::Instance().Draw(SpriteId::BulletPlasma, pos, spin, 1.4f);
@@ -90,9 +90,9 @@ void Bullet::Draw(bool debug) const {
                 for (int i = 0; i < trailCount_; ++i) {
                     float alpha = 1.0f - (float)i / (float)trailCount_;
                     // Outer neon border
-                    DrawLineEx(trail_[i], trail_[std::max(0, i - 1)], 3.5f * alpha, Fade(color, alpha * 0.5f));
+                    DrawLineEx(trail_[i], trail_[std::max(0, i - 1)], 3.0f * alpha, Fade(color, alpha * 0.42f));
                     // Inner white core
-                    DrawLineEx(trail_[i], trail_[std::max(0, i - 1)], 1.5f * alpha, Fade(WHITE, alpha * 0.8f));
+                    DrawLineEx(trail_[i], trail_[std::max(0, i - 1)], 1.3f * alpha, Fade(WHITE, alpha * 0.66f));
                 }
                 EndBlendMode();
                 SpriteManager::Instance().Draw(SpriteId::BulletVulcan, pos, angle, 1.4f);

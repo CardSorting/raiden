@@ -35,9 +35,9 @@ static const char* FS_CODE =
     "uniform float bloomStrength;\n"
     "uniform float vignetteStrength;\n"
     "uniform float glareStrength;\n"
-    "const float scanlineFreq = 640.0;\n"
-    "const float chromaticOffset = 0.0016;\n"
-    "const float brightness = 1.25;\n"
+    "const float scanlineFreq = 360.0;\n"
+    "const float chromaticOffset = 0.0011;\n"
+    "const float brightness = 1.18;\n"
     "\n"
     "vec2 curve(vec2 uv) {\n"
     "    uv = uv * 2.0 - 1.0;\n"
@@ -123,7 +123,7 @@ static bool CircleHit(Vector2 a, float ar, Vector2 b, float br) {
 
 static constexpr int SettingsCount = 20;
 static constexpr int VisibleSettingsRows = 11;
-static constexpr float BossDeathDuration = 1.45f;
+static constexpr float BossDeathDuration = 1.68f;
 
 Game::Game() {
     SetTraceLogLevel(LOG_WARNING);
@@ -231,12 +231,12 @@ void Game::Run() {
         
         // Apply CRT shader
         if (crtShaderEnabled_ && !cleanPixelMode_ && crtShader_.id != 0) {
-            float curvVal = (float)crtCurvature_ * 0.0095f;
-            float scanVal = (float)crtScanline_ * 0.04f;
-            float maskVal = 1.0f - (float)crtMask_ * 0.032f;
-            float bloomVal = (float)crtBloom_ * 0.04f;
-            float vignVal = (float)crtVignette_ * 0.035f;
-            float glareVal = (float)crtGlare_ * 0.011f;
+            float curvVal = (float)crtCurvature_ * 0.0075f;
+            float scanVal = (float)crtScanline_ * 0.032f;
+            float maskVal = 1.0f - (float)crtMask_ * 0.026f;
+            float bloomVal = (float)crtBloom_ * 0.028f;
+            float vignVal = (float)crtVignette_ * 0.028f;
+            float glareVal = (float)crtGlare_ * 0.008f;
 
             SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "curvature"), &curvVal, SHADER_UNIFORM_FLOAT);
             SetShaderValue(crtShader_, GetShaderLocation(crtShader_, "scanlineWeight"), &scanVal, SHADER_UNIFORM_FLOAT);
@@ -293,6 +293,7 @@ void Game::StartGame() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    playerShotShakeTimer_ = 0.0f;
     medalChainTimer_ = 0.0f;
     medalChain_ = 0;
     nextScoreMilestone_ = 10000;
@@ -328,6 +329,7 @@ void Game::ReturnToTitle() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    playerShotShakeTimer_ = 0.0f;
     medalChainTimer_ = 0.0f;
     medalChain_ = 0;
     for (int i = 0; i < 10; ++i) formationCount_[i] = 0;
@@ -351,6 +353,7 @@ void Game::NextLoop() {
     bossDeathExplosionTimer_ = 0.0f;
     lowLifeAudioTimer_ = 0.0f;
     enemyShotAudioTimer_ = 0.0f;
+    playerShotShakeTimer_ = 0.0f;
     medalChainTimer_ = 0.0f;
     medalChain_ = 0;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
@@ -413,8 +416,8 @@ void Game::Update(float dt) {
         audio_.PlaySettingsTick();
     }
     
-    scrollA_ += (80.0f + loop_ * 6.0f) * dt;
-    scrollB_ += (38.0f + loop_ * 3.0f) * dt;
+    scrollA_ += (70.0f + loop_ * 5.0f) * dt;
+    scrollB_ += (32.0f + loop_ * 2.5f) * dt;
     if (scrollA_ > ScreenH) scrollA_ -= ScreenH;
     if (scrollB_ > ScreenH) scrollB_ -= ScreenH;
 
@@ -427,7 +430,7 @@ void Game::Update(float dt) {
     }
 
     // Scroll parallax background layers
-    nebulaScroll_ += 8.0f * dt;
+    nebulaScroll_ += 5.5f * dt;
     if (nebulaScroll_ > ScreenH) nebulaScroll_ -= ScreenH;
 
     for (auto& ast : backgroundAsteroids_) {
@@ -449,7 +452,7 @@ void Game::Update(float dt) {
     }
 
     // Scroll space station walls
-    spaceStationScrollY_ += 35.0f * dt;
+    spaceStationScrollY_ += 31.0f * dt;
     if (spaceStationScrollY_ > 32.0f) spaceStationScrollY_ -= 32.0f;
 
     // Update screen flash
@@ -878,8 +881,8 @@ void Game::UpdatePlaying(float dt) {
         bossDeathPos_.y += 15.0f * dt;
         
         // Phase 1: wing pods rupture with sparks and shrapnel.
-        if (bossDeathTimer_ > 1.05f) {
-            if (bossDeathExplosionTimer_ > 0.06f) {
+        if (bossDeathTimer_ > 1.22f) {
+            if (bossDeathExplosionTimer_ > 0.07f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 wingOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-35.0f, 0.0f} : Vector2{35.0f, 0.0f};
                 Vector2 spawnPos = { bossDeathPos_.x + wingOffset.x + GetRandomValue(-6, 6), bossDeathPos_.y + wingOffset.y + GetRandomValue(-6, 6) };
@@ -892,8 +895,8 @@ void Game::UpdatePlaying(float dt) {
             }
         }
         // Phase 2: engines blow out, smoke vents stay behind the core.
-        else if (bossDeathTimer_ > 0.58f) {
-            if (bossDeathExplosionTimer_ > 0.075f) {
+        else if (bossDeathTimer_ > 0.70f) {
+            if (bossDeathExplosionTimer_ > 0.085f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 engineOffset = (GetRandomValue(0, 1) == 0) ? Vector2{-20.0f, 26.0f} : Vector2{20.0f, 26.0f};
                 Vector2 spawnPos = { bossDeathPos_.x + engineOffset.x + GetRandomValue(-5, 5), bossDeathPos_.y + engineOffset.y + GetRandomValue(-5, 5) };
@@ -905,8 +908,8 @@ void Game::UpdatePlaying(float dt) {
             }
         }
         // Phase 3: the exposed core collapses inward before the final blast.
-        else if (bossDeathTimer_ > 0.12f) {
-            if (bossDeathExplosionTimer_ > 0.07f) {
+        else if (bossDeathTimer_ > 0.30f) {
+            if (bossDeathExplosionTimer_ > 0.085f) {
                 bossDeathExplosionTimer_ = 0.0f;
                 Vector2 randOffset = { (float)GetRandomValue(-25, 25), (float)GetRandomValue(-25, 25) };
                 Vector2 spawnPos = { bossDeathPos_.x + randOffset.x, bossDeathPos_.y + randOffset.y };
@@ -916,24 +919,27 @@ void Game::UpdatePlaying(float dt) {
                 audio_.PlayExplosionAt(ExplosionSize::Small, spawnPos.x, (float)ScreenW);
             }
         }
-        // Phase 4: 0.1s - 0.0s (Final detonation charging - blinding white sparks)
+        // Phase 4: final implosion hold before catastrophic release.
         else {
-            if (bossDeathExplosionTimer_ > 0.04f) {
+            if (bossDeathExplosionTimer_ > 0.055f) {
                 bossDeathExplosionTimer_ = 0.0f;
-                effects_.Spark(bossDeathPos_, WHITE, {0.0f, 0.0f});
+                effects_.Spark(bossDeathPos_, WHITE, {0.0f, -35.0f});
+                effects_.Smoke(bossDeathPos_, Color{35, 28, 45, 150});
+                effects_.Shake(3.0f + (0.30f - std::max(0.0f, bossDeathTimer_)) * 16.0f, 0.08f);
             }
         }
 
         if (bossDeathTimer_ <= 0.0f) {
             effects_.AddText(bossDeathPos_, "CORE COLLAPSE", WHITE);
-            effects_.Explosion(bossDeathPos_, VIOLET, 105, SpriteId::DebrisBossCore);
-            effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 16); // Gold core shards
-            effects_.DebrisShower(bossDeathPos_, DARKGRAY, 20); // Hull shards
-            effects_.DebrisShower(bossDeathPos_, RED, 14); // Hot core slag
-            effects_.Shake(24.0f, 0.75f);
+            effects_.Explosion(bossDeathPos_, VIOLET, 112, SpriteId::DebrisBossCore);
+            effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 18); // Gold core shards
+            effects_.DebrisShower(bossDeathPos_, DARKGRAY, 22); // Hull shards
+            effects_.DebrisShower(bossDeathPos_, RED, 16); // Hot core slag
+            effects_.Spark(bossDeathPos_, WHITE, {0.0f, -160.0f});
+            effects_.Shake(26.0f, 0.72f);
             
             // Trigger screen white flash
-            screenFlashTimer_ = 0.12f;
+            screenFlashTimer_ = 0.10f;
 
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
             audio_.PlayStageClear();
@@ -962,11 +968,24 @@ void Game::UpdatePlaying(float dt) {
         medalChainTimer_ -= dt;
         if (medalChainTimer_ <= 0.0f) medalChain_ = 0;
     }
+    if (playerShotShakeTimer_ > 0.0f) playerShotShakeTimer_ -= dt;
     player_.Update(dt, effects_, enemies_, enemyBullets_);
     size_t before = playerBullets_.size();
     player_.TryShoot(playerBullets_);
     if (playerBullets_.size() > before) {
         audio_.PlayPlayerShotAt(player_.weapon, player_.weaponLevel, player_.pos.x, (float)ScreenW);
+        if (playerShotShakeTimer_ <= 0.0f) {
+            if (player_.weapon == WeaponType::Vulcan) {
+                effects_.Shake(0.55f, 0.035f);
+                playerShotShakeTimer_ = 0.09f;
+            } else if (player_.weapon == WeaponType::Plasma) {
+                effects_.Shake(0.95f, 0.045f);
+                playerShotShakeTimer_ = 0.13f;
+            } else {
+                effects_.Shake(0.75f, 0.04f);
+                playerShotShakeTimer_ = 0.16f;
+            }
+        }
     }
 
     bool bombRequested = player_.BombPressed();
@@ -1057,10 +1076,10 @@ void Game::UpdatePlaying(float dt) {
     for (const auto& e : enemies_) {
         if (e.active && e.IsBoss() && e.hp < e.maxHp / 2) {
             float damageRatio = 1.0f - (float)e.hp / (float)e.maxHp;
-            if (GetRandomValue(0, 100) < (int)(damageRatio * 68.0f)) {
+            if (GetRandomValue(0, 100) < (int)(damageRatio * 40.0f)) {
                 Vector2 ventPos = { e.pos.x + (float)GetRandomValue(-48, 48), e.pos.y + (float)GetRandomValue(-25, 20) };
-                effects_.Smoke(ventPos, Color{58, 58, 64, 170});
-                if (GetRandomValue(0, 100) < 52) {
+                effects_.Smoke(ventPos, Color{58, 58, 64, 155});
+                if (GetRandomValue(0, 100) < 44) {
                     effects_.Spark(ventPos, ORANGE, {0.0f, 60.0f});
                 }
             }
@@ -2083,25 +2102,26 @@ void Game::DrawBackground() const {
         nebulaColor3 = Fade(ORANGE, 0.10f);
     } else if (beat < 30) {
         // Phase 1: Orbit Entry (Dark Green/Cyan Space)
-        bgColor = Color{5, 12, 20, 255};
-        nebulaColor1 = Color{0, 160, 120, 35};
-        nebulaColor2 = Color{0, 80, 110, 25};
-        nebulaColor3 = Color{10, 140, 150, 20};
+        bgColor = Color{4, 11, 18, 255};
+        nebulaColor1 = Color{0, 145, 118, 30};
+        nebulaColor2 = Color{0, 70, 105, 22};
+        nebulaColor3 = Color{15, 120, 150, 18};
     } else if (beat < 60) {
         // Phase 2: Asteroid Storm (Deep Purple/Magenta Nebula)
-        bgColor = Color{12, 6, 22, 255};
-        nebulaColor1 = Color{130, 0, 150, 30};
-        nebulaColor2 = Color{80, 0, 110, 20};
-        nebulaColor3 = Color{160, 10, 120, 20};
+        bgColor = Color{11, 6, 21, 255};
+        nebulaColor1 = Color{112, 0, 145, 27};
+        nebulaColor2 = Color{70, 0, 105, 18};
+        nebulaColor3 = Color{145, 10, 110, 17};
     } else {
         // Phase 3: Industrial Warzone (Deep Amber/Dark Crimson)
-        bgColor = Color{18, 7, 8, 255};
-        nebulaColor1 = Color{160, 25, 0, 32};
-        nebulaColor2 = Color{110, 15, 0, 22};
-        nebulaColor3 = Color{180, 80, 0, 18};
+        bgColor = Color{16, 7, 8, 255};
+        nebulaColor1 = Color{145, 24, 0, 28};
+        nebulaColor2 = Color{100, 15, 0, 18};
+        nebulaColor3 = Color{170, 70, 0, 15};
     }
 
     ClearBackground(bgColor);
+    DrawRectangleGradientV(0, 0, ScreenW, ScreenH, Fade(Color{80, 120, 160, 255}, 0.035f), Fade(Color{120, 40, 60, 255}, 0.045f));
     
     // 1. Layer 1: Distant Nebulae (rendered via soft circular gradients)
     float nY1 = nebulaScroll_ - ScreenH / 2.0f;
@@ -2136,13 +2156,13 @@ void Game::DrawBackground() const {
     
     // 2. Layer 2: Twinkling Parallax Stars with Micro Cross Flares
     for (int i = 0; i < NumStars; ++i) {
-        float sparkle = 0.35f + 0.5f * std::sin((float)GetTime() * 4.5f + stars_[i].pos.x * 0.1f);
+        float sparkle = 0.35f + 0.45f * std::sin((float)GetTime() * 3.4f + stars_[i].pos.x * 0.1f);
         float size = (stars_[i].speed > 100.0f) ? 1.55f : ((stars_[i].speed > 45.0f) ? 1.05f : 0.75f);
         DrawCircleV(stars_[i].pos, size, Fade(stars_[i].color, sparkle * 0.82f));
         
         // Additive micro flare crosses for foreground stars
         if (stars_[i].speed > 120.0f && sparkle > 0.78f) {
-            float flareAlpha = (sparkle - 0.78f) * 2.8f;
+            float flareAlpha = (sparkle - 0.78f) * 2.1f;
             DrawLineV({stars_[i].pos.x - 2, stars_[i].pos.y}, {stars_[i].pos.x + 2, stars_[i].pos.y}, Fade(WHITE, flareAlpha));
             DrawLineV({stars_[i].pos.x, stars_[i].pos.y - 2}, {stars_[i].pos.x, stars_[i].pos.y + 2}, Fade(WHITE, flareAlpha));
         }
@@ -2216,7 +2236,7 @@ void Game::DrawBackground() const {
 
     // 4. Layer 4: Foreground scrolling atmospheric clouds
     for (const auto& cld : backgroundClouds_) {
-        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.10f));
+        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.075f));
     }
 
     DrawRectangleLines(8, 8, ScreenW - 16, ScreenH - 16, Fade(SKYBLUE, 0.35f));
@@ -2945,14 +2965,17 @@ void Game::Draw() {
 
     player_.Draw(debug_ && state_ != State::Title);
     effects_.Draw();
-    for (const auto& b : enemyBullets_) b.Draw(debug_);
     EndMode2D();
 
     if (screenFlashTimer_ > 0.0f) {
-        float alpha = (screenFlashTimer_ / 0.12f) * 0.55f;
+        float alpha = (screenFlashTimer_ / 0.10f) * 0.42f;
         if (alpha > 1.0f) alpha = 1.0f;
         DrawRectangle(0, 0, ScreenW, ScreenH, Fade(WHITE, alpha));
     }
+
+    BeginMode2D(Camera2D{shake, {0, 0}, 0.0f, 1.0f});
+    for (const auto& b : enemyBullets_) b.Draw(debug_);
+    EndMode2D();
 
     DrawHud();
 
@@ -3175,15 +3198,15 @@ void Game::Draw() {
     }
 
     if (crtShaderEnabled_ && !cleanPixelMode_) {
-        float scanAlpha = 0.018f + (float)crtScanline_ * 0.006f;
+        float scanAlpha = 0.012f + (float)crtScanline_ * 0.0045f;
         for (int y = 0; y < ScreenH; y += 2) {
             DrawLine(0, y, ScreenW, y, Fade(BLACK, scanAlpha));
         }
 
-        float vignetteAlpha = 0.12f + (float)crtVignette_ * 0.026f;
+        float vignetteAlpha = 0.10f + (float)crtVignette_ * 0.020f;
         DrawCircleGradient(ScreenW / 2, ScreenH / 2, ScreenH * 0.8f, Fade(WHITE, 0.0f), Fade(BLACK, vignetteAlpha));
 
-        float glareAlpha = 0.015f + (float)crtGlare_ * 0.01f;
+        float glareAlpha = 0.012f + (float)crtGlare_ * 0.007f;
         DrawLine(8, 8, ScreenW - 8, 8, Fade(WHITE, glareAlpha));
         DrawLine(8, 8, 8, ScreenH - 8, Fade(WHITE, glareAlpha));
 

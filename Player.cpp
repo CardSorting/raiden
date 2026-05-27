@@ -133,7 +133,7 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
     }
     
     bool focusMode = !isDemo && (IsKeyDown(KEY_LEFT_SHIFT) || (IsGamepadAvailable(0) && (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1))));
-    float speed = focusMode ? 145.0f : 245.0f;
+    float speed = focusMode ? 150.0f : 252.0f;
     pos.x = std::clamp(pos.x + dir.x * speed * dt, 24.0f, 456.0f);
     pos.y = std::clamp(pos.y + dir.y * speed * dt, 72.0f, 610.0f);
     shootTimer_ = std::max(0.0f, shootTimer_ - dt);
@@ -151,8 +151,8 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
     if (positionCount_ < 8) positionCount_++;
 
     // Momentum-Based Banking (exponential drag interpolation)
-    float targetTilt = dir.x * 2.1f;
-    float tiltSpeed = (dir.x == 0.0f) ? 22.0f : 16.0f;
+    float targetTilt = dir.x * 2.18f;
+    float tiltSpeed = (dir.x == 0.0f) ? 26.0f : 19.0f;
     float tiltBlend = 1.0f - std::exp(-tiltSpeed * dt);
     tilt_ += (targetTilt - tilt_) * tiltBlend;
 
@@ -162,8 +162,8 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
 
     // Physical Spring-Damper Recoil Physics
     // Recoil offset spring system (target: 0.0f)
-    float recoilK = 260.0f;
-    float recoilDamping = 28.0f;
+    float recoilK = 300.0f;
+    float recoilDamping = 31.0f;
     float recoilForce = -recoilK * recoilOffset_ - recoilDamping * recoilVel_;
     recoilVel_ += recoilForce * dt;
     recoilOffset_ += recoilVel_ * dt;
@@ -174,8 +174,8 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
     }
 
     // scaleY_ spring system (target: 1.0f)
-    float scaleK = 420.0f;
-    float scaleDamping = 26.0f;
+    float scaleK = 455.0f;
+    float scaleDamping = 28.0f;
     float scaleForce = -scaleK * (scaleY_ - 1.0f) - scaleDamping * scaleYVel_;
     scaleYVel_ += scaleForce * dt;
     scaleY_ += scaleYVel_ * dt;
@@ -183,19 +183,19 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
 
     // Decay wing vent heat
     heat_ = std::max(0.0f, heat_ - 1.8f * dt);
-    if (heat_ > 0.2f && GetRandomValue(0, 100) < (int)(heat_ * 44)) {
+    if (heat_ > 0.2f && GetRandomValue(0, 100) < (int)(heat_ * 38)) {
         effects.Spark({ pos.x - 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE, {dir.x * -100.0f, 40.0f});
         effects.Spark({ pos.x + 14.0f + GetRandomValue(-2, 2), pos.y + 2.0f }, ORANGE, {dir.x * -100.0f, 40.0f});
     }
 
     // Spawn procedural vectored engine exhaust particles
-    if (GetRandomValue(0, 100) < 48) {
+    if (GetRandomValue(0, 100) < 42) {
         Color thrusterColor = focusMode ? SKYBLUE : (GetRandomValue(0, 1) == 0 ? ORANGE : GOLD);
         
         // Calculate dynamic vectored exhaust direction based on ship movement and roll tilt
         // Plumes tilt opposite to movement direction and banking angle
         float tiltExhaustX = -tilt_ * 30.0f - dir.x * 50.0f;
-        float exhaustY = focusMode ? 34.0f : (dir.y < 0.0f ? 118.0f : 70.0f);
+        float exhaustY = focusMode ? 32.0f : (dir.y < 0.0f ? 110.0f : 68.0f);
         
         // Asymmetric plume speeds depending on left/right banking
         float leftThrustMult = 1.0f;
@@ -225,11 +225,11 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
     
     int level = std::clamp(weaponLevel, 1, 4);
     if (weapon == WeaponType::Vulcan) {
-        recoilVel_ += 95.0f;
-        scaleYVel_ -= 5.5f;
+        recoilVel_ += 88.0f;
+        scaleYVel_ -= 4.8f;
         heat_ = std::min(1.0f, heat_ + 0.05f);
         muzzleFlashTimer_ = 0.04f;
-        shootTimer_ = 0.105f;
+        shootTimer_ = 0.098f;
         bullets.emplace_back(Vector2{pos.x, pos.y - 18}, Vector2{0, -520}, 4, 1, BulletOwner::Player, YELLOW);
         if (level >= 2) {
             bullets.emplace_back(Vector2{pos.x - 10, pos.y - 10}, Vector2{-65, -500}, 4, 1, BulletOwner::Player, GOLD);
@@ -240,8 +240,8 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
             bullets.emplace_back(Vector2{pos.x + 16, pos.y}, Vector2{130, -470}, 4, 1, BulletOwner::Player, ORANGE);
         }
     } else if (weapon == WeaponType::Plasma) {
-        recoilVel_ += 300.0f;
-        scaleYVel_ -= 18.0f;
+        recoilVel_ += 270.0f;
+        scaleYVel_ -= 15.5f;
         heat_ = std::min(1.0f, heat_ + 0.20f);
         muzzleFlashTimer_ = 0.08f;
         shootTimer_ = 0.16f;
@@ -251,8 +251,8 @@ void Player::TryShoot(std::vector<Bullet>& bullets) {
             bullets.emplace_back(Vector2{pos.x + 18, pos.y - 8}, Vector2{90, -345}, 7, 1, BulletOwner::Player, BLUE);
         }
     } else {
-        recoilVel_ += 180.0f;
-        scaleYVel_ -= 11.0f;
+        recoilVel_ += 166.0f;
+        scaleYVel_ -= 9.5f;
         heat_ = std::min(1.0f, heat_ + 0.12f);
         muzzleFlashTimer_ = 0.06f;
         shootTimer_ = 0.20f;
@@ -351,14 +351,14 @@ void Player::Draw(bool debug) const {
     float tiltOffset = -tilt_ * 3.2f;
 
     if (!blink) {
-        Color plumeColor1 = focusMode ? Color{0, 150, 255, 180} : Color{255, 100, 0, 180};
-        Color plumeColor2 = focusMode ? Color{100, 220, 255, 230} : Color{255, 220, 0, 230};
+        Color plumeColor1 = focusMode ? Color{0, 150, 255, 148} : Color{255, 100, 0, 152};
+        Color plumeColor2 = focusMode ? Color{100, 220, 255, 205} : Color{255, 220, 0, 205};
         Color glowColor = focusMode ? SKYBLUE : ORANGE;
 
         // Emissive engine exhaust bloom (additive circular gradients)
         BeginBlendMode(BLEND_ADDITIVE);
-        DrawCircleGradient((int)(drawPos.x - 6.0f), (int)(drawPos.y + 11.0f), 12.0f * leftPlumeScale, Fade(glowColor, 0.45f), Fade(BLACK, 0.0f));
-        DrawCircleGradient((int)(drawPos.x + 6.0f), (int)(drawPos.y + 11.0f), 12.0f * rightPlumeScale, Fade(glowColor, 0.45f), Fade(BLACK, 0.0f));
+        DrawCircleGradient((int)(drawPos.x - 6.0f), (int)(drawPos.y + 11.0f), 10.5f * leftPlumeScale, Fade(glowColor, 0.34f), Fade(BLACK, 0.0f));
+        DrawCircleGradient((int)(drawPos.x + 6.0f), (int)(drawPos.y + 11.0f), 10.5f * rightPlumeScale, Fade(glowColor, 0.34f), Fade(BLACK, 0.0f));
         EndBlendMode();
 
         // Draw left nozzle plume
@@ -400,7 +400,7 @@ void Player::Draw(bool debug) const {
             Vector2 ghostPos = pastPositions_[idx];
             
             float speedAlpha = std::clamp(moveSq / 20.0f, 0.35f, 1.0f);
-            float alpha = (0.26f - (float)i * 0.065f) * speedAlpha;
+            float alpha = (0.23f - (float)i * 0.055f) * speedAlpha;
             if (alpha <= 0.0f) continue;
             
             SpriteId spriteId = SpriteId::PlayerIdle;

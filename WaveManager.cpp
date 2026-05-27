@@ -24,9 +24,9 @@ void WaveManager::Update(float stageTime, int loop, std::vector<Enemy>& enemies)
         SpawnPair(enemies, -20, loop, (beat / 6) % 2 == 0);
     }
     
-    // Standard turrets
-    if (beat < 82 && beat % 10 == 4) enemies.emplace_back(EnemyType::Turret, Vector2{80.0f, -28.0f}, loop, 0);
-    if (beat < 82 && beat % 10 == 8) enemies.emplace_back(EnemyType::Turret, Vector2{400.0f, -28.0f}, loop, 0);
+    // Alternating turret pressure with short recovery gaps between popcorn sweeps.
+    if (beat < 82 && beat % 12 == 5) enemies.emplace_back(EnemyType::Turret, Vector2{88.0f, -28.0f}, loop, 0);
+    if (beat < 82 && beat % 12 == 9) enemies.emplace_back(EnemyType::Turret, Vector2{392.0f, -28.0f}, loop, 0);
     
     // Formations
     // Beat 13: V-formation of 5 Popcorns (formationId = 1)

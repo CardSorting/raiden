@@ -66,8 +66,8 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
         // Structural wobble under damage (instability wobble)
         if (hp < maxHp / 2) {
             float damageRatio = 1.0f - (float)hp / (float)maxHp;
-            pos.x += std::sin(age * 35.0f) * 3.6f * damageRatio + std::sin(age * 8.0f) * 2.2f;
-            pos.y += std::cos(age * 28.0f) * 2.0f * damageRatio;
+            pos.x += std::sin(age * 33.0f) * 3.2f * damageRatio + std::sin(age * 7.2f) * 2.8f;
+            pos.y += std::cos(age * 25.0f) * 1.8f * damageRatio + std::sin(age * 5.0f) * 1.1f;
         }
         
         bool phase2 = (hp < maxHp / 2);
@@ -114,9 +114,10 @@ void Enemy::Hit(int damage, Effects& effects) {
     // Boss Phase 2 Armor Shedding transition
     if (IsBoss() && hp < maxHp / 2 && !bossPanelsShed) {
         bossPanelsShed = true;
-        effects.DebrisShower(pos, Color{125, 130, 150, 255}, 16);
-        effects.Explosion(pos, Color{255, 70, 80, 255}, 24, SpriteId::DebrisBossCore);
-        effects.Shake(12.0f, 0.4f);
+            effects.DebrisShower(pos, Color{125, 130, 150, 255}, 18);
+            effects.Explosion(pos, Color{255, 70, 80, 255}, 26, SpriteId::DebrisBossCore);
+            effects.Spark(pos, WHITE, {0.0f, -80.0f});
+            effects.Shake(13.0f, 0.42f);
         effects.AddText(pos, "ARMOR BREACH", RED);
     }
 
@@ -155,9 +156,9 @@ void Enemy::Draw(bool debug) const {
         SpriteId bossSprite = phase2 ? SpriteId::BossDamaged : SpriteId::Boss;
 
         // Double engine plumes at the top (facing down)
-        float flameRate = phase2 ? 28.0f : 14.0f;
+        float flameRate = phase2 ? 24.0f : 14.0f;
         if ((int)(age * flameRate) % 2 == 0) {
-            float plumeH = (phase2 ? 22.0f : 15.0f) + std::sin(age * 60.0f) * (phase2 ? 8.0f : 5.0f);
+            float plumeH = (phase2 ? 20.0f : 15.0f) + std::sin(age * 54.0f) * (phase2 ? 7.0f : 5.0f);
             DrawTriangle({pos.x - 24, pos.y - 48}, {pos.x - 28, pos.y - 48 - plumeH}, {pos.x - 20, pos.y - 48}, ORANGE);
             DrawTriangle({pos.x - 23, pos.y - 48}, {pos.x - 25, pos.y - 48 - (plumeH * 0.6f)}, {pos.x - 21, pos.y - 48}, YELLOW);
             
@@ -175,11 +176,11 @@ void Enemy::Draw(bool debug) const {
         
         BeginBlendMode(BLEND_ADDITIVE);
         // Outer glowing core aura
-        DrawCircleV(pos, (phase2 ? 13.0f : 8.0f) + 4.0f * pulse, Fade(coreColor, 0.58f + 0.32f * pulse));
+        DrawCircleV(pos, (phase2 ? 14.0f : 8.0f) + 4.0f * pulse, Fade(coreColor, 0.55f + 0.30f * pulse));
         // Inner hot core
         DrawCircleV(pos, phase2 ? 5.0f : 3.5f, WHITE);
         if (phase2) {
-            DrawCircleLines((int)pos.x, (int)pos.y, 18.0f + 3.0f * pulse, Fade(RED, 0.75f));
+            DrawCircleLines((int)pos.x, (int)pos.y, 18.0f + 3.0f * pulse, Fade(RED, 0.68f));
             DrawLineEx({pos.x - 17.0f, pos.y - 5.0f}, {pos.x - 7.0f, pos.y + 6.0f}, 1.5f, Fade(ORANGE, 0.8f));
             DrawLineEx({pos.x + 17.0f, pos.y - 6.0f}, {pos.x + 6.0f, pos.y + 7.0f}, 1.5f, Fade(ORANGE, 0.8f));
         }

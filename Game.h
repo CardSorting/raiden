@@ -109,6 +109,7 @@ private:
     Vector2 bossDeathPos_{};
     float lowLifeAudioTimer_ = 0.0f;
     float enemyShotAudioTimer_ = 0.0f;
+    float playerShotShakeTimer_ = 0.0f;
     float medalChainTimer_ = 0.0f;
     int medalChain_ = 0;
 
