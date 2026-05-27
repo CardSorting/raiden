@@ -1,0 +1,44 @@
+cmake_minimum_required(VERSION 3.16)
+project(SkyCircuit LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(raylib QUIET)
+if (NOT raylib_FOUND)
+  include(FetchContent)
+  FetchContent_Declare(
+    raylib
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
+    GIT_TAG 5.5
+  )
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(raylib)
+endif()
+
+add_executable(sky_circuit
+  main.cpp
+  Game.cpp
+  Player.cpp
+  Enemy.cpp
+  Bullet.cpp
+  Powerup.cpp
+  WaveManager.cpp
+  Effects.cpp
+)
+
+target_include_directories(sky_circuit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_compile_options(sky_circuit PRIVATE
+  $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall -Wextra -Wpedantic>
+  $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+target_link_libraries(sky_circuit PRIVATE raylib)
+
+if (APPLE)
+  target_link_libraries(sky_circuit PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")
+elseif (UNIX)
+  target_link_libraries(sky_circuit PRIVATE m pthread dl rt X11)
+endif()
