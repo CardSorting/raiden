@@ -31,6 +31,7 @@ Game::Game() {
     LoadHighScores();
     
     LoadSettings(); // Loads & applies settings to the audio files
+    audio_.PlayCabinetBoot();
     audio_.PlayMusic(AudioSystem::MusicTrack::Title);
 
     // Initialize stars parallax

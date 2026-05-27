@@ -60,6 +60,7 @@ public:
         AttractShimmer,
         Denied,
         SettingsTick,
+        CabinetBoot,
         Count
     };
 
@@ -127,6 +128,7 @@ public:
     void PlayAttractShimmer();
     void PlayDenied();
     void PlaySettingsTick();
+    void PlayCabinetBoot();
     void RunChaosAudit(float seconds = 4.0f);
     static bool ExportProceduralBank(const char* directory);
 

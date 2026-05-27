@@ -73,6 +73,7 @@ constexpr ExportCueSpec ExportCues[] = {
     { AudioSystem::Cue::AttractShimmer, "attract_shimmer", 1 },
     { AudioSystem::Cue::Denied, "denied", 2 },
     { AudioSystem::Cue::SettingsTick, "settings_tick", 3 },
+    { AudioSystem::Cue::CabinetBoot, "cabinet_boot", 1 },
 };
 
 constexpr ExportMusicSpec ExportMusic[] = {
@@ -483,31 +484,44 @@ Wave MakeBomb() {
     unsigned int seed = 0x7700u;
     float bass = 0.0f;
     float riser = 0.0f;
-    return MakeWave(1.55f, [=](float t, int) mutable {
-        float k = t / 1.55f;
-        bass += (58.0f + (30.0f - 58.0f) * std::min(k * 1.7f, 1.0f)) / (float)SampleRate;
-        riser += (180.0f + (1600.0f - 180.0f) * std::pow(k, 1.65f)) / (float)SampleRate;
-        float pulse = OscSine(bass) * std::exp(-t * 1.8f) * 0.92f;
-        float warning = OscSaw(riser) * Adsr(t, 1.55f, 0.04f, 0.18f, 0.6f, 0.35f) * 0.28f;
-        float blastStart = std::clamp((k - 0.56f) / (0.72f - 0.56f), 0.0f, 1.0f);
+    float shred = 0.21f;
+    float pinkLow = 0.0f;
+    float pinkMid = 0.0f;
+    OnePoleLowPass lp;
+    OnePoleHighPass hp;
+    return MakeWave(1.72f, [=](float t, int) mutable {
+        float k = t / 1.72f;
+        bass += PitchSweep(62.0f, 26.0f, std::min(k * 1.45f, 1.0f), 0.68f) / (float)SampleRate;
+        riser += PitchSweep(160.0f, 1850.0f, std::pow(k, 1.55f), 1.0f) / (float)SampleRate;
+        shred += PitchSweep(920.0f, 110.0f, k, 0.75f) / (float)SampleRate;
+        float pulse = OscSine(bass) * std::exp(-t * 1.45f) * 0.98f;
+        float warning = CabinetDrive(OscSaw(riser), 1.35f, 0.08f) * Adsr(t, 1.72f, 0.035f, 0.2f, 0.62f, 0.44f) * 0.28f;
+        float blastStart = std::clamp((k - 0.50f) / (0.68f - 0.50f), 0.0f, 1.0f);
         blastStart = blastStart * blastStart * (3.0f - 2.0f * blastStart);
-        float blast = Noise(seed) * blastStart * std::exp(-(t - 0.86f) * 2.1f) * 0.62f;
-        return pulse + warning + blast;
+        float body = lp.Process(PinkNoise(seed, pinkLow, pinkMid), 1180.0f) * blastStart * std::exp(-std::max(0.0f, t - 0.82f) * 2.0f) * 0.72f;
+        float glass = hp.Process(Noise(seed), 2100.0f) * blastStart * std::exp(-std::max(0.0f, t - 0.82f) * 5.0f) * 0.28f;
+        float shredGate = (std::sin(t * Pi2 * (18.0f + k * 30.0f)) > 0.1f) ? 1.0f : 0.25f;
+        float metalTear = Bitcrush(OscSquare(shred, 0.18f), 16.0f) * shredGate * blastStart * std::exp(-std::max(0.0f, t - 0.74f) * 3.3f) * 0.22f;
+        return pulse + warning + CabinetDrive(body + glass + metalTear, 1.65f, 0.16f);
     });
 }
 
 Wave MakeBombClear() {
-    // Screen-clear sweep: wide-feeling rising wash that says bullets were erased.
+    // Screen-clear sweep: a rising erase wash with a digital zipper tail.
     unsigned int seed = 0x7750u;
     float sweep = 0.0f;
     float air = 0.0f;
+    float zipper = 0.12f;
     OnePoleHighPass hp;
-    return MakeWave(0.58f, [=](float t, int) mutable {
-        float k = t / 0.58f;
-        sweep += PitchSweep(160.0f, 1900.0f, k, 0.82f) / (float)SampleRate;
-        air += PitchSweep(480.0f, 2600.0f, k, 1.2f) / (float)SampleRate;
-        float noise = hp.Process(Noise(seed), 900.0f) * std::pow(1.0f - k, 1.3f) * 0.24f;
-        return (OscSaw(sweep) * 0.26f + OscTriangle(air) * 0.18f + noise) * Adsr(t, 0.58f, 0.015f, 0.08f, 0.72f, 0.18f);
+    return MakeWave(0.74f, [=](float t, int) mutable {
+        float k = t / 0.74f;
+        sweep += PitchSweep(120.0f, 2300.0f, k, 0.76f) / (float)SampleRate;
+        air += Vibrato(PitchSweep(440.0f, 3200.0f, k, 1.16f), t, 0.015f, 9.0f) / (float)SampleRate;
+        zipper += PitchSweep(2600.0f, 620.0f, k, 0.7f) / (float)SampleRate;
+        float noise = hp.Process(Noise(seed), 780.0f) * std::pow(1.0f - k, 1.15f) * 0.30f;
+        float digitalTail = Bitcrush(OscSquare(zipper, 0.10f), 12.0f) * (k > 0.42f ? std::exp(-(t - 0.31f) * 3.2f) : 0.0f) * 0.16f;
+        return (OscSaw(sweep) * 0.30f + OscTriangle(air) * 0.20f + noise + digitalTail) *
+               Adsr(t, 0.74f, 0.012f, 0.09f, 0.78f, 0.25f);
     });
 }
 
@@ -578,13 +592,21 @@ Wave MakePickupMedal() {
 }
 
 Wave MakeScoreMilestone() {
-    // Short flourish for score thresholds; bright but very brief to avoid stealing combat focus.
+    // Cabinet score relay: bright payout chirp with a mechanical counter snap.
+    unsigned int seed = 0x5C0E0u;
     float p = 0.0f;
-    constexpr int notes[4] = { 79, 83, 86, 91 };
-    return MakeWave(0.31f, [&](float t, int) mutable {
-        int idx = std::clamp((int)(t / 0.065f), 0, 3);
+    float relay = 0.37f;
+    constexpr int notes[5] = { 76, 79, 83, 88, 95 };
+    OnePoleHighPass hp;
+    return MakeWave(0.42f, [&](float t, int) mutable {
+        int idx = std::clamp((int)(t / 0.068f), 0, 4);
+        float local = std::fmod(t, 0.068f);
         p += MidiNote(notes[idx]) / (float)SampleRate;
-        return OscSquare(p, 0.42f) * PercEnv(std::fmod(t, 0.065f), 0.065f, 0.002f, 0.9f) * 0.27f;
+        relay += PitchSweep(700.0f, 1380.0f, t / 0.42f, 1.25f) / (float)SampleRate;
+        float snap = hp.Process(Noise(seed), 1900.0f) * PercEnv(local, 0.068f, 0.001f, 1.9f) * 0.11f;
+        float flourish = OscSquare(p, 0.42f) * PercEnv(local, 0.068f, 0.002f, 0.74f) * 0.34f;
+        float counter = OscTriangle(relay) * Adsr(t, 0.42f, 0.005f, 0.06f, 0.42f, 0.16f) * 0.12f;
+        return flourish + counter + snap;
     });
 }
 
@@ -713,11 +735,19 @@ Wave MakeResume() {
 }
 
 Wave MakeContinueTick() {
-    // Continue countdown tick: tense, lower than menu ticks, deliberately dry.
+    // Continue countdown tick: tense cabinet metronome with a small relay thunk.
+    unsigned int seed = 0xC017u;
     float p = 0.0f;
-    return MakeWave(0.075f, [&](float t, int) mutable {
-        p += 440.0f / (float)SampleRate;
-        return OscSquare(p, 0.30f) * PercEnv(t, 0.075f, 0.001f, 1.4f) * 0.36f;
+    float thunk = 0.2f;
+    OnePoleLowPass lp;
+    return MakeWave(0.105f, [=](float t, int) mutable {
+        float k = t / 0.105f;
+        p += PitchSweep(520.0f, 330.0f, k, 0.9f) / (float)SampleRate;
+        thunk += PitchSweep(108.0f, 72.0f, k, 0.55f) / (float)SampleRate;
+        float contact = lp.Process(Noise(seed), 900.0f) * (k < 0.18f ? 1.0f - k / 0.18f : 0.0f) * 0.16f;
+        return OscSquare(p, 0.30f) * PercEnv(t, 0.105f, 0.001f, 1.32f) * 0.34f +
+               OscSine(thunk) * std::exp(-t * 28.0f) * 0.28f +
+               contact;
     });
 }
 
@@ -774,19 +804,24 @@ Wave MakeHighScoreEntry() {
 
 Wave MakeStageStart() {
     float phase = 0.0f;
+    float engine = 0.4f;
+    unsigned int seed = 0x57A9Eu;
     constexpr int notes[6] = { 60, 64, 67, 72, 76, 79 };
-    return MakeWave(0.72f, [&](float t, int) mutable {
+    return MakeWave(0.82f, [&](float t, int) mutable {
         int idx = std::clamp((int)(t / 0.095f), 0, 5);
         float local = std::fmod(t, 0.095f);
         phase += MidiNote(notes[idx]) / (float)SampleRate;
+        engine += PitchSweep(74.0f, 118.0f, t / 0.82f, 1.5f) / (float)SampleRate;
+        float launch = (OscSaw(engine) + Noise(seed) * 0.12f) * Adsr(t, 0.82f, 0.03f, 0.12f, 0.38f, 0.28f) * 0.17f;
         return (OscSquare(phase, 0.48f) * 0.36f + OscTriangle(phase * 0.5f) * 0.18f) *
-               PercEnv(local, 0.095f, 0.004f, 1.1f);
+               PercEnv(local, 0.095f, 0.004f, 1.1f) + launch;
     });
 }
 
 Wave MakeStageClear() {
     float lead = 0.0f;
     float harmony = 0.27f;
+    float bass = 0.49f;
     constexpr int notes[12] = { 72, 76, 79, 84, 83, 84, 86, 88, 91, 88, 91, 96 };
     return MakeWave(1.42f, [&](float t, int) mutable {
         int idx = std::clamp((int)(t / 0.105f), 0, 11);
@@ -794,7 +829,9 @@ Wave MakeStageClear() {
         float env = PercEnv(local, 0.105f, 0.004f, idx >= 9 ? 0.55f : 1.0f);
         lead += MidiNote(notes[idx]) / (float)SampleRate;
         harmony += MidiNote(notes[idx] - 12) / (float)SampleRate;
-        return OscSquare(lead, 0.45f) * env * 0.3f + OscTriangle(harmony) * env * 0.18f;
+        bass += MidiNote((idx < 6 ? 48 : 55) + (idx > 9 ? 12 : 0)) / (float)SampleRate;
+        float cabinetBody = OscTriangle(bass) * Adsr(t, 1.42f, 0.01f, 0.16f, 0.44f, 0.42f) * 0.14f;
+        return OscSquare(lead, 0.45f) * env * 0.31f + OscTriangle(harmony) * env * 0.18f + cabinetBody;
     });
 }
 
@@ -896,6 +933,34 @@ Wave MakeSettingsTick(int variant) {
     });
 }
 
+Wave MakeCabinetBoot() {
+    unsigned int seed = 0xCABB001u;
+    float mains = 0.0f;
+    float scan = 0.1f;
+    float chime = 0.37f;
+    float relay = 0.0f;
+    OnePoleLowPass lp;
+    OnePoleHighPass hp;
+    return MakeWave(1.12f, [=](float t, int) mutable {
+        float k = t / 1.12f;
+        mains += Vibrato(PitchSweep(54.0f, 64.0f, std::min(k * 2.0f, 1.0f), 0.8f), t, 0.006f, 5.0f) / (float)SampleRate;
+        scan += PitchSweep(1180.0f, 2320.0f, k, 1.35f) / (float)SampleRate;
+        chime += MidiNote(t < 0.42f ? 60 : (t < 0.64f ? 67 : 72)) / (float)SampleRate;
+        relay += PitchSweep(360.0f, 92.0f, k, 0.55f) / (float)SampleRate;
+
+        float powerEnv = Adsr(t, 1.12f, 0.025f, 0.18f, 0.62f, 0.36f);
+        float degauss = lp.Process(Noise(seed), 380.0f + 1400.0f * k) * std::exp(-t * 2.3f) * 0.32f;
+        float relayClick = 0.0f;
+        if (t < 0.035f || (t > 0.27f && t < 0.305f)) {
+            relayClick = hp.Process(Noise(seed), 1400.0f) * 0.40f;
+        }
+        float scanline = OscSquare(scan, 0.18f) * Adsr(t, 1.12f, 0.16f, 0.18f, 0.32f, 0.22f) * 0.13f;
+        float readyChime = OscTriangle(chime) * (t > 0.36f ? PercEnv(std::fmod(t - 0.36f, 0.16f), 0.16f, 0.004f, 0.7f) : 0.0f) * 0.24f;
+        float thunk = OscSine(relay) * std::exp(-std::max(0.0f, t - 0.25f) * 15.0f) * (t > 0.24f ? 0.32f : 0.0f);
+        return CabinetDrive(OscSine(mains) * powerEnv * 0.44f + degauss + relayClick + scanline + readyChime + thunk, 1.35f, 0.06f);
+    });
+}
+
 Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
     switch (cue) {
         case AudioSystem::Cue::VulcanShot: return MakeVulcanShot(variant);
@@ -943,6 +1008,7 @@ Wave MakeCueWave(AudioSystem::Cue cue, int variant) {
         case AudioSystem::Cue::AttractShimmer: return MakeAttractShimmer();
         case AudioSystem::Cue::Denied: return MakeDenied(variant);
         case AudioSystem::Cue::SettingsTick: return MakeSettingsTick(variant);
+        case AudioSystem::Cue::CabinetBoot: return MakeCabinetBoot();
         case AudioSystem::Cue::Count: break;
     }
     return {};
@@ -962,6 +1028,10 @@ Wave MakeMusic(AudioSystem::MusicTrack track) {
     float lead = 0.11f;
     float arp = 0.37f;
     float kick = 0.0f;
+    float pad = 0.19f;
+    float counter = 0.53f;
+    float subPulse = 0.0f;
+    OnePoleHighPass drumHp;
     const int stageBass[4] = { 45, 41, 48, 43 };
     const int bossBass[4] = { 38, 39, 36, 43 };
     const int titleBass[4] = { 48, 43, 45, 40 };
@@ -985,32 +1055,48 @@ Wave MakeMusic(AudioSystem::MusicTrack track) {
         int bassPattern = (step % 4 == 3) ? 7 : ((step % 2 == 0) ? 0 : 12);
         bass += MidiNote(root + bassPattern) / (float)SampleRate;
         float bassEnv = std::pow(1.0f - sp, 0.7f);
-        float bassVal = (track == AudioSystem::MusicTrack::Boss ? OscSaw(bass) : OscSquare(bass, 0.42f)) * bassEnv * 0.17f;
+        subPulse += MidiNote(root - 12) / (float)SampleRate;
+        float bassVal = (track == AudioSystem::MusicTrack::Boss ? OscSaw(bass) : OscSquare(bass, 0.42f)) * bassEnv * 0.18f;
+        bassVal += OscSine(subPulse) * std::pow(1.0f - sp, 1.6f) * (track == AudioSystem::MusicTrack::Boss ? 0.075f : 0.045f);
 
         float leadVal = 0.0f;
         int note = track == AudioSystem::MusicTrack::Boss ? bossLead[step % 16] : melody[step % 32];
         if (note > 0 && (track != AudioSystem::MusicTrack::Title || step % 2 == 0)) {
             lead += MidiNote(note) / (float)SampleRate;
-            leadVal = OscSquare(lead, 0.38f) * std::pow(1.0f - sp, 1.15f) * 0.13f;
+            float leadShape = track == AudioSystem::MusicTrack::Boss ? 0.30f : 0.38f;
+            leadVal = CabinetDrive(OscSquare(lead, leadShape) + OscSine(lead * 2.01f) * 0.18f, 1.18f, 0.04f) *
+                      std::pow(1.0f - sp, 1.15f) * (track == AudioSystem::MusicTrack::Title ? 0.10f : 0.14f);
         }
 
         int arpNote = root + ((step % 3 == 0) ? 12 : (step % 3 == 1 ? 15 : 19));
         arp += MidiNote(arpNote + (track == AudioSystem::MusicTrack::Boss ? -12 : 12)) / (float)SampleRate;
-        float arpVal = OscTriangle(arp) * std::pow(1.0f - sp, 1.8f) * (track == AudioSystem::MusicTrack::Title ? 0.10f : 0.08f);
+        float arpVal = OscTriangle(arp) * std::pow(1.0f - sp, 1.8f) * (track == AudioSystem::MusicTrack::Title ? 0.10f : 0.085f);
+
+        int padNote = root + (track == AudioSystem::MusicTrack::Boss ? 7 : ((bar % 2 == 0) ? 12 : 19));
+        pad += MidiNote(padNote) / (float)SampleRate;
+        counter += MidiNote(root + ((step % 8 < 4) ? 24 : 31)) / (float)SampleRate;
+        float padGate = 0.55f + 0.45f * std::sin((float)step * 0.37f + sp * Pi2);
+        float padVal = (OscTriangle(pad) * 0.06f + OscSine(counter) * 0.035f) *
+                       padGate * Tremolo((float)i / (float)SampleRate, track == AudioSystem::MusicTrack::Boss ? 0.22f : 0.14f, 5.0f);
 
         float drum = 0.0f;
         if (beat == 0 || beat == 4 || (track == AudioSystem::MusicTrack::Boss && beat == 6)) {
             kick += (135.0f + (45.0f - 135.0f) * std::min(sp * 1.8f, 1.0f)) / (float)SampleRate;
-            drum += OscSine(kick) * std::pow(1.0f - sp, 2.4f) * 0.28f;
+            drum += CabinetDrive(OscSine(kick), 1.4f, 0.04f) * std::pow(1.0f - sp, 2.25f) * 0.31f;
         }
         if (beat == 2 || beat == 6) {
-            drum += Noise(seed) * std::pow(1.0f - sp, 2.0f) * 0.10f;
+            float snare = drumHp.Process(Noise(seed), 950.0f) * std::pow(1.0f - sp, 1.85f);
+            drum += CabinetDrive(snare, 1.45f, 0.10f) * (track == AudioSystem::MusicTrack::Boss ? 0.15f : 0.11f);
         }
         if ((step % 2) == 1) {
-            drum += Noise(seed) * std::pow(1.0f - sp, 4.2f) * 0.045f;
+            float hat = drumHp.Process(Noise(seed), 3500.0f) * std::pow(1.0f - sp, 5.0f);
+            drum += Bitcrush(hat, 20.0f) * 0.055f;
+        }
+        if (track == AudioSystem::MusicTrack::Boss && (step % 4) == 1) {
+            drum += drumHp.Process(Noise(seed), 2400.0f) * std::pow(1.0f - sp, 3.0f) * 0.075f;
         }
 
-        mixFrames[(size_t)i] = bassVal + leadVal + arpVal + drum;
+        mixFrames[(size_t)i] = CabinetDrive(bassVal + leadVal + arpVal + padVal + drum, 1.08f, track == AudioSystem::MusicTrack::Boss ? 0.06f : 0.035f);
     }
 
     FadeLoopBoundary(mixFrames, 384);
@@ -1127,6 +1213,7 @@ void AudioSystem::LoadCues() {
     soundsReady_ &= AddCue(Cue::AttractShimmer, Category::UI, Priority::Low, 0.35f, 1.8f, 1);
     soundsReady_ &= AddCue(Cue::Denied, Category::UI, Priority::Normal, 0.68f, 0.1f, 2);
     soundsReady_ &= AddCue(Cue::SettingsTick, Category::UI, Priority::Low, 0.46f, 0.018f, 3);
+    soundsReady_ &= AddCue(Cue::CabinetBoot, Category::UI, Priority::Critical, 0.88f, 1.0f, 1);
 
     std::array<MusicTrack, 3> tracks = { MusicTrack::Title, MusicTrack::Stage, MusicTrack::Boss };
     for (int i = 0; i < 3; ++i) {
@@ -1207,6 +1294,9 @@ void AudioSystem::Update() {
     float targetMusicGain = 1.0f;
     if (now < musicDuckUntil_) targetMusicGain = std::min(targetMusicGain, 0.52f);
     if (musicManuallyDucked_) targetMusicGain = std::min(targetMusicGain, 0.38f);
+    int activeVoices = CountPlaying();
+    if (activeVoices >= 11) targetMusicGain = std::min(targetMusicGain, 0.62f);
+    else if (activeVoices >= 8) targetMusicGain = std::min(targetMusicGain, 0.74f);
     currentMusicGain_ += (targetMusicGain - currentMusicGain_) * 0.12f;
     ApplyMusicVolume();
 
@@ -1320,13 +1410,13 @@ int AudioSystem::PriorityRank(Priority priority) const {
 }
 
 float AudioSystem::CongestionGain(int activeVoices, int activeInCategory, Priority priority) const {
-    float globalTrim = 1.0f - std::max(0, activeVoices - 7) * 0.045f;
-    float categoryTrim = 1.0f - std::max(0, activeInCategory - 2) * 0.06f;
+    float globalTrim = 1.0f - std::max(0, activeVoices - 6) * 0.05f;
+    float categoryTrim = 1.0f - std::max(0, activeInCategory - 2) * 0.075f;
     if (PriorityRank(priority) >= PriorityRank(Priority::High)) {
-        globalTrim = std::max(globalTrim, 0.82f);
+        globalTrim = std::max(globalTrim, 0.80f);
         categoryTrim = std::max(categoryTrim, 0.86f);
     }
-    return std::clamp(globalTrim * categoryTrim, 0.56f, 1.0f);
+    return std::clamp(globalTrim * categoryTrim, 0.50f, 1.0f);
 }
 
 float AudioSystem::CategoryHeadroom(Category category, Priority priority) const {
@@ -1470,9 +1560,9 @@ void AudioSystem::PlayCue(Cue cue, float pitch, float gain, float pan) {
     bank.lastPlayed = now;
 
     if (bank.priority == Priority::Critical) {
-        musicDuckUntil_ = std::max(musicDuckUntil_, now + 0.55);
+        musicDuckUntil_ = std::max(musicDuckUntil_, now + 0.72);
     } else if (bank.priority == Priority::High && bank.category != Category::UI) {
-        musicDuckUntil_ = std::max(musicDuckUntil_, now + 0.20);
+        musicDuckUntil_ = std::max(musicDuckUntil_, now + 0.28);
     }
 }
 
@@ -1690,6 +1780,7 @@ void AudioSystem::PlayLowLifeWarning() { PlayCue(Cue::LowLife); }
 void AudioSystem::PlayAttractShimmer() { PlayCue(Cue::AttractShimmer); }
 void AudioSystem::PlayDenied() { PlayCue(Cue::Denied); }
 void AudioSystem::PlaySettingsTick() { PlayCue(Cue::SettingsTick, RandomRange(0.98f, 1.06f), 0.88f); }
+void AudioSystem::PlayCabinetBoot() { PlayCue(Cue::CabinetBoot); }
 
 void AudioSystem::RunChaosAudit(float seconds) {
     if (!Ready()) return;
@@ -1697,6 +1788,7 @@ void AudioSystem::RunChaosAudit(float seconds) {
     SetMasterVolume(1.0f);
     SetVolumes(8, 6);
     PlayMusic(MusicTrack::Stage);
+    PlayCabinetBoot();
 
     double start = AudioClockSeconds();
     double nextPlayer = start;
@@ -1713,7 +1805,7 @@ void AudioSystem::RunChaosAudit(float seconds) {
         double now = AudioClockSeconds();
         if (now >= nextPlayer) {
             WeaponType weapon = weaponStep % 3 == 0 ? WeaponType::Vulcan : (weaponStep % 3 == 1 ? WeaponType::Plasma : WeaponType::Missile);
-            PlayPlayerShot(weapon);
+            PlayPlayerShotAt(weapon, 1 + (weaponStep % 4), 40.0f + (float)((weaponStep * 37) % 400), 480.0f);
             ++weaponStep;
             nextPlayer += 0.055;
         }
@@ -1743,6 +1835,9 @@ void AudioSystem::RunChaosAudit(float seconds) {
         }
         if (now >= nextUi) {
             PlayMenuMove();
+            if (pickupStep % 4 == 1) PlayMenuConfirm();
+            if (pickupStep % 7 == 2) PlayMenuCancel();
+            if (pickupStep % 5 == 1) PlaySettingsTick();
             if (pickupStep % 3 == 0) PlayScoreMilestone();
             if (pickupStep % 5 == 0) PlayFormationBonus();
             PlayBonusTick(pickupStep);
@@ -1754,9 +1849,19 @@ void AudioSystem::RunChaosAudit(float seconds) {
 
     PlayBomb();
     PlayPlayerHit();
+    PlayPlayerDeath();
     PlayRespawn();
+    PlayInsertCoin();
+    PlayPressStart();
+    PlayPause();
+    PlayResume();
+    PlayStageStart();
+    PlayStageClear();
+    PlayContinueTick();
     PlayExtraLife();
     PlayHighScoreEntry();
+    PlayGameOver();
+    PlayBossDefeat();
     for (int i = 0; i < 90; ++i) {
         Update();
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
