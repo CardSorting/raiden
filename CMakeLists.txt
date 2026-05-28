@@ -25,7 +25,7 @@ add_executable(sky_circuit
   Enemy.cpp
   Bullet.cpp
   Powerup.cpp
-  WaveManager.cpp
+  StageDirector.cpp
   Effects.cpp
   SpriteManager.cpp
 )

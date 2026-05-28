@@ -124,6 +124,12 @@ static bool CircleHit(Vector2 a, float ar, Vector2 b, float br) {
 static constexpr int SettingsCount = 20;
 static constexpr int VisibleSettingsRows = 11;
 static constexpr float BossDeathDuration = 1.68f;
+static constexpr int DiagBulletWarnThreshold = 42;
+static constexpr int DiagEnemyWarnThreshold = 14;
+static constexpr int DiagCombinedBulletThreshold = 30;
+static constexpr int DiagCombinedEnemyThreshold = 9;
+static constexpr int DiagRecoveryBulletThreshold = 2;
+static constexpr int DiagRecoveryEnemyThreshold = 6;
 
 const char* Game::CharacterCallsigns::Callsign(CommsSpeaker speaker) {
     switch (speaker) {
@@ -559,7 +565,13 @@ void Game::StartGame() {
     spaceStationScrollY_ = 0.0f;
     screenFlashTimer_ = 0.0f;
     effects_.Clear();
-    waves_.Reset();
+    stageDirector_.Reset();
+    stageRecoveryActive_ = false;
+    stageBossRunwayActive_ = false;
+    diagLastBlock_ = -1;
+    diagSludgeWarned_ = false;
+    diagLastDeathBlock_ = "NONE";
+    diagLastDeathCause_ = "NONE";
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
     stageClearTickTimer_ = 0.0f;
@@ -598,7 +610,13 @@ void Game::ReturnToTitle() {
     player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
     effects_.Clear();
-    waves_.Reset();
+    stageDirector_.Reset();
+    stageRecoveryActive_ = false;
+    stageBossRunwayActive_ = false;
+    diagLastBlock_ = -1;
+    diagSludgeWarned_ = false;
+    diagLastDeathBlock_ = "NONE";
+    diagLastDeathCause_ = "NONE";
     stageTime_ = 0.0f;
     clearTimer_ = 0.0f;
     stageClearTickTimer_ = 0.0f;
@@ -649,7 +667,13 @@ void Game::NextLoop() {
     missionBriefing_.Begin();
     for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
-    waves_.Reset();
+    stageDirector_.Reset();
+    stageRecoveryActive_ = false;
+    stageBossRunwayActive_ = false;
+    diagLastBlock_ = -1;
+    diagSludgeWarned_ = false;
+    diagLastDeathBlock_ = "NONE";
+    diagLastDeathCause_ = "NONE";
     player_.bombs = std::min(6, player_.bombs + 1);
     state_ = State::Playing;
     audio_.SetMusicDucked(false);
@@ -1276,6 +1300,38 @@ void Game::UpdatePlaying(float dt) {
         if (medalChainTimer_ <= 0.0f) medalChain_ = 0;
     }
     if (playerShotShakeTimer_ > 0.0f) playerShotShakeTimer_ -= dt;
+
+    bool recoveryWindow = !bossSpawned_ && stageDirector_.IsRecoveryWindow(stageTime_);
+    if (recoveryWindow && !stageRecoveryActive_) {
+        int bullets = ActiveEnemyBulletCount();
+        int enemies = ActiveEnemyCount();
+        if (bullets > DiagRecoveryBulletThreshold || enemies > DiagRecoveryEnemyThreshold) {
+            TraceLog(LOG_WARNING, TextFormat("[STAGE DIAG] recovery pollution: block=%s bullets=%d enemies=%d t=%.2f",
+                                             stageDirector_.CurrentBlockName(stageTime_), bullets, enemies,
+                                             stageDirector_.CurrentBlockElapsed(stageTime_)));
+        }
+        enemyBullets_.clear();
+        enemyShotAudioTimer_ = 0.0f;
+    }
+    stageRecoveryActive_ = recoveryWindow;
+
+    bool bossRunway = !bossSpawned_ && stageDirector_.IsBossRunway(stageTime_);
+    if (bossRunway && !stageBossRunwayActive_) {
+        int bullets = ActiveEnemyBulletCount();
+        int nonBossEnemies = ActiveNonBossEnemyCount();
+        if (bullets > 0 || nonBossEnemies > 0) {
+            TraceLog(LOG_WARNING, TextFormat("[STAGE DIAG] runway cleanup: staleBullets=%d staleNonBossEnemies=%d t=%.2f",
+                                             bullets, nonBossEnemies, stageDirector_.CurrentBlockElapsed(stageTime_)));
+        }
+        enemyBullets_.clear();
+        enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
+                                      [](const Enemy& e) { return !e.IsBoss(); }),
+                       enemies_.end());
+        for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
+        enemyShotAudioTimer_ = 0.0f;
+    }
+    stageBossRunwayActive_ = bossRunway;
+
     player_.Update(dt, effects_, enemies_, enemyBullets_);
     UpdateBossStory(dt);
 
@@ -1333,9 +1389,19 @@ void Game::UpdatePlaying(float dt) {
     }
 
     if (!bossSpawned_) {
-        waves_.Update(stageTime_, loop_ + (difficulty_ == 1 ? 1 : 0), enemies_);
+        stageDirector_.Update(stageTime_, loop_ + (difficulty_ == 1 ? 1 : 0), enemies_);
     }
-    if (!bossSpawned_ && waves_.ShouldSpawnBoss(stageTime_, BossAlive())) {
+    if (!bossSpawned_ && stageDirector_.ShouldSpawnBoss(stageTime_, BossAlive())) {
+        int bullets = ActiveEnemyBulletCount();
+        int nonBossEnemies = ActiveNonBossEnemyCount();
+        if (bullets > 0 || nonBossEnemies > 0) {
+            TraceLog(LOG_WARNING, TextFormat("[STAGE DIAG] boss spawn cleanup: staleBullets=%d staleNonBossEnemies=%d block=%s",
+                                             bullets, nonBossEnemies, stageDirector_.CurrentBlockName(stageTime_)));
+        }
+        enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
+                                      [](const Enemy& e) { return !e.IsBoss(); }),
+                       enemies_.end());
+        for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemies_.emplace_back(EnemyType::Miniboss, Vector2{240, -70}, loop_ + (difficulty_ == 1 ? 1 : 0), 0);
         bossSpawned_ = true;
         bossStoryState_ = BossStoryState::Entrance;
@@ -1392,6 +1458,7 @@ void Game::UpdatePlaying(float dt) {
     }
     for (auto& p : powerups_) p.Update(dt);
 
+    UpdateStageDiagnostics();
     HandleCollisions();
     CheckScoreMilestones();
     Cleanup();
@@ -2022,6 +2089,106 @@ void Game::UpdateClearScoresConfirm() {
     }
 }
 
+int Game::ActiveEnemyCount() const {
+    return (int)std::count_if(enemies_.begin(), enemies_.end(), [](const Enemy& e) {
+        return e.active;
+    });
+}
+
+int Game::ActiveEnemyBulletCount() const {
+    return (int)std::count_if(enemyBullets_.begin(), enemyBullets_.end(), [](const Bullet& b) {
+        return b.active;
+    });
+}
+
+int Game::ActiveNonBossEnemyCount() const {
+    return (int)std::count_if(enemies_.begin(), enemies_.end(), [](const Enemy& e) {
+        return e.active && !e.IsBoss();
+    });
+}
+
+static const char* EnemyTypeName(EnemyType type) {
+    switch (type) {
+        case EnemyType::Popcorn: return "Popcorn";
+        case EnemyType::Turret: return "Turret";
+        case EnemyType::Miniboss: return "Boss";
+    }
+    return "Unknown";
+}
+
+const char* Game::NearestActiveEnemyTypeName() const {
+    const Enemy* nearest = nullptr;
+    float bestDistSq = 0.0f;
+    for (const auto& e : enemies_) {
+        if (!e.active) continue;
+        float dx = e.pos.x - player_.pos.x;
+        float dy = e.pos.y - player_.pos.y;
+        float distSq = dx * dx + dy * dy;
+        if (!nearest || distSq < bestDistSq) {
+            nearest = &e;
+            bestDistSq = distSq;
+        }
+    }
+    return nearest ? EnemyTypeName(nearest->type) : "None";
+}
+
+void Game::LogPlayerDeath(const char* cause) {
+    diagLastDeathBlock_ = stageDirector_.CurrentBlockName(stageTime_);
+    diagLastDeathCause_ = cause;
+    TraceLog(LOG_WARNING, TextFormat(
+        "[STAGE DEATH] cause=%s block=%s section=%s encounter=%s transition=%s blockT=%.2f enemies=%d bullets=%d intensity=%.2f nearest=%s recovery=%s runway=%s lives=%d",
+        cause,
+        stageDirector_.CurrentBlockName(stageTime_),
+        stageDirector_.CurrentSectionName(stageTime_),
+        stageDirector_.CurrentEncounterName(stageTime_),
+        stageDirector_.CurrentTransitionName(stageTime_),
+        stageDirector_.CurrentBlockElapsed(stageTime_),
+        ActiveEnemyCount(),
+        ActiveEnemyBulletCount(),
+        stageDirector_.CurrentIntensity(stageTime_),
+        NearestActiveEnemyTypeName(),
+        stageDirector_.IsRecoveryWindow(stageTime_) ? "yes" : "no",
+        stageDirector_.IsBossRunway(stageTime_) ? "yes" : "no",
+        player_.lives));
+}
+
+void Game::UpdateStageDiagnostics() {
+    if (state_ != State::Playing || demoMode_) return;
+
+    int block = stageDirector_.CurrentBlockIndex(stageTime_);
+    if (block != diagLastBlock_) {
+        diagLastBlock_ = block;
+        diagSludgeWarned_ = false;
+    }
+
+    int enemies = ActiveEnemyCount();
+    int bullets = ActiveEnemyBulletCount();
+    bool recovery = stageDirector_.IsRecoveryWindow(stageTime_);
+    bool runway = stageDirector_.IsBossRunway(stageTime_);
+    bool climax = std::string(stageDirector_.CurrentTransitionName(stageTime_)) == "CLIMAX" || BossAlive();
+
+    bool bulletSludge = bullets > DiagBulletWarnThreshold;
+    bool enemySludge = enemies > DiagEnemyWarnThreshold;
+    bool combinedSludge = !climax && bullets >= DiagCombinedBulletThreshold && enemies >= DiagCombinedEnemyThreshold;
+    bool calmPollution = (recovery || runway) && bullets > DiagRecoveryBulletThreshold;
+
+    if (!diagSludgeWarned_ && (bulletSludge || enemySludge || combinedSludge || calmPollution)) {
+        diagSludgeWarned_ = true;
+        TraceLog(LOG_WARNING, TextFormat(
+            "[STAGE DIAG] pressure warning: block=%s section=%s encounter=%s transition=%s blockT=%.2f enemies=%d bullets=%d intensity=%.2f recovery=%s runway=%s",
+            stageDirector_.CurrentBlockName(stageTime_),
+            stageDirector_.CurrentSectionName(stageTime_),
+            stageDirector_.CurrentEncounterName(stageTime_),
+            stageDirector_.CurrentTransitionName(stageTime_),
+            stageDirector_.CurrentBlockElapsed(stageTime_),
+            enemies,
+            bullets,
+            stageDirector_.CurrentIntensity(stageTime_),
+            recovery ? "yes" : "no",
+            runway ? "yes" : "no"));
+    }
+}
+
 void Game::HandleCollisions() {
     for (auto& b : playerBullets_) {
         if (!b.active) continue;
@@ -2082,6 +2249,7 @@ void Game::HandleCollisions() {
             if (b.active && CircleHit(b.pos, b.radius, player_.pos, player_.hitRadius)) {
                 b.active = false;
                 --player_.lives;
+                LogPlayerDeath("enemy bullet");
                 effects_.Explosion(player_.pos, RED, 38, SpriteId::DebrisPlayerWingLeft);
                 effects_.Shake(8.0f, 0.35f);
                 if (player_.lives <= 0) {
@@ -2107,6 +2275,7 @@ void Game::HandleCollisions() {
         if (e.active && !player_.invulnerable && CircleHit(e.pos, e.radius, player_.pos, player_.hitRadius)) {
             e.active = false;
             --player_.lives;
+            LogPlayerDeath("enemy collision");
             effects_.Explosion(player_.pos, RED, 38, SpriteId::DebrisPlayerWingRight);
             if (player_.lives <= 0) {
                 audio_.PlayPlayerDeath();
@@ -2298,23 +2467,23 @@ void Game::UpdateCommsEvents(float dt) {
         commsFirstWave_ = true;
         QueueComms(CommsSpeaker::Ace, "Keep the channel open.", "I’m going in.", 2, 2.7f);
     }
-    if (!commsUpperLane_ && stageTime_ > 5.2f && !bossSpawned_) {
+    if (!commsUpperLane_ && stageTime_ > 16.4f && !bossSpawned_) {
         commsUpperLane_ = true;
         QueueComms(CommsSpeaker::Control, "Upper lane is hostile.", "Keep low.", 2, 2.4f);
     }
-    if (!commsBreakThrough_ && stageTime_ > 18.0f && !bossSpawned_) {
+    if (!commsBreakThrough_ && stageTime_ > 32.8f && !bossSpawned_) {
         commsBreakThrough_ = true;
         QueueComms(CommsSpeaker::Shade, "You always pick the locked door.", "Don’t drift admiring it.", 2, 2.7f);
     }
-    if (!commsEncirclement_ && stageTime_ > 25.4f && !bossSpawned_) {
+    if (!commsEncirclement_ && stageTime_ > 48.8f && !bossSpawned_) {
         commsEncirclement_ = true;
         QueueComms(CommsSpeaker::Control, "Pincer vectors crossing.", "Find the gap, then push.", 3, 2.5f);
     }
-    if (!commsRecovery_ && stageTime_ > 34.5f && !bossSpawned_) {
+    if (!commsRecovery_ && stageTime_ > 59.7f && !bossSpawned_) {
         commsRecovery_ = true;
         QueueComms(CommsSpeaker::Wrench, "Lane is open for a second.", "Take the metal, breathe.", 2, 2.5f);
     }
-    if (!commsGateApproach_ && stageTime_ > 76.8f && !bossSpawned_) {
+    if (!commsGateApproach_ && stageTime_ > 96.8f && !bossSpawned_) {
         commsGateApproach_ = true;
         QueueComms(CommsSpeaker::Ace, "Comms are getting thin.", "Something is listening.", 4, 2.8f);
     }
@@ -2582,7 +2751,7 @@ void Game::DrawBackground() const {
     Color nebulaColor2 = Fade(BLUE, 0.12f);
     Color nebulaColor3 = Fade(VIOLET, 0.10f);
 
-    float routeTime = std::fmod(stageTime_, 90.0f);
+    float routeTime = std::min(stageTime_, stageDirector_.RouteDuration());
     int beat = (int)routeTime;
     if (bossWarningTimer_ > 0.0f) {
         // Red Alert Alert/Warning State
@@ -2591,25 +2760,31 @@ void Game::DrawBackground() const {
         nebulaColor1 = Fade(RED, 0.22f);
         nebulaColor2 = Fade(MAROON, 0.15f);
         nebulaColor3 = Fade(ORANGE, 0.10f);
-    } else if (routeTime < 23.0f) {
-        // Entry/intercept/sweep: cool orbit lanes with clear silhouettes.
+    } else if (routeTime < 32.0f) {
+        // Launch/sweep: cool orbit lanes with clear silhouettes.
         bgColor = Color{4, 11, 18, 255};
         nebulaColor1 = Color{0, 145, 118, 30};
         nebulaColor2 = Color{0, 70, 105, 22};
         nebulaColor3 = Color{15, 120, 150, 18};
-    } else if (routeTime < 34.0f) {
+    } else if (routeTime < 48.0f) {
+        // Intercept: colder blue pressure before the route clamps down.
+        bgColor = Color{5, 7, 22, 255};
+        nebulaColor1 = Color{40, 90, 180, 24};
+        nebulaColor2 = Color{0, 120, 135, 18};
+        nebulaColor3 = Color{70, 40, 160, 15};
+    } else if (routeTime < 59.0f) {
         // Encirclement: warmer magenta pressure while vectors close in.
         bgColor = Color{11, 6, 21, 255};
         nebulaColor1 = Color{112, 0, 145, 27};
         nebulaColor2 = Color{70, 0, 105, 18};
         nebulaColor3 = Color{145, 10, 110, 17};
-    } else if (routeTime < 42.0f) {
+    } else if (routeTime < 70.0f) {
         // Recovery: desaturated calm before the route climbs again.
         bgColor = Color{5, 10, 16, 255};
         nebulaColor1 = Color{0, 120, 150, 18};
         nebulaColor2 = Color{60, 70, 110, 14};
         nebulaColor3 = Color{20, 150, 120, 12};
-    } else if (routeTime < 72.0f) {
+    } else if (routeTime < 96.0f) {
         // Escalation: industrial amber searchlight space.
         bgColor = Color{16, 7, 8, 255};
         nebulaColor1 = Color{145, 24, 0, 28};
@@ -2634,8 +2809,8 @@ void Game::DrawBackground() const {
     DrawCircleGradient(200, (int)(nY2 - ScreenH), 290, nebulaColor3, Fade(BLACK, 0.0f));
 
     // 1a. Faint orbital gate silhouette: the stage's recurring denial icon.
-    if (routeTime > 74.0f || bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
-        float gateAlpha = BossAlive() ? 0.18f : (routeTime > 74.0f ? 0.07f + std::min(0.06f, (routeTime - 74.0f) * 0.008f) : 0.11f);
+    if (routeTime > 96.5f || bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
+        float gateAlpha = BossAlive() ? 0.18f : (routeTime > 96.5f ? 0.07f + std::min(0.06f, (routeTime - 96.5f) * 0.008f) : 0.11f);
         float gatePulse = 0.5f + 0.5f * std::sin((float)GetTime() * 1.8f);
         Vector2 gateCenter = {240.0f, 128.0f};
         BeginBlendMode(BLEND_ADDITIVE);
@@ -2651,7 +2826,7 @@ void Game::DrawBackground() const {
     }
 
     // 1b. Layer 1b: Sweeping Background Industrial Searchlights (Stage Phase 3 / Boss Alert)
-    if (beat >= 60 || bossWarningTimer_ > 0.0f || BossAlive()) {
+    if (beat >= 82 || bossWarningTimer_ > 0.0f || BossAlive()) {
         float time = (float)GetTime();
         float angle1 = std::sin(time * 0.45f) * 35.0f - 90.0f;
         float angle2 = std::cos(time * 0.35f) * 25.0f - 90.0f;
@@ -2882,10 +3057,12 @@ void Game::DrawHud() const {
         DrawRectangle(16, comboY + 12, (int)(72 * ratio), 2, chainColor);
     }
 
-    // Dynamic STAGE Timer / WARNING
-    if (stageTime_ < 90.0f) {
-        DrawText(TextFormat("TIME %02d", 90 - (int)stageTime_), 395, 4, 10, GRAY);
-        DrawText(TextFormat("LOOP %d", loop_), 395, 16, 12, SKYBLUE);
+    // Dynamic stage act / WARNING
+    float routeDuration = stageDirector_.RouteDuration();
+    if (stageTime_ < routeDuration) {
+        int remaining = std::max(0, (int)(routeDuration - stageTime_));
+        DrawText(TextFormat("B%02d %s", stageDirector_.CurrentBlockIndex(stageTime_), stageDirector_.CurrentEncounterName(stageTime_)), 334, 4, 10, GRAY);
+        DrawText(TextFormat("%s %03d  L%d", stageDirector_.CurrentTransitionName(stageTime_), remaining, loop_), 334, 16, 10, SKYBLUE);
     } else {
         DrawText("WARNING", 395, 4, 10, RED);
         DrawText("BOSS ALIVE", 395, 16, 12, RED);
@@ -2907,6 +3084,49 @@ void Game::DrawHud() const {
         DrawRectangle(0, ScreenH - 46, ScreenW, 46, Fade(BLACK, 0.85f));
         DrawText("DEMO PLAY - PRESS ANY KEY", ScreenW / 2 - demoW / 2, ScreenH - 30, 16, demoColor);
     }
+}
+
+void Game::DrawStageDiagnostics() const {
+    int enemies = ActiveEnemyCount();
+    int bullets = ActiveEnemyBulletCount();
+    bool recovery = stageDirector_.IsRecoveryWindow(stageTime_);
+    bool runway = stageDirector_.IsBossRunway(stageTime_);
+    bool climax = std::string(stageDirector_.CurrentTransitionName(stageTime_)) == "CLIMAX" || BossAlive();
+    bool pressureWarn = bullets > DiagBulletWarnThreshold ||
+                        enemies > DiagEnemyWarnThreshold ||
+                        (bullets >= DiagCombinedBulletThreshold && enemies >= DiagCombinedEnemyThreshold) ||
+                        ((recovery || runway) && bullets > DiagRecoveryBulletThreshold);
+
+    int x = 12;
+    int y = 72;
+    int w = 286;
+    int h = 126;
+    DrawRectangle(x, y, w, h, Fade(BLACK, 0.82f));
+    DrawRectangleLines(x, y, w, h, pressureWarn ? RED : Fade(SKYBLUE, 0.8f));
+    DrawText("STAGE DIRECTOR DIAG", x + 8, y + 7, 10, pressureWarn ? RED : SKYBLUE);
+    DrawText(TextFormat("Block %02d  %.1fs  %s",
+                        stageDirector_.CurrentBlockIndex(stageTime_),
+                        stageDirector_.CurrentBlockElapsed(stageTime_),
+                        stageDirector_.CurrentBlockName(stageTime_)),
+             x + 8, y + 22, 10, RAYWHITE);
+    DrawText(TextFormat("Section %-9s Encounter %s",
+                        stageDirector_.CurrentSectionName(stageTime_),
+                        stageDirector_.CurrentEncounterName(stageTime_)),
+             x + 8, y + 36, 10, GRAY);
+    DrawText(TextFormat("Transition %-10s Intensity %.2f",
+                        stageDirector_.CurrentTransitionName(stageTime_),
+                        stageDirector_.CurrentIntensity(stageTime_)),
+             x + 8, y + 50, 10, GRAY);
+    DrawText(TextFormat("Enemies %02d/%02d  Bullets %02d/%02d",
+                        enemies, DiagEnemyWarnThreshold, bullets, DiagBulletWarnThreshold),
+             x + 8, y + 64, 10, pressureWarn ? ORANGE : RAYWHITE);
+    DrawText(TextFormat("Recovery %s  Runway %s  Climax %s",
+                        recovery ? "YES" : "no",
+                        runway ? "YES" : "no",
+                        climax ? "YES" : "no"),
+             x + 8, y + 78, 10, (recovery || runway) ? LIME : GRAY);
+    DrawText(TextFormat("Last death: %s", diagLastDeathBlock_.c_str()), x + 8, y + 92, 10, GOLD);
+    DrawText(TextFormat("Cause: %s", diagLastDeathCause_.c_str()), x + 8, y + 106, 10, GOLD);
 }
 
 void Game::DrawCenteredText(const char* title, const char* subtitle) const {
@@ -3498,6 +3718,9 @@ void Game::Draw() {
     EndMode2D();
 
     DrawHud();
+    if (debug_ && state_ == State::Playing) {
+        DrawStageDiagnostics();
+    }
 
     if (state_ == State::Playing && bossWarningTimer_ > 0.0f) {
         if ((int)(bossWarningTimer_ * 8) % 2 == 0) {

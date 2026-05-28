@@ -12,7 +12,7 @@ Perform a second, deeper audit and hardening pass on `Sky Circuit` to make the g
 ## JoyZoning Architectural Mapping
 
 ### DOMAIN
-- Gameplay rules in `Player`, `Enemy`, `Bullet`, `Powerup`, `WaveManager`, and `Effects` remain deterministic and simple.
+- Gameplay rules in `Player`, `Enemy`, `Bullet`, `Powerup`, `StageDirector`, and `Effects` remain deterministic and simple.
 - DOMAIN probe: no new disk/network I/O is introduced; the added navigation does not alter pure gameplay rules.
 
 ### CORE

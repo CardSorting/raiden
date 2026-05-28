@@ -4,7 +4,7 @@
 #include "Enemy.h"
 #include "Powerup.h"
 #include "Effects.h"
-#include "WaveManager.h"
+#include "StageDirector.h"
 #include "AudioSystem.h"
 #include <vector>
 #include <string>
@@ -126,7 +126,13 @@ private:
     std::vector<Enemy> enemies_;
     std::vector<Powerup> powerups_;
     Effects effects_;
-    WaveManager waves_;
+    StageDirector stageDirector_;
+    bool stageRecoveryActive_ = false;
+    bool stageBossRunwayActive_ = false;
+    int diagLastBlock_ = -1;
+    bool diagSludgeWarned_ = false;
+    std::string diagLastDeathBlock_ = "NONE";
+    std::string diagLastDeathCause_ = "NONE";
     bool debug_ = false;
     bool shouldExit_ = false;
     int titleSelection_ = 0;
@@ -303,6 +309,7 @@ private:
     void Draw();
     void DrawBackground() const;
     void DrawHud() const;
+    void DrawStageDiagnostics() const;
     void DrawCenteredText(const char* title, const char* subtitle) const;
     void DrawTitleMenu() const;
     void DrawHowTo() const;
@@ -314,6 +321,12 @@ private:
     void DrawDifficultySelect() const;
     void DrawContinue() const;
     void HandleCollisions();
+    void UpdateStageDiagnostics();
+    void LogPlayerDeath(const char* cause);
+    int ActiveEnemyCount() const;
+    int ActiveEnemyBulletCount() const;
+    int ActiveNonBossEnemyCount() const;
+    const char* NearestActiveEnemyTypeName() const;
     void Cleanup();
     void SpawnDrop(Vector2 pos, EnemyType source);
     bool BossAlive() const;
