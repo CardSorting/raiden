@@ -16,7 +16,7 @@ public:
     void Run();
 
 private:
-    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry, ExitConfirm, ClearScoresConfirm, DifficultySelect, Continue };
+    enum class State { Title, HowTo, Playing, Paused, StageClear, GameOver, Settings, HighScores, NameEntry, ExitConfirm, ClearScoresConfirm, Continue };
     static constexpr int ScreenW = 480;
     static constexpr int ScreenH = 640;
 
@@ -149,9 +149,7 @@ private:
     int stageClearTicksPlayed_ = 0;
     int stageClearBonus_ = 0;
     float gameOverTimer_ = 0.0f;
-    int difficulty_ = 0; // 0 = Normal, 1 = Ace
     float continueTimer_ = 0.0f;
-    int difficultySelection_ = 0;
 
     enum class InputType { KeyboardGamepad, Mouse };
     InputType lastInputType_ = InputType::KeyboardGamepad;
@@ -305,7 +303,6 @@ private:
     void UpdateNameEntry();
     void UpdateExitConfirm();
     void UpdateClearScoresConfirm();
-    void UpdateDifficultySelect();
     void UpdateContinue(float dt);
     void Draw();
     void DrawBackground() const;
@@ -320,7 +317,6 @@ private:
     void DrawNameEntry() const;
     void DrawExitConfirm() const;
     void DrawClearScoresConfirm() const;
-    void DrawDifficultySelect() const;
     void DrawContinue() const;
     void HandleCollisions();
     void UpdateStageDiagnostics();

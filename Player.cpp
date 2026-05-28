@@ -131,8 +131,9 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
         }
     }
 
+    int touchCount = GetTouchPointCount();
     bool mousePointerDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    bool touchPointerDown = GetTouchPointCount() > 0;
+    bool touchPointerDown = touchCount == 1;
     bool pointerDown = !isDemo && (mousePointerDown || touchPointerDown);
     Vector2 pointerPos = mousePointerDown ? GetMousePosition() : (touchPointerDown ? GetTouchPosition(0) : pos);
     bool pointerSteering = pointerDown && pointerPos.y > 86.0f;

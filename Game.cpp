@@ -562,7 +562,7 @@ void Game::Run() {
 
 void Game::StartGame() {
     player_.ResetForNewGame();
-    player_.lives = (difficulty_ == 0) ? 3 : 2;
+    player_.lives = 3;
     player_.isDemo = demoMode_;
     player_.controlLayout = controlLayout_;
     playerBullets_.clear(); enemyBullets_.clear(); enemies_.clear(); powerups_.clear();
@@ -945,8 +945,6 @@ void Game::Update(float dt) {
                 titleTimer_ = 0.0f;
                 if (titleSelection_ == 0) {
                     audio_.PlayPressStart();
-                    difficultySelection_ = 0;
-                    difficulty_ = 0;
                     demoMode_ = false;
                     StartTransition(State::Playing);
                 } else {
@@ -987,8 +985,6 @@ void Game::Update(float dt) {
         }
     } else if (state_ == State::Settings) {
         UpdateSettings();
-    } else if (state_ == State::DifficultySelect) {
-        UpdateDifficultySelect();
     } else if (state_ == State::Continue) {
         UpdateContinue(dt);
     } else if (state_ == State::ExitConfirm) {
@@ -1021,7 +1017,11 @@ void Game::Update(float dt) {
                 pausePressed = true;
             }
         }
-        if (pausePressed) {
+        if (!demoMode_ && !IsWindowFocused()) {
+            audio_.PlayPause();
+            pauseSelection_ = 0;
+            state_ = State::Paused;
+        } else if (pausePressed) {
             audio_.PlayPause();
             pauseSelection_ = 0;
             state_ = State::Paused;
@@ -1210,7 +1210,6 @@ void Game::UpdatePlaying(float dt) {
             int livesBonus = player_.lives * 500;
             int bombsBonus = player_.bombs * 200;
             int stageBonus = (baseBonus + livesBonus + bombsBonus) * loop_;
-            if (difficulty_ == 1) stageBonus = (stageBonus * 3) / 2;
             stageClearBonus_ = stageBonus;
             player_.score += stageBonus;
             CheckScoreMilestones();
@@ -1453,7 +1452,8 @@ void Game::UpdatePlaying(float dt) {
     }
 
     if (!bossSpawned_) {
-        stageDirector_.Update(stageTime_, loop_ + (difficulty_ == 1 ? 1 : 0), enemies_);
+        stageDirector_.Update(stageTime_, loop_, enemies_);
+        // Identity guardrail: route pressure comes from choreography and cadence, not entity bloat.
         int maxNonBoss = stageDirector_.IsBonusStage(stageTime_) ? 14 : (stageDirector_.CurrentIntensity(stageTime_) > 0.55f ? 9 : 7);
         int nonBossCount = ActiveNonBossEnemyCount();
         if (nonBossCount > maxNonBoss) {
@@ -1478,7 +1478,7 @@ void Game::UpdatePlaying(float dt) {
                                       [](const Enemy& e) { return !e.IsBoss(); }),
                        enemies_.end());
         for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
-        enemies_.emplace_back(EnemyType::Miniboss, Vector2{240, -70}, loop_ + (difficulty_ == 1 ? 1 : 0), 0);
+        enemies_.emplace_back(EnemyType::Miniboss, Vector2{240, -70}, loop_, 0);
         bossSpawned_ = true;
         bossStoryState_ = BossStoryState::Entrance;
         lastBossAttackPhase_ = -1;
@@ -1516,7 +1516,8 @@ void Game::UpdatePlaying(float dt) {
     }
     for (auto& b : enemyBullets_) b.Update(dt, {}, effects_);
     size_t beforeBullets = enemyBullets_.size();
-    for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_ + (difficulty_ == 1 ? 1 : 0));
+    for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_);
+    // Mobile readability contract: clear lanes beat bullet volume.
     int bulletCap = 24;
     if (BossAlive()) bulletCap = 34;
     else if (stageDirector_.IsRecoveryWindow(stageTime_) || stageDirector_.IsBossRunway(stageTime_)) bulletCap = 6;
@@ -2298,13 +2299,11 @@ void Game::HandleCollisions() {
             effects_.Spark(b.pos, e.IsBoss() ? SKYBLUE : YELLOW);
             if (!e.active) {
                 int scoreAdded = e.scoreValue;
-                if (difficulty_ == 1) scoreAdded = (scoreAdded * 3) / 2;
                 bool bonusKill = stageDirector_.IsBonusStage(stageTime_) && !e.IsBoss();
                 if (bonusKill) {
                     medalChain_ = medalChainTimer_ > 0.0f ? medalChain_ + 1 : 1;
                     medalChainTimer_ = 1.20f;
                     int rhythmBonus = 75 * std::min(medalChain_, 12);
-                    if (difficulty_ == 1) rhythmBonus = (rhythmBonus * 3) / 2;
                     scoreAdded += rhythmBonus;
                     audio_.PlayMedalAt(medalChain_, e.pos.x, (float)ScreenW);
                 }
@@ -2343,7 +2342,6 @@ void Game::HandleCollisions() {
                         formationCount_[e.formationId]--;
                         if (formationCount_[e.formationId] == 0) {
                             int bonus = 1000;
-                            if (difficulty_ == 1) bonus = (bonus * 3) / 2;
                             player_.score += bonus;
                             bool bonusPerfect = stageDirector_.IsBonusStage(stageTime_);
                             effects_.AddText(e.pos, TextFormat(bonusPerfect ? "PERFECT +%d" : "BONUS +%d", bonus), GOLD);
@@ -2440,7 +2438,7 @@ void Game::HandleCollisions() {
             effects_.AddText(player_.pos, "BOMB +1", PURPLE);
         }
         else {
-            int scoreGain = (difficulty_ == 1) ? 750 : 500;
+            int scoreGain = 500;
             player_.score += scoreGain;
             medalChain_ = medalChainTimer_ > 0.0f ? medalChain_ + 1 : 1;
             medalChainTimer_ = 1.35f;
@@ -2653,129 +2651,6 @@ void Game::Cleanup() {
     powerups_.erase(std::remove_if(powerups_.begin(), powerups_.end(), [](const Powerup& p){ return !p.active || p.Offscreen(ScreenH); }), powerups_.end());
 }
 
-void Game::UpdateDifficultySelect() {
-    bool keyUp = IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W);
-    bool keyDown = IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S);
-    bool keyConfirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
-    bool keyBack = IsKeyPressed(KEY_ESCAPE);
-    
-    if (IsGamepadAvailable(0)) {
-        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_UP)) keyUp = true;
-        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN)) keyDown = true;
-        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) keyConfirm = true;
-        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) keyBack = true;
-    }
-    
-    Vector2 mousePos = GetMousePosition();
-    static Vector2 dsLastMouse = { -1.0f, -1.0f };
-    bool mouseMoved = (std::abs(mousePos.x - dsLastMouse.x) > 0.5f || std::abs(mousePos.y - dsLastMouse.y) > 0.5f);
-    dsLastMouse = mousePos;
-    
-    if (lastInputType_ == InputType::Mouse && mouseMoved) {
-        for (int i = 0; i < 2; ++i) {
-            int y = 220 + i * 130;
-            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 10 && mousePos.y <= y + 100) {
-                if (difficultySelection_ != i) {
-                    difficultySelection_ = i;
-                    audio_.PlayMenuMove();
-                }
-            }
-        }
-    }
-    
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        for (int i = 0; i < 2; ++i) {
-            int y = 220 + i * 130;
-            if (mousePos.x >= 50 && mousePos.x <= 430 && mousePos.y >= y - 10 && mousePos.y <= y + 100) {
-                difficultySelection_ = i;
-                keyConfirm = true;
-            }
-        }
-    }
-    
-    if (keyUp || keyDown) {
-        difficultySelection_ = 1 - difficultySelection_;
-        audio_.PlayMenuMove();
-    }
-    
-    if (keyConfirm) {
-        audio_.PlayPressStart();
-        difficulty_ = difficultySelection_;
-        demoMode_ = false;
-        StartTransition(State::Playing);
-    } else if (keyBack) {
-        audio_.PlayMenuConfirm();
-        StartTransition(State::Title);
-    }
-}
-
-void Game::DrawDifficultySelect() const {
-    DrawRectangle(30, 100, ScreenW - 60, ScreenH - 200, Fade(BLACK, 0.85f));
-    DrawRectangleLines(30, 100, ScreenW - 60, ScreenH - 200, Fade(SKYBLUE, 0.8f));
-    
-    int titleW = MeasureText("SELECT DIFFICULTY", 24);
-    DrawText("SELECT DIFFICULTY", ScreenW / 2 - titleW / 2, 130, 24, GOLD);
-    
-    DrawLine(50, 175, ScreenW - 50, 175, Fade(SKYBLUE, 0.4f));
-    
-    const char* diffTitles[2] = { "NORMAL MODE", "ACE MODE (HARD)" };
-    const char* diffDescs[2] = { 
-        "Standard difficulty loop. Highly recommended for newcomers.", 
-        "Hyper-aggressive enemies and faster bullets. 1.5x score multiplier!" 
-    };
-    const char* pilotClasses[2] = { "CLASS: CADET PATROLLER", "CLASS: ACE INTERCEPTOR" };
-    Color diffColors[2] = { LIME, RED };
-
-    auto drawStatBar = [](int x, int y, const char* label, int filled, Color col) {
-        DrawText(label, x, y, 9, GRAY);
-        for (int b = 0; b < 5; ++b) {
-            Color barCol = (b < filled) ? col : DARKGRAY;
-            DrawRectangle(x + 28 + b * 9, y + 1, 7, 7, barCol);
-        }
-    };
-
-    auto drawSelectShip = [](float x, float y, Color color, bool selected) {
-        float time = (float)GetTime();
-        if (selected) {
-            float flameH = 6.0f + std::sin(time * 35.0f) * 2.5f;
-            DrawTriangle({x - 3, y + 6}, {x - 4, y + 6 + flameH}, {x - 2, y + 6}, ORANGE);
-            DrawTriangle({x + 3, y + 6}, {x + 2, y + 6}, {x + 4, y + 6 + flameH}, ORANGE);
-        }
-        DrawTriangle({x, y - 5}, {x - 10, y + 3}, {x - 2, y + 3}, DARKGRAY);
-        DrawTriangle({x, y - 5}, {x + 2, y + 3}, {x + 10, y + 3}, DARKGRAY);
-        DrawTriangle({x, y - 10}, {x - 5, y + 6}, {x + 5, y + 6}, color);
-        DrawCircleV({x, y - 1}, 2.0f, SKYBLUE);
-    };
-    
-    for (int i = 0; i < 2; ++i) {
-        int y = 220 + i * 130;
-        bool selected = (difficultySelection_ == i);
-        
-        if (selected) {
-            DrawRectangle(50, y - 10, ScreenW - 100, 110, Fade(BLUE, 0.35f));
-            DrawRectangleLines(50, y - 10, ScreenW - 100, 110, Fade(GOLD, 0.7f));
-        } else {
-            DrawRectangle(50, y - 10, ScreenW - 100, 110, Fade(DARKGRAY, 0.12f));
-            DrawRectangleLines(50, y - 10, ScreenW - 100, 110, Fade(GRAY, 0.25f));
-        }
-        
-        // Draw Fighter ship preview on the left inside the card
-        drawSelectShip(85.0f, (float)y + 35.0f, diffColors[i], selected);
-
-        // Text labels
-        DrawText(diffTitles[i], 125, y, 16, selected ? GOLD : diffColors[i]);
-        DrawText(diffDescs[i], 125, y + 22, 10, RAYWHITE);
-        DrawText(pilotClasses[i], 125, y + 38, 10, selected ? GOLD : GRAY);
-
-        // Stat meters
-        drawStatBar(125, y + 54, "SPD", i == 0 ? 3 : 5, SKYBLUE);
-        drawStatBar(220, y + 54, "ARM", i == 0 ? 5 : 2, LIME);
-        drawStatBar(315, y + 54, "THT", i == 0 ? 2 : 5, RED);
-    }
-    
-    DrawText("UP/DOWN navigate  |  ENTER/CLICK select", ScreenW / 2 - MeasureText("UP/DOWN navigate  |  ENTER/CLICK select", 12) / 2, 480, 12, GRAY);
-}
-
 void Game::UpdateContinue(float dt) {
     float oldTimer = continueTimer_;
     continueTimer_ -= dt;
@@ -2793,7 +2668,7 @@ void Game::UpdateContinue(float dt) {
     if (startPressed) {
         audio_.PlayPressStart();
 
-        player_.lives = (difficulty_ == 0) ? 3 : 2;
+        player_.lives = 3;
         player_.bombs = 3;
         player_.invulnerable = true;
         player_.invulnTimer = 3.0f;
@@ -3421,7 +3296,7 @@ void Game::DrawHowTo() const {
     DrawText("- Auto-fire keeps thumbs focused on movement.", 50, 410, 12, RAYWHITE);
     DrawText("- Two-finger tap deploys a bomb.", 50, 426, 12, RAYWHITE);
     DrawText("- Route Vantage rewards clean bonus chains.", 50, 442, 12, GRAY);
-    DrawText("- ACE Mode raises pressure and grants 1.5x points.", 50, 458, 12, RED);
+    DrawText("- Clear lanes matter more than bullet volume.", 50, 458, 12, SKYBLUE);
 
     // Back to menu action
     Vector2 mousePos = GetMousePosition();
@@ -3960,7 +3835,7 @@ void Game::Draw() {
 
     DrawStageRitualOverlay();
     DrawHud();
-    if (debug_ && state_ == State::Playing) {
+    if (debug_ && state_ == State::Playing && IsKeyDown(KEY_F3)) {
         DrawStageDiagnostics();
     }
 
@@ -4032,8 +3907,6 @@ void Game::Draw() {
 
     if (state_ == State::Title) {
         DrawTitleMenu();
-    } else if (state_ == State::DifficultySelect) {
-        DrawDifficultySelect();
     } else if (state_ == State::Continue) {
         DrawContinue();
     } else if (state_ == State::HowTo) {
