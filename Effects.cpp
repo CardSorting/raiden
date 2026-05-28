@@ -2,6 +2,7 @@
 #include "SpriteManager.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 void Effects::Update(float dt) {
     // 1. Update classic particles
@@ -54,6 +55,18 @@ void Effects::Update(float dt) {
         tp.pos.y -= 25.0f * dt;
     }
     textParticles_.erase(std::remove_if(textParticles_.begin(), textParticles_.end(), [](const TextParticle& tp){ return tp.life <= 0; }), textParticles_.end());
+
+    auto trimOldest = [](auto& items, size_t maxCount) {
+        if (items.size() > maxCount) {
+            items.erase(items.begin(), items.begin() + (long)(items.size() - maxCount));
+        }
+    };
+    trimOldest(particles_, 160);
+    trimOldest(animatedExplosions_, 24);
+    trimOldest(shockwaves_, 10);
+    trimOldest(embers_, 64);
+    trimOldest(debris_, 80);
+    trimOldest(textParticles_, 18);
 
     shakeTime_ = std::max(0.0f, shakeTime_ - dt);
 }
@@ -143,7 +156,7 @@ void Effects::Draw() const {
     // 5. Draw score / event indicators
     for (const auto& tp : textParticles_) {
         float a = tp.life / tp.maxLife;
-        int fontSize = 10;
+        int fontSize = std::strlen(tp.text) <= 8 ? 12 : 10;
         int tw = MeasureText(tp.text, fontSize);
         
         DrawText(tp.text, (int)(tp.pos.x - tw / 2) + 1, (int)tp.pos.y + 1, fontSize, Fade(BLACK, a * 0.65f));
@@ -167,7 +180,7 @@ void Effects::AddText(Vector2 pos, const char* text, Color color) {
     tp.pos = pos;
     std::snprintf(tp.text, sizeof(tp.text), "%s", text);
     tp.color = color;
-    tp.life = tp.maxLife = 0.8f;
+    tp.life = tp.maxLife = 0.72f;
     textParticles_.push_back(tp);
 }
 
@@ -204,7 +217,7 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     shockwaves_.push_back(sw);
 
     // 4. Spawn Additive Embers (bright slow hot sparks)
-    int emberCount = (count > 50) ? 30 : ((count > 15) ? 10 : 2);
+    int emberCount = (count > 50) ? 18 : ((count > 15) ? 7 : 2);
     for (int i = 0; i < emberCount; ++i) {
         float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
         float speed = (float)GetRandomValue(20, 85);
@@ -218,7 +231,7 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     }
 
     // 5. Spawn Physical Shrapnel Debris (rotated gravity-affected panels or custom components)
-    int debrisCount = (count > 50) ? 18 : ((count > 15) ? 6 : 2);
+    int debrisCount = (count > 50) ? 12 : ((count > 15) ? 5 : 2);
     for (int i = 0; i < debrisCount; ++i) {
         float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
         float speed = (float)GetRandomValue(35, 140);
@@ -254,7 +267,7 @@ void Effects::Explosion(Vector2 pos, Color color, int count, SpriteId debrisSpri
     }
 
     // 6. Spawn classic Ash particles
-    int particleCount = (count > 50) ? 35 : count;
+    int particleCount = (count > 50) ? 24 : std::min(count, 18);
     for (int i = 0; i < particleCount; ++i) {
         float angle = (float)i / (float)particleCount * 6.2831853f + (float)GetRandomValue(-15, 15) * 0.01f;
         float speed = (float)GetRandomValue(65, 205);
@@ -337,4 +350,3 @@ Vector2 Effects::ShakeOffset() const {
     if (shakeTime_ <= 0.0f) return {0, 0};
     return {(float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_, (float)GetRandomValue(-100, 100) / 100.0f * shakeAmount_};
 }
-

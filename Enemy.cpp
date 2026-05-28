@@ -19,23 +19,23 @@ static float WrapAngle(float a) {
 
 Enemy::Enemy(EnemyType t, Vector2 p, int loop, int formId) : type(t), pos(p), formationId(formId), aimAngle(0.0f), bossPanelsShed(false) {
     if (type == EnemyType::Popcorn) {
-        radius = 13; hp = maxHp = 2 + loop / 2; scoreValue = 120; vel = {0, 105}; drift = (float)GetRandomValue(-65, 65);
+        radius = 15; hp = maxHp = 2 + loop / 2; scoreValue = 120; vel = {0, 105}; drift = (float)GetRandomValue(-48, 48);
     } else if (type == EnemyType::Turret) {
-        radius = 18; hp = maxHp = 7 + loop * 2; scoreValue = 420; vel = {0, 42};
+        radius = 21; hp = maxHp = 7 + loop * 2; scoreValue = 420; vel = {0, 42};
     } else {
-        radius = 48; hp = maxHp = 260 + loop * 55; scoreValue = 9000 + loop * 1250; vel = {0, 58}; phase = 0;
+        radius = 55; hp = maxHp = 230 + loop * 45; scoreValue = 9000 + loop * 1250; vel = {0, 44}; phase = 0;
     }
 }
 
 void Enemy::FireAimed(Vector2 playerPos, std::vector<Bullet>& enemyBullets, float speed, int damage) const {
     Vector2 d = Norm({playerPos.x - pos.x, playerPos.y - pos.y});
-    float size = IsBoss() ? 7.5f : 5.5f;
+    float size = IsBoss() ? 8.4f : 6.4f;
     Color c = IsBoss() ? Color{255, 42, 76, 255} : PINK;
     enemyBullets.emplace_back(pos, Vector2{d.x * speed, d.y * speed}, size, damage, BulletOwner::Enemy, c);
 }
 
 void Enemy::FireRadial(std::vector<Bullet>& enemyBullets, int count, float speed, float angleOffset) const {
-    float size = IsBoss() ? 7.0f : 5.0f;
+    float size = IsBoss() ? 8.0f : 5.8f;
     Color c = IsBoss() ? Color{255, 72, 128, 255} : MAGENTA;
     for (int i = 0; i < count; ++i) {
         float a = angleOffset + (float)i / (float)count * 6.2831853f;
@@ -82,7 +82,7 @@ void Enemy::SetBossPhase(BossAttackPhase nextPhase) {
     if (phase == next) return;
     phase = next;
     phaseTimer = 0.0f;
-    fireTimer = -0.85f;
+    fireTimer = -1.10f;
 }
 
 void Enemy::BeginBossCombat() {
@@ -145,15 +145,15 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
 
         if (pos.y > 36 && pos.y < 430) {
             if (firePattern == EnemyFirePattern::Default) {
-                if (ReadyToFire(1.25f - std::min(0.45f, loop * 0.04f))) {
-                    FireAimed(playerPos, enemyBullets, 145.0f + loop * 12.0f);
+                if (ReadyToFire(1.45f - std::min(0.28f, loop * 0.025f))) {
+                    FireAimed(playerPos, enemyBullets, 132.0f + loop * 8.0f);
                 }
             } else if (firePattern == EnemyFirePattern::AimedSingle) {
-                if (ReadyToFire(0.0f)) FireAimed(playerPos, enemyBullets, 148.0f + loop * 10.0f);
+                if (ReadyToFire(0.0f)) FireAimed(playerPos, enemyBullets, 136.0f + loop * 7.0f);
             } else if (firePattern == EnemyFirePattern::FanPulse) {
                 float rate = fireRate > 0.0f ? fireRate : 1.05f;
                 if (ReadyToFire(rate)) {
-                    FireAimedFan(playerPos, enemyBullets, 3, 140.0f + loop * 9.0f, 0.12f, Color{255, 96, 196, 255}, 5.0f);
+                    FireAimedFan(playerPos, enemyBullets, 3, 128.0f + loop * 6.0f, 0.14f, Color{255, 96, 196, 255}, 6.0f);
                 }
             }
         }
@@ -171,11 +171,11 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
             if (firePattern == EnemyFirePattern::TurretBurst) {
                 float rate = fireRate > 0.0f ? fireRate : 0.38f;
                 if (ReadyToFire(rate)) {
-                    FireAimed(playerPos, enemyBullets, 176.0f + loop * 9.0f);
+                    FireAimed(playerPos, enemyBullets, 158.0f + loop * 6.0f);
                 }
             } else {
-                if (ReadyToFire(0.92f - std::min(0.25f, loop * 0.025f))) {
-                    FireAimed(playerPos, enemyBullets, 170.0f + loop * 9.0f);
+                if (ReadyToFire(1.10f - std::min(0.18f, loop * 0.018f))) {
+                    FireAimed(playerPos, enemyBullets, 152.0f + loop * 6.0f);
                 }
             }
         }
@@ -197,37 +197,37 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
             current = BossPhase();
 
             if (current == BossAttackPhase::AzureNeedle) {
-                pos.x = 240.0f + std::sin(phaseTimer * 0.78f) * 118.0f;
+                pos.x = 240.0f + std::sin(phaseTimer * 0.58f) * 92.0f;
                 pos.y = 108.0f + std::sin(phaseTimer * 1.35f) * 7.0f;
-                float rate = std::max(0.58f, 0.98f - loop * 0.035f);
+                float rate = std::max(0.82f, 1.18f - loop * 0.026f);
                 if (fireTimer > rate) {
                     fireTimer = 0.0f;
-                    int burst = ((int)(phaseTimer / rate) % 4 == 3) ? 3 : 5;
-                    FireAimedFan(playerPos, enemyBullets, burst, 180.0f + loop * 9.0f, 0.105f, Color{72, 190, 255, 255}, 6.4f);
+                    int burst = ((int)(phaseTimer / rate) % 4 == 3) ? 1 : 3;
+                    FireAimedFan(playerPos, enemyBullets, burst, 162.0f + loop * 6.0f, 0.135f, Color{72, 190, 255, 255}, 7.2f);
                     if (((int)(phaseTimer / rate) % 3) == 1) {
                         Vector2 left = {pos.x - 54.0f, pos.y + 2.0f};
                         Vector2 right = {pos.x + 54.0f, pos.y + 2.0f};
                         Vector2 dl = Norm({playerPos.x - left.x, playerPos.y - left.y});
                         Vector2 dr = Norm({playerPos.x - right.x, playerPos.y - right.y});
-                        enemyBullets.emplace_back(left, Vector2{dl.x * (168.0f + loop * 7.0f), dl.y * (168.0f + loop * 7.0f)}, 5.5f, 1, BulletOwner::Enemy, Color{255, 228, 92, 255});
-                        enemyBullets.emplace_back(right, Vector2{dr.x * (168.0f + loop * 7.0f), dr.y * (168.0f + loop * 7.0f)}, 5.5f, 1, BulletOwner::Enemy, Color{255, 228, 92, 255});
+                        enemyBullets.emplace_back(left, Vector2{dl.x * (148.0f + loop * 5.0f), dl.y * (148.0f + loop * 5.0f)}, 6.4f, 1, BulletOwner::Enemy, Color{255, 228, 92, 255});
+                        enemyBullets.emplace_back(right, Vector2{dr.x * (148.0f + loop * 5.0f), dr.y * (148.0f + loop * 5.0f)}, 6.4f, 1, BulletOwner::Enemy, Color{255, 228, 92, 255});
                     }
                 }
             } else if (current == BossAttackPhase::FallingStar) {
-                pos.x = 240.0f + std::sin(phaseTimer * 0.72f) * 92.0f;
-                pos.y = 114.0f + std::sin(phaseTimer * 1.44f) * 18.0f;
-                float rate = std::max(0.29f, 0.43f - loop * 0.012f);
+                pos.x = 240.0f + std::sin(phaseTimer * 0.58f) * 74.0f;
+                pos.y = 114.0f + std::sin(phaseTimer * 1.10f) * 12.0f;
+                float rate = std::max(0.48f, 0.66f - loop * 0.010f);
                 if (fireTimer > rate) {
                     fireTimer = 0.0f;
-                    int count = 18 + std::min(6, loop);
-                    float speed = 78.0f + loop * 4.5f;
-                    FireRadialGap(enemyBullets, count, speed, phaseTimer * 1.22f, PI * 0.5f, 0.46f, Color{255, 96, 196, 255}, 5.8f);
+                    int count = 12 + std::min(4, loop);
+                    float speed = 70.0f + loop * 3.5f;
+                    FireRadialGap(enemyBullets, count, speed, phaseTimer * 0.95f, PI * 0.5f, 0.78f, Color{255, 96, 196, 255}, 6.8f);
                     if (((int)(phaseTimer * 2.4f) % 3) == 0) {
                         float ring = 34.0f;
-                        for (int i = 0; i < 6; ++i) {
-                            float a = phaseTimer * 0.95f + (float)i / 6.0f * PI * 2.0f;
+                        for (int i = 0; i < 4; ++i) {
+                            float a = phaseTimer * 0.95f + (float)i / 4.0f * PI * 2.0f;
                             Vector2 origin = {pos.x + std::cos(a) * ring, pos.y + std::sin(a) * ring};
-                            enemyBullets.emplace_back(origin, Vector2{std::cos(a) * speed * 0.72f, std::sin(a) * speed * 0.72f}, 5.2f, 1, BulletOwner::Enemy, Color{80, 230, 255, 255});
+                            enemyBullets.emplace_back(origin, Vector2{std::cos(a) * speed * 0.72f, std::sin(a) * speed * 0.72f}, 6.2f, 1, BulletOwner::Enemy, Color{80, 230, 255, 255});
                         }
                     }
                 }
@@ -236,28 +236,28 @@ void Enemy::Update(float dt, Vector2 playerPos, std::vector<Bullet>& enemyBullet
                 pos.x = 240.0f + std::sin(phaseTimer * 1.25f) * 58.0f + std::sin(age * 29.0f) * 2.4f * damageRatio;
                 pos.y = 112.0f + std::sin(phaseTimer * 2.6f) * 9.0f + std::cos(age * 23.0f) * 1.6f * damageRatio;
                 float cycle = std::fmod(phaseTimer, 3.6f);
-                if (cycle < 2.55f && fireTimer > 0.46f) {
+                if (cycle < 2.35f && fireTimer > 0.64f) {
                     fireTimer = 0.0f;
                     float gap = PI * 0.5f + std::sin(phaseTimer * 0.7f) * 0.62f;
-                    FireRadialGap(enemyBullets, 28 + std::min(8, loop), 92.0f + loop * 4.0f, phaseTimer * 1.65f, gap, 0.72f, Color{255, 126, 38, 255}, 5.8f);
+                    FireRadialGap(enemyBullets, 18 + std::min(5, loop), 82.0f + loop * 3.2f, phaseTimer * 1.25f, gap, 1.00f, Color{255, 126, 38, 255}, 6.8f);
                     if (((int)(phaseTimer * 2.0f) % 4) == 1) {
-                        FireAimedFan(playerPos, enemyBullets, 3, 205.0f + loop * 7.0f, 0.08f, Color{255, 56, 82, 255}, 6.8f);
+                        FireAimedFan(playerPos, enemyBullets, 3, 176.0f + loop * 5.0f, 0.11f, Color{255, 56, 82, 255}, 7.4f);
                     }
                 }
             } else if (current == BossAttackPhase::Overload) {
-                pos.x = 240.0f + std::sin(phaseTimer * 2.35f) * 128.0f + std::sin(age * 31.0f) * 4.0f;
-                pos.y = 103.0f + std::sin(phaseTimer * 4.1f) * 14.0f;
-                float cycle = std::fmod(phaseTimer, 3.15f);
-                if (cycle < 2.12f && fireTimer > std::max(0.18f, 0.25f - loop * 0.01f)) {
+                pos.x = 240.0f + std::sin(phaseTimer * 1.35f) * 106.0f + std::sin(age * 22.0f) * 2.5f;
+                pos.y = 103.0f + std::sin(phaseTimer * 2.4f) * 10.0f;
+                float cycle = std::fmod(phaseTimer, 3.45f);
+                if (cycle < 2.12f && fireTimer > std::max(0.34f, 0.45f - loop * 0.01f)) {
                     fireTimer = 0.0f;
                     float safeLane = PI * 0.5f + std::sin(phaseTimer * 0.9f) * 0.42f;
-                    FireRadialGap(enemyBullets, 18 + std::min(6, loop), 118.0f + loop * 4.0f, age * 2.35f, safeLane, 0.64f, Color{255, 40, 108, 255}, 6.2f);
+                    FireRadialGap(enemyBullets, 14 + std::min(4, loop), 104.0f + loop * 3.0f, age * 1.65f, safeLane, 0.88f, Color{255, 40, 108, 255}, 7.0f);
                     if (((int)(phaseTimer * 3.2f) % 2) == 0) {
-                        for (int i = 0; i < 8; ++i) {
-                            float a = -age * 1.45f + (float)i / 8.0f * PI * 2.0f;
+                        for (int i = 0; i < 5; ++i) {
+                            float a = -age * 1.05f + (float)i / 5.0f * PI * 2.0f;
                             Vector2 origin = {pos.x + std::cos(a) * 56.0f, pos.y + std::sin(a) * 56.0f};
                             Vector2 inward = Norm({pos.x - origin.x, pos.y + 28.0f - origin.y});
-                            enemyBullets.emplace_back(origin, Vector2{inward.x * (92.0f + loop * 3.0f), inward.y * (92.0f + loop * 3.0f)}, 5.2f, 1, BulletOwner::Enemy, Color{128, 230, 255, 255});
+                            enemyBullets.emplace_back(origin, Vector2{inward.x * (82.0f + loop * 2.5f), inward.y * (82.0f + loop * 2.5f)}, 6.2f, 1, BulletOwner::Enemy, Color{128, 230, 255, 255});
                         }
                     }
                 }
@@ -379,9 +379,13 @@ void Enemy::Draw(bool debug) const {
         
         BeginBlendMode(BLEND_ADDITIVE);
         // Outer glowing core aura
-        DrawCircleV(pos, (phase2 ? 14.0f : 8.0f) + 4.0f * pulse, Fade(coreColor, 0.55f + 0.30f * pulse));
+        DrawCircleV(pos, (phase2 ? 16.0f : 10.0f) + 5.0f * pulse + (flash ? 8.0f : 0.0f),
+                    Fade(coreColor, (flash ? 0.86f : 0.55f) + 0.24f * pulse));
         // Inner hot core
-        DrawCircleV(pos, phase2 ? 5.0f : 3.5f, WHITE);
+        DrawCircleV(pos, phase2 ? 6.0f : 4.5f, WHITE);
+        if (flash) {
+            DrawCircleLines((int)pos.x, (int)pos.y, phase2 ? 29.0f : 22.0f, Fade(WHITE, 0.72f));
+        }
         if (phase2) {
             DrawCircleLines((int)pos.x, (int)pos.y, 18.0f + 3.0f * pulse, Fade(RED, 0.68f));
             DrawLineEx({pos.x - 17.0f, pos.y - 5.0f}, {pos.x - 7.0f, pos.y + 6.0f}, 1.5f, Fade(ORANGE, 0.8f));
@@ -410,31 +414,31 @@ void Enemy::Draw(bool debug) const {
 
         // Attack telegraphs: thin, high-contrast danger hints before each named pattern resolves.
         BeginBlendMode(BLEND_ADDITIVE);
-        if (current == BossAttackPhase::AzureNeedle && fireTimer > 0.68f) {
+        if (current == BossAttackPhase::AzureNeedle && fireTimer > 0.62f) {
             float shotAngle = (aimAngle - 90.0f) * DEG2RAD;
             Vector2 end = { pos.x + std::cos(shotAngle) * 540.0f, pos.y + std::sin(shotAngle) * 540.0f };
-            DrawLineEx(pos, end, 2.0f, Fade(Color{72, 190, 255, 255}, 0.34f));
-            DrawLineEx({pos.x - 7.0f, pos.y}, {end.x - 20.0f, end.y}, 1.0f, Fade(SKYBLUE, 0.18f));
-            DrawLineEx({pos.x + 7.0f, pos.y}, {end.x + 20.0f, end.y}, 1.0f, Fade(SKYBLUE, 0.18f));
-        } else if (current == BossAttackPhase::FallingStar && fireTimer > 0.25f) {
+            DrawLineEx(pos, end, 3.0f, Fade(Color{72, 190, 255, 255}, 0.40f));
+            DrawLineEx({pos.x - 10.0f, pos.y}, {end.x - 24.0f, end.y}, 1.5f, Fade(SKYBLUE, 0.22f));
+            DrawLineEx({pos.x + 10.0f, pos.y}, {end.x + 24.0f, end.y}, 1.5f, Fade(SKYBLUE, 0.22f));
+        } else if (current == BossAttackPhase::FallingStar && fireTimer > 0.33f) {
             float r = 26.0f + std::sin(age * 18.0f) * 2.0f;
-            DrawCircleLines((int)pos.x, (int)pos.y, r, Fade(Color{255, 96, 196, 255}, 0.62f));
-            DrawCircleLines((int)pos.x, (int)pos.y, r + 15.0f, Fade(SKYBLUE, 0.28f));
+            DrawCircleLines((int)pos.x, (int)pos.y, r, Fade(Color{255, 96, 196, 255}, 0.68f));
+            DrawCircleLines((int)pos.x, (int)pos.y, r + 18.0f, Fade(SKYBLUE, 0.34f));
         } else if (current == BossAttackPhase::BrokenHalo) {
             float cycle = std::fmod(phaseTimer, 3.6f);
-            if (cycle < 2.55f && fireTimer > 0.28f) {
+            if (cycle < 2.35f && fireTimer > 0.36f) {
                 float gap = PI * 0.5f + std::sin(phaseTimer * 0.7f) * 0.62f;
                 Vector2 safe = { pos.x + std::cos(gap) * 76.0f, pos.y + std::sin(gap) * 76.0f };
-                DrawCircleLines((int)pos.x, (int)pos.y, 42.0f + 5.0f * pulse, Fade(ORANGE, 0.48f));
-                DrawLineEx(pos, safe, 4.0f, Fade(LIME, 0.20f));
+                DrawCircleLines((int)pos.x, (int)pos.y, 42.0f + 5.0f * pulse, Fade(ORANGE, 0.46f));
+                DrawLineEx(pos, safe, 7.0f, Fade(LIME, 0.30f));
             }
         } else if (current == BossAttackPhase::Overload) {
-            float cycle = std::fmod(phaseTimer, 3.15f);
+            float cycle = std::fmod(phaseTimer, 3.45f);
             if (cycle < 2.12f) {
-                DrawLineEx({pos.x - 64.0f, pos.y - 38.0f}, {pos.x + 64.0f, pos.y + 38.0f}, 2.5f, Fade(RED, 0.32f));
-                DrawLineEx({pos.x + 64.0f, pos.y - 38.0f}, {pos.x - 64.0f, pos.y + 38.0f}, 2.5f, Fade(RED, 0.32f));
+                DrawLineEx({pos.x - 64.0f, pos.y - 38.0f}, {pos.x + 64.0f, pos.y + 38.0f}, 3.0f, Fade(RED, 0.34f));
+                DrawLineEx({pos.x + 64.0f, pos.y - 38.0f}, {pos.x - 64.0f, pos.y + 38.0f}, 3.0f, Fade(RED, 0.34f));
             } else {
-                DrawCircleLines((int)pos.x, (int)pos.y, 50.0f, Fade(SKYBLUE, 0.24f));
+                DrawCircleLines((int)pos.x, (int)pos.y, 50.0f, Fade(SKYBLUE, 0.30f));
             }
         }
         EndBlendMode();

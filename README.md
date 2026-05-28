@@ -1,6 +1,6 @@
 # Sky Circuit
 
-Sky Circuit is a complete local C++17/raylib vertical arcade shooter. It captures the immediate feel of 1990s cabinet shmups with original procedural vector art, generated arcade tones, readable enemy patterns, powerups, bombs, score pressure, and a looping stage built for quick play sessions.
+Sky Circuit is a complete local C++17/raylib vertical mobile-first arcade shooter. It keeps the theatre of 1990s cabinet shmups, but the primary play assumptions are handheld readability, thumb-driven steering, short sessions, compressed pacing, generous telegraphs, and stable performance.
 
 ## Onboarding & How to Start the Game
 
@@ -30,14 +30,17 @@ When the game starts up, select **Start Mission** to play:
 - **Gamepad Navigation**: Press **D-Pad Up/Down** and confirm with the **Down Face Button (A / Cross)**.
 
 ### 4. First Flight Controls
-Once the mission starts, a helper banner will appear at the bottom of the playfield showing the active control configuration:
+Once the mission starts, a helper banner appears near the bottom of the playfield:
+- **Touch / Mouse Drag**: Drag below the ship to steer. The ship floats above the thumb/finger so it stays visible.
+- **Auto-Fire**: Weapons fire continuously during play.
+- **Bomb**: Two-finger tap on touch screens, right-click with mouse, or press the mapped bomb button.
 - **Arrows Layout (Default)**: Move with Arrow Keys, Shoot with Z or Space, Bomb with X.
 - **WASD Layout**: Move with W/A/S/D, Shoot with J or Space, Bomb with K.
 *Note: You can switch control presets, adjust volume sliders, or toggle fullscreen modes inside the **Settings** menu at any time.*
 
 ## Features
 
-- 480x640 vertical playfield.
+- 480x640 vertical mobile playfield.
 - Familiar title menu with **Start Mission**, **High Scores**, **Settings**, **How To Play**, and **Exit**.
 - **Interactive Settings**: Sliders for SFX and Music volume, Screen Shake toggle, Screen Mode (Windowed/Fullscreen), and Hitbox display toggle.
 - **Persistent High Scores Leaderboard**: Hall of Fame saving to local `highscores.txt` with Name Entry UI for player initials.
@@ -46,16 +49,17 @@ Once the mission starts, a helper banner will appear at the bottom of the playfi
 - **Gamepad / Controller Support**: Full controller integration for gameplay and menus.
 - In-game help screen with objective, controls, pickups, and survival tips.
 - Pause, stage-clear, and game-over states.
-- Smooth 8-direction movement plus focused slow movement.
+- Touch/mouse drag steering with thumb offset, plus keyboard/gamepad compatibility.
+- Auto-fire weapons tuned for movement-first handheld play.
 - Deliberately small visible red hitbox for fair bullet reading.
-- Hold-to-fire weapons:
+- Weapons:
   - **Vulcan**: fast straight shot with upgraded spread.
   - **Plasma**: slower wide coverage.
   - **Missile**: secondary homing projectiles.
 - Bomb button clears enemy bullets, damages enemies, grants brief invulnerability, and shakes the screen.
 - Powerups: weapon change, weapon upgrade, bomb, and score medal.
-- Authored arcade stage progression with named wave blocks, transition choreography, a bonus formation round, recovery windows, mid-stage spike, and expanded boss runway.
-- Miniboss with aimed, radial, and mixed attack phases.
+- Authored mobile-first stage progression with named wave blocks, clear transition callouts, an earlier reward-heavy bonus formation, recovery windows, short pressure spikes, and an expanded boss runway.
+- Miniboss with slower entrance, clearer weak point, wider safe lanes, and reduced projectile overlap.
 - Stage clear restarts the loop harder.
 - Particle explosions, HUD, scrolling layered background, and F1 debug hitboxes.
 
@@ -67,10 +71,10 @@ Once the mission starts, a helper banner will appear at the bottom of the playfi
 | Confirm selection | Enter or Space | Face Button Down (A / Cross) | Left-click option |
 | Adjust volume sliders | Left/Right or A/D | D-Pad Left/Right | Drag slider handle |
 | Back from submenus | Enter, Escape, or Backspace | Face Button Down / Right (A/B) | Left-click BACK button |
-| Move | Arrow keys or WASD | Left Analog Stick or D-Pad | - |
+| Move | Arrow keys or WASD | Left Analog Stick or D-Pad | Drag below ship |
 | Focus / Slow movement | Left Shift | Shoulder Triggers (L1 / R1) | - |
-| Shoot | Hold Z or Space | Face Button Down / Left (A / X) | - |
-| Bomb | X | Face Button Right (B / Circle) | - |
+| Shoot | Auto-fire, Z, or Space | Auto-fire / Face Button Down or Left | Auto-fire |
+| Bomb | X | Face Button Right (B / Circle) | Two-finger tap / right click |
 | Pause / Resume | P | Menu/Start Button | Navigate pause menu choices |
 | Toggle hitboxes | F1 (in gameplay) | Configurable in Settings | - |
 
@@ -118,7 +122,7 @@ If using MinGW or Ninja single-config generators, the executable may be at `buil
 
 - The game uses simple vectors and circle collisions for clarity and fast iteration.
 - Procedural vector art and tones are intentional: the game has no copyrighted sprites, logos, music, or level layouts.
-- The gameplay loop is deterministic-feeling and compact: push through staggered route acts, take a short score-attack bonus parade, defeat the carrier, clear the stage, then repeat at a higher difficulty.
+- The gameplay loop is compact and mobile-first: quick orientation, early spectacle, short pressure bursts, a low-stress score parade, readable boss approach, boss combat, stage clear, then repeat at a higher difficulty.
 - Stage pacing is directed through explicit wave blocks: opening orientation, sweep language, formation reassembly, aimed interceptors, false recovery pinch, breathing lane, debris drift, bonus formation, threat horizon, fortress corridor, fortress collapse, tactical silence, boss arrival, and boss combat.
 - The red center dot is the actual player hitbox; the ship body may overlap bullets without counting as a hit.
 

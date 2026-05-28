@@ -24,6 +24,8 @@ void Player::ResetForNewGame() {
     scaleY_ = 1.0f;
     scaleYVel_ = 0.0f;
     heat_ = 0.0f;
+    pointerControlActive_ = false;
+    pointerIdleTimer_ = 0.0f;
     positionCount_ = 0;
     for (int i = 0; i < 8; ++i) pastPositions_[i] = pos;
 }
@@ -41,6 +43,8 @@ void Player::ResetAfterHit() {
     scaleY_ = 1.0f;
     scaleYVel_ = 0.0f;
     heat_ = 0.0f;
+    pointerControlActive_ = false;
+    pointerIdleTimer_ = 0.0f;
     positionCount_ = 0;
     for (int i = 0; i < 8; ++i) pastPositions_[i] = pos;
 }
@@ -127,15 +131,58 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
         }
     }
 
+    bool mousePointerDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    bool touchPointerDown = GetTouchPointCount() > 0;
+    bool pointerDown = !isDemo && (mousePointerDown || touchPointerDown);
+    Vector2 pointerPos = mousePointerDown ? GetMousePosition() : (touchPointerDown ? GetTouchPosition(0) : pos);
+    bool pointerSteering = pointerDown && pointerPos.y > 86.0f;
+    bool pointerApplied = false;
+    if (pointerSteering) {
+        pointerControlActive_ = true;
+        pointerIdleTimer_ = 0.0f;
+        Vector2 target = { pointerPos.x, pointerPos.y - 74.0f };
+        target.x = std::clamp(target.x, 26.0f, 454.0f);
+        target.y = std::clamp(target.y, 92.0f, 586.0f);
+        Vector2 delta = { target.x - pos.x, target.y - pos.y };
+        float dist = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+        if (dist > 0.85f) {
+            float responsiveness = dist > 96.0f ? 33.0f : 25.0f;
+            float blend = 1.0f - std::exp(-responsiveness * dt);
+            Vector2 step = { delta.x * blend, delta.y * blend };
+            float stepLen = std::sqrt(step.x * step.x + step.y * step.y);
+            float maxStep = (dist > 96.0f ? 520.0f : 430.0f) * dt;
+            if (stepLen > maxStep && stepLen > 0.001f) {
+                step.x = step.x / stepLen * maxStep;
+                step.y = step.y / stepLen * maxStep;
+                stepLen = maxStep;
+            }
+            pos.x = std::clamp(pos.x + step.x, 28.0f, 452.0f);
+            pos.y = std::clamp(pos.y + step.y, 92.0f, 586.0f);
+            if (stepLen > 0.001f) {
+                dir.x = step.x / stepLen;
+                dir.y = step.y / stepLen;
+            }
+            pointerApplied = true;
+        } else {
+            dir = {0.0f, 0.0f};
+            pointerApplied = true;
+        }
+    } else if (!pointerDown && pointerControlActive_) {
+        pointerIdleTimer_ += dt;
+        if (pointerIdleTimer_ > 0.20f) pointerControlActive_ = false;
+    }
+
     if (dir.x != 0 || dir.y != 0) {
         float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
         dir.x /= len; dir.y /= len;
     }
     
     bool focusMode = !isDemo && (IsKeyDown(KEY_LEFT_SHIFT) || (IsGamepadAvailable(0) && (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1))));
-    float speed = focusMode ? 150.0f : 252.0f;
-    pos.x = std::clamp(pos.x + dir.x * speed * dt, 24.0f, 456.0f);
-    pos.y = std::clamp(pos.y + dir.y * speed * dt, 72.0f, 610.0f);
+    if (!pointerApplied) {
+        float speed = focusMode ? 158.0f : 268.0f;
+        pos.x = std::clamp(pos.x + dir.x * speed * dt, 28.0f, 452.0f);
+        pos.y = std::clamp(pos.y + dir.y * speed * dt, 92.0f, 586.0f);
+    }
     shootTimer_ = std::max(0.0f, shootTimer_ - dt);
     animationTime += dt;
     if (invulnerable) {
@@ -189,7 +236,7 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
     }
 
     // Spawn procedural vectored engine exhaust particles
-    if (GetRandomValue(0, 100) < 42) {
+    if (GetRandomValue(0, 100) < 32) {
         Color thrusterColor = focusMode ? SKYBLUE : (GetRandomValue(0, 1) == 0 ? ORANGE : GOLD);
         
         // Calculate dynamic vectored exhaust direction based on ship movement and roll tilt
@@ -210,7 +257,7 @@ void Player::Update(float dt, Effects& effects, const std::vector<Enemy>& enemie
 }
 
 void Player::TryShoot(std::vector<Bullet>& bullets) {
-    bool shootPressed = isDemo;
+    bool shootPressed = isDemo || IsWindowFocused();
     if (!shootPressed) {
         if (controlLayout == 0) {
             shootPressed = IsKeyDown(KEY_Z) || IsKeyDown(KEY_SPACE);
@@ -275,6 +322,10 @@ bool Player::BombPressed() const {
         if (IsGamepadAvailable(0)) {
             bombPressed = bombPressed || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
         }
+        static bool twoFingerWasDown = false;
+        bool twoFingerDown = GetTouchPointCount() >= 2;
+        bombPressed = bombPressed || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || (twoFingerDown && !twoFingerWasDown);
+        twoFingerWasDown = twoFingerDown;
     }
     return bombPressed;
 }

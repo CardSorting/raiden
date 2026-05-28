@@ -47,5 +47,6 @@ public:
 
 private:
     float shootTimer_ = 0.0f;
+    bool pointerControlActive_ = false;
+    float pointerIdleTimer_ = 0.0f;
 };
-

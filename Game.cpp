@@ -121,13 +121,18 @@ static bool CircleHit(Vector2 a, float ar, Vector2 b, float br) {
     return dx * dx + dy * dy <= r * r;
 }
 
+static void TrimOldestEnemyBullets(std::vector<Bullet>& bullets, int maxCount) {
+    if ((int)bullets.size() <= maxCount) return;
+    bullets.erase(bullets.begin(), bullets.begin() + ((int)bullets.size() - maxCount));
+}
+
 static constexpr int SettingsCount = 20;
 static constexpr int VisibleSettingsRows = 11;
-static constexpr float BossDeathDuration = 1.68f;
-static constexpr int DiagBulletWarnThreshold = 42;
-static constexpr int DiagEnemyWarnThreshold = 14;
-static constexpr int DiagCombinedBulletThreshold = 30;
-static constexpr int DiagCombinedEnemyThreshold = 9;
+static constexpr float BossDeathDuration = 1.34f;
+static constexpr int DiagBulletWarnThreshold = 28;
+static constexpr int DiagEnemyWarnThreshold = 10;
+static constexpr int DiagCombinedBulletThreshold = 22;
+static constexpr int DiagCombinedEnemyThreshold = 7;
 static constexpr int DiagRecoveryBulletThreshold = 2;
 static constexpr int DiagRecoveryEnemyThreshold = 6;
 
@@ -298,16 +303,15 @@ void Game::CommsQueue::Draw(const CommsPortrait& portrait) const {
     if (!active_) return;
     float alpha = std::clamp(timer_ < 0.35f ? timer_ / 0.35f : 1.0f, 0.0f, 1.0f);
     Color frame = CharacterCallsigns::ColorFor(current_.speaker);
-    DrawRectangle(12, 44, 328, 72, Fade(BLACK, 0.82f * alpha));
-    DrawRectangleLines(12, 44, 328, 72, Fade(frame, 0.78f * alpha));
+    DrawRectangle(14, 48, 292, 56, Fade(BLACK, 0.76f * alpha));
+    DrawRectangleLines(14, 48, 292, 56, Fade(frame, 0.68f * alpha));
     float pulse = 0.5f + 0.5f * std::sin((float)GetTime() * 9.5f);
-    portrait.Draw({20.0f, 49.0f}, current_.speaker, pulse);
-    DrawText(CharacterCallsigns::Callsign(current_.speaker), 91, 54, 13, Fade(frame, alpha));
-    DrawText(CharacterCallsigns::Name(current_.speaker), 176, 55, 10, Fade(GRAY, alpha * 0.88f));
-    DrawLine(90, 72, 326, 72, Fade(frame, 0.28f * alpha));
-    DrawText(current_.line1, 91, 80, 12, Fade(RAYWHITE, alpha));
+    portrait.Draw({20.0f, 51.0f}, current_.speaker, pulse);
+    DrawText(CharacterCallsigns::Callsign(current_.speaker), 91, 56, 12, Fade(frame, alpha));
+    DrawLine(90, 72, 292, 72, Fade(frame, 0.24f * alpha));
+    DrawText(current_.line1, 91, 80, 11, Fade(RAYWHITE, alpha));
     if (current_.line2 && current_.line2[0] != '\0') {
-        DrawText(current_.line2, 91, 96, 12, Fade(RAYWHITE, alpha));
+        DrawText(current_.line2, 91, 94, 11, Fade(RAYWHITE, alpha * 0.92f));
     }
 }
 
@@ -345,7 +349,7 @@ void Game::BossAttackNameOverlay::Reset() {
 }
 
 void Game::MissionBriefingOverlay::Begin() {
-    timer_ = 5.6f;
+    timer_ = 2.8f;
 }
 
 void Game::MissionBriefingOverlay::Update(float dt) {
@@ -355,15 +359,13 @@ void Game::MissionBriefingOverlay::Update(float dt) {
 void Game::MissionBriefingOverlay::Draw() const {
     if (timer_ <= 0.0f) return;
     float alpha = std::clamp(timer_ < 0.75f ? timer_ / 0.75f : 1.0f, 0.0f, 1.0f);
-    DrawRectangle(0, 78, 480, 126, Fade(BLACK, 0.72f * alpha));
-    DrawLine(32, 78, 448, 78, Fade(SKYBLUE, 0.55f * alpha));
-    DrawLine(32, 204, 448, 204, Fade(SKYBLUE, 0.30f * alpha));
-    const char* title = "STAGE 1: SKY CIRCUIT";
-    DrawText(title, 240 - MeasureText(title, 26) / 2, 94, 26, Fade(GOLD, alpha));
-    DrawText("Unauthorized Entry Through the Upper Gate", 62, 126, 13, Fade(SKYBLUE, alpha));
-    DrawText("SOLACE-IX // LAUNCH CLEARANCE DENIED", 62, 150, 13, Fade(Color{255, 112, 132, 255}, alpha));
-    DrawText("Manual override accepted.", 62, 170, 13, Fade(RAYWHITE, alpha));
-    DrawText("ACE: Liora Vance // Keep the channel open.", 62, 190, 12, Fade(GRAY, alpha));
+    DrawRectangle(0, 78, 480, 112, Fade(BLACK, 0.66f * alpha));
+    DrawLine(30, 78, 450, 78, Fade(GOLD, 0.52f * alpha));
+    DrawLine(30, 190, 450, 190, Fade(SKYBLUE, 0.30f * alpha));
+    const char* route = "ROUTE VANTAGE";
+    DrawText(route, 240 - MeasureText(route, 28) / 2, 94, 28, Fade(GOLD, alpha));
+    DrawText("GATELINE-01 // SOLACE LAUNCH", 240 - MeasureText("GATELINE-01 // SOLACE LAUNCH", 13) / 2, 130, 13, Fade(SKYBLUE, alpha));
+    DrawText("DRAG TO FLY  //  AUTO-FIRE ARMED", 240 - MeasureText("DRAG TO FLY  //  AUTO-FIRE ARMED", 13) / 2, 156, 13, Fade(RAYWHITE, alpha));
 }
 
 void Game::MissionBriefingOverlay::Reset() {
@@ -371,16 +373,20 @@ void Game::MissionBriefingOverlay::Reset() {
 }
 
 void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bombs, int stageClearBonus) const {
-    DrawRectangle(0, 0, 480, 640, Fade(BLACK, 0.65f));
-    DrawRectangle(30, 86, 420, 468, Fade(BLACK, 0.87f));
-    DrawRectangleLines(30, 86, 420, 468, Fade(GOLD, 0.8f));
+    DrawRectangle(0, 0, 480, 640, Fade(BLACK, 0.58f));
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawRing({240.0f, 126.0f}, 72.0f, 75.0f, (float)GetTime() * 24.0f, (float)GetTime() * 24.0f + 310.0f, 64, Fade(GOLD, 0.18f));
+    DrawLineEx({72.0f, 230.0f}, {408.0f, 230.0f}, 2.0f, Fade(SKYBLUE, 0.20f));
+    EndBlendMode();
+    DrawRectangle(30, 86, 420, 468, Fade(BLACK, 0.82f));
+    DrawRectangleLines(30, 86, 420, 468, Fade(GOLD, 0.82f));
 
-    const char* title = "STAGE CLEAR";
-    DrawText(title, 240 - MeasureText(title, 32) / 2, 106, 32, GOLD);
-    DrawText("MOTHER-3: Gate is open. Barely.", 52, 154, 12, RAYWHITE);
+    const char* title = "ROUTE VANTAGE CLEAR";
+    DrawText(title, 240 - MeasureText(title, 28) / 2, 106, 28, GOLD);
+    DrawText("CONTROL: Gate line is open.", 52, 154, 12, RAYWHITE);
     DrawText("WRENCH: SOLACE is scorched, but flying.", 52, 172, 12, Color{255, 184, 76, 255});
-    DrawText("SHADE: So the locked door was personal.", 52, 190, 12, Color{190, 128, 255, 255});
-    DrawText("ACE: No. It was waiting.", 52, 208, 12, SKYBLUE);
+    DrawText("SHADE: The locked door learned to burn.", 52, 190, 12, Color{190, 128, 255, 255});
+    DrawText("ACE: Log it. We came back louder.", 52, 208, 12, SKYBLUE);
     DrawLine(50, 232, 430, 232, Fade(GOLD, 0.4f));
 
     int baseBonus = 2000;
@@ -393,7 +399,7 @@ void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bo
         shownTotalBonus = (int)((float)totalBonus * reveal);
     }
 
-    DrawText("MISSION PERFORMANCE RESULTS", 60, 254, 15, SKYBLUE);
+    DrawText("RUN PAYOUT", 60, 254, 15, SKYBLUE);
     DrawText("Base Clear Bonus:", 60, 288, 15, RAYWHITE);
     DrawText(TextFormat("+%d", baseBonus), 322, 288, 15, LIME);
     DrawText(TextFormat("Survivor Lives (%d):", lives), 60, 320, 15, RAYWHITE);
@@ -404,7 +410,7 @@ void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bo
     DrawText("TOTAL STAGE BONUS:", 60, 410, 18, GOLD);
     DrawText(TextFormat("+%d", shownTotalBonus), 322, 410, 18, GOLD);
 
-    const char* hook = "NEXT: THE EMPTY ORBITAL CHOIR";
+    const char* hook = "NEXT ROUTE: EMPTY ORBITAL CHOIR";
     DrawText(hook, 240 - MeasureText(hook, 15) / 2, 468, 15, Color{255, 112, 132, 255});
     const char* loopText = TextFormat("ADVANCING TO LOOP %d", loop + 1);
     DrawText(loopText, 240 - MeasureText(loopText, 14) / 2, 500, 14, SKYBLUE);
@@ -414,7 +420,7 @@ void Game::StageClearDebrief::Draw(float clearTimer, int loop, int lives, int bo
 
 Game::Game() {
     SetTraceLogLevel(LOG_WARNING);
-    InitWindow(ScreenW, ScreenH, "Sky Circuit - raylib arcade shooter");
+    InitWindow(ScreenW, ScreenH, "Sky Circuit - mobile arcade shooter");
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
     audio_.Init();
@@ -454,7 +460,7 @@ Game::Game() {
     }
 
     // Populate background asteroids
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 5; ++i) {
         AsteroidInstance ast;
         ast.pos = { (float)GetRandomValue(0, ScreenW), (float)GetRandomValue(-ScreenH, ScreenH) };
         ast.speed = (float)GetRandomValue(35, 60);
@@ -465,7 +471,7 @@ Game::Game() {
     }
 
     // Populate background clouds
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 3; ++i) {
         CloudInstance cld;
         cld.pos = { (float)GetRandomValue(-20, ScreenW - 20), (float)GetRandomValue(-ScreenH, ScreenH) };
         cld.speed = (float)GetRandomValue(70, 110);
@@ -594,11 +600,16 @@ void Game::StartGame() {
     medalChain_ = 0;
     nextScoreMilestone_ = 10000;
     nextExtraLifeScore_ = 50000;
-    tutorialTimer_ = 4.0f;
+    tutorialTimer_ = 2.8f;
     ResetStorySystems();
     missionBriefing_.Begin();
     for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
     state_ = State::Playing;
+    if (!demoMode_) {
+        effects_.AddText({240.0f, 178.0f}, "ROUTE VANTAGE", GOLD);
+        effects_.AddText({240.0f, 216.0f}, "READY", SKYBLUE);
+        QueueComms(CommsSpeaker::Control, "Route Vantage live.", "Touch and drag. Auto-fire armed.", 4, 2.5f);
+    }
     
     audio_.SetMusicDucked(false);
     audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
@@ -682,26 +693,23 @@ void Game::NextLoop() {
     diagLastDeathCause_ = "NONE";
     player_.bombs = std::min(6, player_.bombs + 1);
     state_ = State::Playing;
+    effects_.AddText({240.0f, 178.0f}, "ROUTE VANTAGE", GOLD);
+    effects_.AddText({240.0f, 216.0f}, TextFormat("LOOP %d", loop_), SKYBLUE);
+    QueueComms(CommsSpeaker::Control, "Gate memory repeating.", "Loop route armed.", 4, 2.4f);
     audio_.SetMusicDucked(false);
     audio_.PlayMusic(AudioSystem::MusicTrack::Stage);
     audio_.PlayStageStart();
 }
 
 void Game::Update(float dt) {
-    // Coin insertion trigger (C key or Select button on Gamepad)
+    // Legacy cabinet pulse: free-play builds keep the cadence without gating runs.
     bool coinPressed = IsKeyPressed(KEY_C);
     if (IsGamepadAvailable(0)) {
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)) coinPressed = true;
     }
     if (coinPressed) {
-        if (credits_ < 99) {
-            credits_++;
-            audio_.PlayInsertCoin();
-            effects_.AddText({ 240, 320 }, "CREDIT +1", GOLD);
-        } else {
-            audio_.PlayDenied();
-            effects_.AddText({ 240, 320 }, "CREDIT MAX", RED);
-        }
+        audio_.PlayInsertCoin();
+        effects_.AddText({ 240, 320 }, "FREE PLAY", GOLD);
     }
 
     // Detect active input device for hybrid navigation focus
@@ -864,7 +872,7 @@ void Game::Update(float dt) {
             lastAttractShimmer = attractShimmer;
             audio_.PlayAttractShimmer();
         }
-        if (titleTimer_ > 10.0f) {
+        if (titleTimer_ > 24.0f) {
             demoMode_ = true;
             titleTimer_ = 0.0f;
             StartGame();
@@ -886,8 +894,9 @@ void Game::Update(float dt) {
             
             if (lastInputType_ == InputType::Mouse && mouseMoved) {
                 for (int i = 0; i < 5; ++i) {
-                    int y = 220 + i * 32;
-                    if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                    Rectangle hit = i == 0 ? Rectangle{52.0f, 220.0f, 376.0f, 76.0f}
+                                           : Rectangle{64.0f, 320.0f + (float)(i - 1) * 52.0f, 352.0f, 44.0f};
+                    if (CheckCollisionPointRec(mousePos, hit)) {
                         if (titleSelection_ != i) {
                             titleSelection_ = i;
                             titleTimer_ = 0.0f;
@@ -899,8 +908,9 @@ void Game::Update(float dt) {
             
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 for (int i = 0; i < 5; ++i) {
-                    int y = 220 + i * 32;
-                    if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                    Rectangle hit = i == 0 ? Rectangle{52.0f, 220.0f, 376.0f, 76.0f}
+                                           : Rectangle{64.0f, 320.0f + (float)(i - 1) * 52.0f, 352.0f, 44.0f};
+                    if (CheckCollisionPointRec(mousePos, hit)) {
                         titleSelection_ = i;
                         keyConfirm = true;
                     }
@@ -934,19 +944,11 @@ void Game::Update(float dt) {
             if (keyConfirm) {
                 titleTimer_ = 0.0f;
                 if (titleSelection_ == 0) {
-                    if (credits_ > 0 || demoMode_) {
-                        audio_.PlayPressStart();
-                        difficultySelection_ = 0;
-                        if (demoMode_) {
-                            difficulty_ = 0;
-                            StartTransition(State::Playing);
-                        } else {
-                            StartTransition(State::DifficultySelect);
-                        }
-                    } else {
-                        audio_.PlayDenied();
-                        effects_.AddText({ 240, 215 }, "INSERT COIN!", RED);
-                    }
+                    audio_.PlayPressStart();
+                    difficultySelection_ = 0;
+                    difficulty_ = 0;
+                    demoMode_ = false;
+                    StartTransition(State::Playing);
                 } else {
                     audio_.PlayMenuConfirm();
                     if (titleSelection_ == 1) {
@@ -1133,8 +1135,9 @@ void Game::Update(float dt) {
         
         if (lastInputType_ == InputType::Mouse && mouseMoved) {
             for (int i = 0; i < 3; ++i) {
-                int y = 290 + i * 36;
-                if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                Rectangle hit = i == 0 ? Rectangle{54.0f, 286.0f, 372.0f, 64.0f}
+                                       : Rectangle{84.0f, 368.0f + (float)(i - 1) * 52.0f, 312.0f, 44.0f};
+                if (CheckCollisionPointRec(mousePos, hit)) {
                     if (gameOverSelection_ != i) {
                         gameOverSelection_ = i;
                         audio_.PlayMenuMove();
@@ -1145,8 +1148,9 @@ void Game::Update(float dt) {
         
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             for (int i = 0; i < 3; ++i) {
-                int y = 290 + i * 36;
-                if (mousePos.x >= 120 && mousePos.x <= 360 && mousePos.y >= y - 6 && mousePos.y <= y + 20) {
+                Rectangle hit = i == 0 ? Rectangle{54.0f, 286.0f, 372.0f, 64.0f}
+                                       : Rectangle{84.0f, 368.0f + (float)(i - 1) * 52.0f, 312.0f, 44.0f};
+                if (CheckCollisionPointRec(mousePos, hit)) {
                     gameOverSelection_ = i;
                     keyConfirm = true;
                 }
@@ -1164,15 +1168,9 @@ void Game::Update(float dt) {
         
         if (keyConfirm) {
             if (gameOverSelection_ == 0) {
-                if (credits_ > 0 || demoMode_) {
-                    audio_.PlayPressStart();
-                    if (!demoMode_) credits_--;
-                    StartTransition(State::Playing);
-                } else {
-                    audio_.PlayDenied();
-                    effects_.Shake(4.0f, 0.15f);
-                    effects_.AddText({ 240, 215 }, "INSERT COIN!", RED);
-                }
+                audio_.PlayPressStart();
+                demoMode_ = false;
+                StartTransition(State::Playing);
             } else if (gameOverSelection_ == 1) {
                 audio_.PlayMenuConfirm();
                 returnFromSettings_ = State::GameOver;
@@ -1278,18 +1276,29 @@ void Game::UpdatePlaying(float dt) {
 
         if (bossDeathTimer_ <= 0.0f) {
             effects_.AddText(bossDeathPos_, "CORE COLLAPSE", WHITE);
+            effects_.AddText({240.0f, bossDeathPos_.y + 76.0f}, "ROUTE VANTAGE CLEAR", GOLD);
             effects_.Explosion(bossDeathPos_, VIOLET, 112, SpriteId::DebrisBossCore);
             effects_.DebrisShower(bossDeathPos_, Color{235, 190, 15, 255}, 18); // Gold core shards
             effects_.DebrisShower(bossDeathPos_, DARKGRAY, 22); // Hull shards
             effects_.DebrisShower(bossDeathPos_, RED, 16); // Hot core slag
             effects_.Spark(bossDeathPos_, WHITE, {0.0f, -160.0f});
+            for (int i = 0; i < 8; ++i) {
+                float a = ((float)i / 8.0f) * PI * 2.0f;
+                Vector2 medalPos = {
+                    std::clamp(bossDeathPos_.x + std::cos(a) * 52.0f, 28.0f, (float)ScreenW - 28.0f),
+                    std::clamp(bossDeathPos_.y + std::sin(a) * 36.0f + 42.0f, 80.0f, (float)ScreenH - 80.0f)
+                };
+                powerups_.emplace_back(PowerupType::Medal, medalPos);
+            }
             effects_.Shake(26.0f, 0.72f);
             
             // Trigger screen white flash
             screenFlashTimer_ = 0.16f;
 
             audio_.PlayExplosionAt(ExplosionSize::Large, bossDeathPos_.x, (float)ScreenW);
-            bossClearDelayTimer_ = 1.05f;
+            audio_.PlayBonusTick(8);
+            QueueComms(CommsSpeaker::Control, "Route Vantage is open.", "Bring SOLACE home.", 5, 2.6f);
+            bossClearDelayTimer_ = 2.15f;
         }
         
         enemyBullets_.clear();
@@ -1322,6 +1331,7 @@ void Game::UpdatePlaying(float dt) {
                        enemies_.end());
         for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemyShotAudioTimer_ = 0.0f;
+        effects_.AddText({240.0f, 172.0f}, "SAFE LANE", SKYBLUE);
     }
     stageRecoveryActive_ = recoveryWindow;
 
@@ -1339,6 +1349,8 @@ void Game::UpdatePlaying(float dt) {
                        enemies_.end());
         for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemyShotAudioTimer_ = 0.0f;
+        effects_.AddText({240.0f, 172.0f}, "BONUS PARADE", GOLD);
+        audio_.PlayBonusTick(0);
     } else if (!bonusStage && stageBonusActive_) {
         enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
                                       [](const Enemy& e) { return !e.IsBoss(); }),
@@ -1361,6 +1373,8 @@ void Game::UpdatePlaying(float dt) {
                        enemies_.end());
         for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemyShotAudioTimer_ = 0.0f;
+        effects_.AddText({240.0f, 172.0f}, "GATE APPROACH", RED);
+        audio_.PlayBossWarning();
     }
     stageBossRunwayActive_ = bossRunway;
 
@@ -1378,6 +1392,7 @@ void Game::UpdatePlaying(float dt) {
                        enemies_.end());
         for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemyShotAudioTimer_ = 0.0f;
+        effects_.AddText({240.0f, 172.0f}, "SILENCE", SKYBLUE);
     }
     stageSilenceActive_ = tacticalSilence;
 
@@ -1439,6 +1454,18 @@ void Game::UpdatePlaying(float dt) {
 
     if (!bossSpawned_) {
         stageDirector_.Update(stageTime_, loop_ + (difficulty_ == 1 ? 1 : 0), enemies_);
+        int maxNonBoss = stageDirector_.IsBonusStage(stageTime_) ? 14 : (stageDirector_.CurrentIntensity(stageTime_) > 0.55f ? 9 : 7);
+        int nonBossCount = ActiveNonBossEnemyCount();
+        if (nonBossCount > maxNonBoss) {
+            int toCull = nonBossCount - maxNonBoss;
+            for (auto& e : enemies_) {
+                if (toCull <= 0) break;
+                if (!e.IsBoss()) {
+                    e.active = false;
+                    --toCull;
+                }
+            }
+        }
     }
     if (!bossSpawned_ && stageDirector_.ShouldSpawnBoss(stageTime_, BossAlive())) {
         int bullets = ActiveEnemyBulletCount();
@@ -1490,6 +1517,11 @@ void Game::UpdatePlaying(float dt) {
     for (auto& b : enemyBullets_) b.Update(dt, {}, effects_);
     size_t beforeBullets = enemyBullets_.size();
     for (auto& e : enemies_) e.Update(dt, player_.pos, enemyBullets_, loop_ + (difficulty_ == 1 ? 1 : 0));
+    int bulletCap = 24;
+    if (BossAlive()) bulletCap = 34;
+    else if (stageDirector_.IsRecoveryWindow(stageTime_) || stageDirector_.IsBossRunway(stageTime_)) bulletCap = 6;
+    else if (stageDirector_.IsBonusStage(stageTime_) || stageDirector_.IsTacticalSilence(stageTime_)) bulletCap = 0;
+    TrimOldestEnemyBullets(enemyBullets_, bulletCap);
     UpdateBossStory(dt);
     if (enemyBullets_.size() > beforeBullets) {
         enemyShotAudioTimer_ -= dt;
@@ -1505,7 +1537,19 @@ void Game::UpdatePlaying(float dt) {
             enemyShotAudioTimer_ = 0.07f;
         }
     }
-    for (auto& p : powerups_) p.Update(dt);
+    for (auto& p : powerups_) {
+        p.Update(dt);
+        float dx = player_.pos.x - p.pos.x;
+        float dy = player_.pos.y - p.pos.y;
+        float d2 = dx * dx + dy * dy;
+        float magnetRadius = p.type == PowerupType::Medal ? 138.0f : 92.0f;
+        if (d2 > 4.0f && d2 < magnetRadius * magnetRadius) {
+            float dist = std::sqrt(d2);
+            float pull = (p.type == PowerupType::Medal ? 188.0f : 118.0f) * dt;
+            p.pos.x += dx / dist * pull;
+            p.pos.y += dy / dist * pull;
+        }
+    }
 
     UpdateStageDiagnostics();
     HandleCollisions();
@@ -1831,16 +1875,16 @@ void Game::ResetSettingsToDefault() {
     isFullscreen_ = false;
     controlLayout_ = 0;
     player_.controlLayout = controlLayout_;
-    crtShaderEnabled_ = true;
-    cleanPixelMode_ = false;
+    crtShaderEnabled_ = false;
+    cleanPixelMode_ = true;
     crtCurvature_ = 3;
-    crtScanline_ = 3;
-    crtMask_ = 4;
-    crtBloom_ = 2;
-    crtVignette_ = 3;
-    crtGlare_ = 2;
+    crtScanline_ = 1;
+    crtMask_ = 0;
+    crtBloom_ = 1;
+    crtVignette_ = 1;
+    crtGlare_ = 0;
     aspectMode_ = 0;
-    drawBezel_ = true;
+    drawBezel_ = false;
     
     debug_ = hitboxOverlayEnabled_;
     if (IsWindowFullscreen()) {
@@ -2251,23 +2295,40 @@ void Game::HandleCollisions() {
             if (!e.active || !CircleHit(b.pos, b.radius, e.pos, e.radius)) continue;
             b.active = false;
             e.Hit(b.damage, effects_);
-            effects_.Spark(b.pos, YELLOW);
+            effects_.Spark(b.pos, e.IsBoss() ? SKYBLUE : YELLOW);
             if (!e.active) {
                 int scoreAdded = e.scoreValue;
                 if (difficulty_ == 1) scoreAdded = (scoreAdded * 3) / 2;
+                bool bonusKill = stageDirector_.IsBonusStage(stageTime_) && !e.IsBoss();
+                if (bonusKill) {
+                    medalChain_ = medalChainTimer_ > 0.0f ? medalChain_ + 1 : 1;
+                    medalChainTimer_ = 1.20f;
+                    int rhythmBonus = 75 * std::min(medalChain_, 12);
+                    if (difficulty_ == 1) rhythmBonus = (rhythmBonus * 3) / 2;
+                    scoreAdded += rhythmBonus;
+                    audio_.PlayMedalAt(medalChain_, e.pos.x, (float)ScreenW);
+                }
                 player_.score += scoreAdded;
                 
-                char scoreText[16];
+                char scoreText[24];
                 std::snprintf(scoreText, sizeof(scoreText), "+%d", scoreAdded);
-                effects_.AddText(e.pos, scoreText, YELLOW);
+                effects_.AddText(e.pos, bonusKill && medalChain_ > 1 ? TextFormat("+%d  x%d", scoreAdded, medalChain_) : scoreText,
+                                 bonusKill ? GOLD : YELLOW);
 
                 SpriteId debrisSprite = SpriteId::AsteroidChunk;
                 if (e.type == EnemyType::Popcorn) debrisSprite = SpriteId::DebrisEnemyWing;
                 else if (e.type == EnemyType::Turret) debrisSprite = SpriteId::DebrisEnemyThruster;
-                effects_.Explosion(e.pos, e.IsBoss() ? VIOLET : ORANGE, e.IsBoss() ? 80 : 22, debrisSprite);
-                effects_.Shake(e.IsBoss() ? 8.0f : 3.0f, e.IsBoss() ? 0.45f : 0.16f);
+                int burstCount = e.IsBoss() ? 72 : (e.type == EnemyType::Turret ? 24 : (bonusKill ? 12 : 14));
+                effects_.Explosion(e.pos, e.IsBoss() ? VIOLET : (bonusKill ? GOLD : ORANGE), burstCount, debrisSprite);
+                effects_.Spark(e.pos, bonusKill ? GOLD : WHITE, {0.0f, bonusKill ? -95.0f : -60.0f});
+                effects_.Shake(e.IsBoss() ? 7.0f : (e.type == EnemyType::Turret ? 3.2f : 1.8f),
+                               e.IsBoss() ? 0.34f : (e.type == EnemyType::Turret ? 0.13f : 0.07f));
                 if (e.IsBoss()) bossDeathPos_ = e.pos;
-                SpawnDrop(e.pos, e.type);
+                if (bonusKill) {
+                    powerups_.emplace_back(PowerupType::Medal, e.pos);
+                } else {
+                    SpawnDrop(e.pos, e.type);
+                }
 
                 if (e.IsBoss()) {
                     audio_.PlayExplosionAt(ExplosionSize::Large, e.pos.x, (float)ScreenW);
@@ -2284,15 +2345,28 @@ void Game::HandleCollisions() {
                             int bonus = 1000;
                             if (difficulty_ == 1) bonus = (bonus * 3) / 2;
                             player_.score += bonus;
-                            effects_.AddText(e.pos, TextFormat("FORMATION BONUS! +%d", bonus), GOLD);
+                            bool bonusPerfect = stageDirector_.IsBonusStage(stageTime_);
+                            effects_.AddText(e.pos, TextFormat(bonusPerfect ? "PERFECT +%d" : "BONUS +%d", bonus), GOLD);
                             powerups_.emplace_back(PowerupType::Medal, e.pos);
+                            if (bonusPerfect) {
+                                Vector2 leftMedal = {std::max(28.0f, e.pos.x - 26.0f), e.pos.y + 10.0f};
+                                Vector2 rightMedal = {std::min((float)ScreenW - 28.0f, e.pos.x + 26.0f), e.pos.y + 10.0f};
+                                powerups_.emplace_back(PowerupType::Medal, leftMedal);
+                                powerups_.emplace_back(PowerupType::Medal, rightMedal);
+                                effects_.Spark(e.pos, GOLD, {0.0f, -130.0f});
+                                effects_.Shake(2.4f, 0.11f);
+                                audio_.PlayBonusTick(medalChain_ + 2);
+                            }
                             audio_.PlayFormationBonusAt(e.pos.x, (float)ScreenW);
                         }
                     }
                 }
             } else if (e.IsBoss()) {
+                if (GetRandomValue(0, 100) < 42) effects_.Spark(b.pos, Color{80, 230, 255, 255}, {0.0f, -70.0f});
+                effects_.Shake(0.65f, 0.035f);
                 audio_.PlayBossDamageAt(e.pos.x, (float)ScreenW);
             } else if (e.type == EnemyType::Turret) {
+                effects_.Shake(0.35f, 0.025f);
                 audio_.PlayBossDamageAt(e.pos.x, (float)ScreenW);
             }
             break;
@@ -2313,7 +2387,7 @@ void Game::HandleCollisions() {
                         audio_.PlayGameOver();
                         StartTransition(State::GameOver);
                     } else {
-                        continueTimer_ = 9.9f;
+                        continueTimer_ = 6.2f;
                         StartTransition(State::Continue);
                     }
                 } else {
@@ -2338,7 +2412,7 @@ void Game::HandleCollisions() {
                     audio_.PlayGameOver();
                     StartTransition(State::GameOver);
                 } else {
-                    continueTimer_ = 9.9f;
+                    continueTimer_ = 6.2f;
                     StartTransition(State::Continue);
                 }
             } else {
@@ -2453,10 +2527,10 @@ void Game::StartBossDialogue() {
     bossWarningKlaxonTimer_ = 0.0f;
     audio_.PlayBossWarning();
     bossDialogue_.Begin({
-        {"ACE", "Route’s closed. I’ll cut one.", CommsSpeaker::Ace},
-        {"VANTAGE-9", "UNREGISTERED ACE DETECTED. SOLACE SIGNATURE: OBSOLETE.", CommsSpeaker::Boss},
-        {"SHADE", "Good news: it hates you specifically.", CommsSpeaker::Shade},
-        {"VANTAGE-9", "SKY CIRCUIT ACCESS DENIED. MEMORY OF FLIGHT: REVOKED.", CommsSpeaker::Boss}
+        {"ACE", "Route's closed. I'll cut one.", CommsSpeaker::Ace},
+        {"VANTAGE-9", "SOLACE SIGNATURE FOUND. PILOT MEMORY: DENIED.", CommsSpeaker::Boss},
+        {"SHADE", "Great. The door learned your name.", CommsSpeaker::Shade},
+        {"VANTAGE-9", "VANTAGE-9 ONLINE. SKY CIRCUIT LOCKED.", CommsSpeaker::Boss}
     });
 }
 
@@ -2627,7 +2701,6 @@ void Game::UpdateDifficultySelect() {
     if (keyConfirm) {
         audio_.PlayPressStart();
         difficulty_ = difficultySelection_;
-        if (credits_ > 0) credits_--;
         demoMode_ = false;
         StartTransition(State::Playing);
     } else if (keyBack) {
@@ -2710,35 +2783,29 @@ void Game::UpdateContinue(float dt) {
         if (continueTimer_ > 0.0f) audio_.PlayContinueTick();
     }
     
-    bool startPressed = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
+    bool startPressed = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     if (IsGamepadAvailable(0)) {
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
             startPressed = true;
         }
     }
-    
+
     if (startPressed) {
-        if (credits_ > 0) {
-            credits_--;
-            audio_.PlayPressStart();
-            
-            player_.lives = (difficulty_ == 0) ? 3 : 2;
-            player_.bombs = 3;
-            player_.invulnerable = true;
-            player_.invulnTimer = 3.0f;
-            player_.pos = {240, 560};
-            audio_.PlayRespawn();
-            
-            enemyBullets_.clear();
-            
-            // Go straight back to playing
-            state_ = State::Playing;
-            return;
-        } else {
-            audio_.PlayDenied();
-            effects_.Shake(4.0f, 0.15f);
-            effects_.AddText({ 240, 380 }, "INSERT COIN!", RED);
-        }
+        audio_.PlayPressStart();
+
+        player_.lives = (difficulty_ == 0) ? 3 : 2;
+        player_.bombs = 3;
+        player_.invulnerable = true;
+        player_.invulnTimer = 3.0f;
+        player_.pos = {240, 560};
+        audio_.PlayRespawn();
+        effects_.AddText({240.0f, 380.0f}, "RE-LAUNCH", GOLD);
+
+        enemyBullets_.clear();
+        playerBullets_.clear();
+
+        state_ = State::Playing;
+        return;
     }
     
     if (continueTimer_ <= 0.0f) {
@@ -2755,48 +2822,35 @@ void Game::UpdateContinue(float dt) {
 }
 
 void Game::DrawContinue() const {
-    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.75f));
+    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.68f));
     
-    int cy = ScreenH / 2 - 130;
+    int cy = ScreenH / 2 - 138;
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawRing({240.0f, (float)cy + 92.0f}, 88.0f, 92.0f, (float)GetTime() * 38.0f, (float)GetTime() * 38.0f + 300.0f, 64, Fade(GOLD, 0.20f));
+    DrawLineEx({72.0f, (float)cy + 222.0f}, {408.0f, (float)cy + 222.0f}, 2.0f, Fade(SKYBLUE, 0.18f));
+    EndBlendMode();
     
-    int textW = MeasureText("CONTINUE?", 32);
-    Color pulseCol = (int)(GetTime() * 4.0f) % 2 == 0 ? GOLD : RAYWHITE;
-    DrawText("CONTINUE?", ScreenW / 2 - textW / 2, cy, 32, pulseCol);
+    int textW = MeasureText("RUN BROKEN", 28);
+    DrawText("RUN BROKEN", ScreenW / 2 - textW / 2, cy, 28, RED);
     
     int sec = (int)std::ceil(continueTimer_);
     sec = std::max(0, std::min(9, sec));
     const char* timerStr = TextFormat("%d", sec);
-    int timerW = MeasureText(timerStr, 80);
-    DrawText(timerStr, ScreenW / 2 - timerW / 2, cy + 45, 80, RED);
+    int timerW = MeasureText(timerStr, 74);
+    DrawText(timerStr, ScreenW / 2 - timerW / 2, cy + 42, 74, GOLD);
     
-    int scW = MeasureText(TextFormat("CURRENT SCORE: %08d", player_.score), 15);
-    DrawText(TextFormat("CURRENT SCORE: %08d", player_.score), ScreenW / 2 - scW / 2, cy + 145, 15, SKYBLUE);
+    int scW = MeasureText(TextFormat("SCORE %08d", player_.score), 15);
+    DrawText(TextFormat("SCORE %08d", player_.score), ScreenW / 2 - scW / 2, cy + 132, 15, SKYBLUE);
     
     float blink = std::sin((float)GetTime() * 10.0f);
-    if (credits_ > 0) {
-        if (blink > 0.0f) {
-            int prW = MeasureText("PRESS START TO CONTINUE", 16);
-            DrawText("PRESS START TO CONTINUE", ScreenW / 2 - prW / 2, cy + 185, 16, LIME);
-        }
-        int crW = MeasureText(TextFormat("CREDITS: %02d (1 USED)", credits_), 14);
-        DrawText(TextFormat("CREDITS: %02d (1 USED)", credits_), ScreenW / 2 - crW / 2, cy + 212, 14, SKYBLUE);
-    } else {
-        if (blink > 0.0f) {
-            int prW = MeasureText("INSERT COIN [C]", 16);
-            DrawText("INSERT COIN [C]", ScreenW / 2 - prW / 2, cy + 185, 16, RED);
-        }
-        int crW = MeasureText("NO CREDITS AVAILABLE", 13);
-        DrawText("NO CREDITS AVAILABLE", ScreenW / 2 - crW / 2, cy + 212, 13, GRAY);
+    DrawRectangle(54, cy + 180, 372, 70, Fade(GOLD, 0.17f));
+    DrawRectangleLines(54, cy + 180, 372, 70, Fade(GOLD, 0.72f));
+    if (blink > 0.0f) {
+        int prW = MeasureText("TAP TO RE-LAUNCH", 20);
+        DrawText("TAP TO RE-LAUNCH", ScreenW / 2 - prW / 2, cy + 203, 20, LIME);
     }
-
-    // Glowing Coin Door graphic on Continue screen
-    int doorX = ScreenW / 2 - 40;
-    int doorY = cy + 242;
-    DrawRectangle(doorX, doorY, 80, 50, BLACK);
-    DrawRectangleLines(doorX, doorY, 80, 50, GRAY);
-    DrawRectangle(doorX + 32, doorY + 10, 16, 22, DARKGRAY);
-    DrawRectangle(doorX + 38, doorY + 12, 4, 18, (credits_ == 0 && (int)(GetTime() * 3.0f) % 2 == 0) ? RED : ORANGE);
-    DrawText("COIN", doorX + 26, doorY + 36, 9, GRAY);
+    int routeW = MeasureText("ROUTE VANTAGE // FREE PLAY", 12);
+    DrawText("ROUTE VANTAGE // FREE PLAY", ScreenW / 2 - routeW / 2, cy + 270, 12, GRAY);
 }
 
 void Game::DrawBackground() const {
@@ -2815,48 +2869,60 @@ void Game::DrawBackground() const {
         nebulaColor1 = Fade(RED, 0.22f);
         nebulaColor2 = Fade(MAROON, 0.15f);
         nebulaColor3 = Fade(ORANGE, 0.10f);
-    } else if (routeTime < 37.0f) {
+    } else if (routeTime < 27.0f) {
         // Launch, sweep, and reassembly: cool orbit lanes with clear silhouettes.
         bgColor = Color{4, 11, 18, 255};
         nebulaColor1 = Color{0, 145, 118, 30};
         nebulaColor2 = Color{0, 70, 105, 22};
         nebulaColor3 = Color{15, 120, 150, 18};
-    } else if (routeTime < 53.0f) {
+    } else if (routeTime < 40.0f) {
         // Intercept: colder blue pressure before the route clamps down.
         bgColor = Color{5, 7, 22, 255};
         nebulaColor1 = Color{40, 90, 180, 24};
         nebulaColor2 = Color{0, 120, 135, 18};
         nebulaColor3 = Color{70, 40, 160, 15};
-    } else if (routeTime < 65.0f) {
+    } else if (routeTime < 47.0f) {
         // Encirclement: warmer magenta pressure while vectors close in.
         bgColor = Color{11, 6, 21, 255};
         nebulaColor1 = Color{112, 0, 145, 27};
         nebulaColor2 = Color{70, 0, 105, 18};
         nebulaColor3 = Color{145, 10, 110, 17};
-    } else if (routeTime < 81.0f) {
-        // Recovery: desaturated calm before the route climbs again.
+    } else if (routeTime < 56.0f) {
+        // Safe lane and debris drift: cooler open air for attention recovery.
         bgColor = Color{5, 10, 16, 255};
-        nebulaColor1 = Color{0, 120, 150, 18};
-        nebulaColor2 = Color{60, 70, 110, 14};
-        nebulaColor3 = Color{20, 150, 120, 12};
-    } else if (routeTime < 95.0f) {
-        // Bonus parade: brighter arcade cabinet score-attack palette.
-        bgColor = Color{6, 11, 18, 255};
-        nebulaColor1 = Color{255, 180, 35, 26};
-        nebulaColor2 = Color{0, 190, 190, 20};
-        nebulaColor3 = Color{255, 60, 120, 15};
-    } else if (routeTime < 103.0f) {
+        nebulaColor1 = Color{0, 150, 175, 17};
+        nebulaColor2 = Color{60, 90, 120, 13};
+        nebulaColor3 = Color{20, 170, 120, 11};
+    } else if (routeTime < 67.0f) {
+        // Bonus parade: instantly recognizable gold/cyan celebration space.
+        bgColor = Color{8, 10, 17, 255};
+        nebulaColor1 = Color{255, 190, 35, 32};
+        nebulaColor2 = Color{0, 215, 200, 24};
+        nebulaColor3 = Color{255, 64, 135, 18};
+    } else if (routeTime < 73.0f) {
         // Threat horizon: the celebration drains into colder warning space.
         bgColor = Color{8, 6, 16, 255};
         nebulaColor1 = Color{90, 210, 255, 20};
         nebulaColor2 = Color{110, 18, 70, 16};
         nebulaColor3 = Color{255, 120, 30, 10};
-    } else if (routeTime < 129.0f) {
+    } else if (routeTime < 94.0f) {
         // Fortress corridor: industrial amber searchlight space.
         bgColor = Color{16, 7, 8, 255};
         nebulaColor1 = Color{145, 24, 0, 28};
         nebulaColor2 = Color{100, 15, 0, 18};
         nebulaColor3 = Color{170, 70, 0, 15};
+    } else if (routeTime < 100.0f) {
+        // Collapse: hot fragments around a darkening route.
+        bgColor = Color{14, 5, 8, 255};
+        nebulaColor1 = Color{180, 36, 8, 24};
+        nebulaColor2 = Color{255, 86, 25, 16};
+        nebulaColor3 = Color{85, 10, 45, 13};
+    } else if (routeTime < 106.0f) {
+        // Tactical silence: restrained, sparse, and unmistakably still.
+        bgColor = Color{3, 6, 12, 255};
+        nebulaColor1 = Color{60, 120, 140, 10};
+        nebulaColor2 = Color{20, 50, 80, 8};
+        nebulaColor3 = Color{90, 130, 160, 7};
     } else {
         // Gate warning: colder, emptier, with the lock shape coming forward.
         bgColor = Color{8, 6, 13, 255};
@@ -2876,8 +2942,8 @@ void Game::DrawBackground() const {
     DrawCircleGradient(200, (int)(nY2 - ScreenH), 290, nebulaColor3, Fade(BLACK, 0.0f));
 
     // 1a. Faint orbital gate silhouette: the stage's recurring denial icon.
-    if (routeTime > 129.0f || bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
-        float gateAlpha = BossAlive() ? 0.18f : (routeTime > 129.0f ? 0.07f + std::min(0.06f, (routeTime - 129.0f) * 0.008f) : 0.11f);
+    if (routeTime > 94.0f || bossWarningTimer_ > 0.0f || BossAlive() || bossDeathTimer_ > 0.0f || bossClearDelayTimer_ > 0.0f) {
+        float gateAlpha = BossAlive() ? 0.18f : (routeTime > 94.0f ? 0.06f + std::min(0.08f, (routeTime - 94.0f) * 0.008f) : 0.11f);
         float gatePulse = 0.5f + 0.5f * std::sin((float)GetTime() * 1.8f);
         Vector2 gateCenter = {240.0f, 128.0f};
         BeginBlendMode(BLEND_ADDITIVE);
@@ -2893,7 +2959,7 @@ void Game::DrawBackground() const {
     }
 
     // 1b. Layer 1b: Sweeping Background Industrial Searchlights (Stage Phase 3 / Boss Alert)
-    if (beat >= 95 || bossWarningTimer_ > 0.0f || BossAlive()) {
+    if (beat >= 67 || bossWarningTimer_ > 0.0f || BossAlive()) {
         float time = (float)GetTime();
         float angle1 = std::sin(time * 0.45f) * 35.0f - 90.0f;
         float angle2 = std::cos(time * 0.35f) * 25.0f - 90.0f;
@@ -2923,7 +2989,7 @@ void Game::DrawBackground() const {
         DrawCircleV(stars_[i].pos, size, Fade(stars_[i].color, sparkle * 0.82f));
         
         // Additive micro flare crosses for foreground stars
-        if (stars_[i].speed > 120.0f && sparkle > 0.78f) {
+        if (stars_[i].speed > 135.0f && sparkle > 0.84f) {
             float flareAlpha = (sparkle - 0.78f) * 2.1f;
             DrawLineV({stars_[i].pos.x - 2, stars_[i].pos.y}, {stars_[i].pos.x + 2, stars_[i].pos.y}, Fade(WHITE, flareAlpha));
             DrawLineV({stars_[i].pos.x, stars_[i].pos.y - 2}, {stars_[i].pos.x, stars_[i].pos.y + 2}, Fade(WHITE, flareAlpha));
@@ -2944,7 +3010,7 @@ void Game::DrawBackground() const {
     
     // 3. Layer 3: Scrolling asteroid debris chunks (Mid-ground)
     for (const auto& ast : backgroundAsteroids_) {
-        SpriteManager::Instance().Draw(SpriteId::AsteroidChunk, ast.pos, ast.rotation, ast.scale, Fade(GRAY, 0.32f));
+        SpriteManager::Instance().Draw(SpriteId::AsteroidChunk, ast.pos, ast.rotation, ast.scale, Fade(GRAY, 0.18f));
     }
 
     // 3aa. Layer 3aa: Scrolling playfield base girder lines (very low-contrast mechanical base plates)
@@ -2998,10 +3064,10 @@ void Game::DrawBackground() const {
 
     // 4. Layer 4: Foreground scrolling atmospheric clouds
     for (const auto& cld : backgroundClouds_) {
-        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.075f));
+        SpriteManager::Instance().Draw(SpriteId::CloudForeground, cld.pos, 0.0f, cld.scale, Fade(WHITE, 0.045f));
     }
 
-    DrawRectangleLines(8, 8, ScreenW - 16, ScreenH - 16, Fade(SKYBLUE, 0.35f));
+    DrawRectangleLines(8, 8, ScreenW - 16, ScreenH - 16, Fade(SKYBLUE, 0.16f));
 }
 
 void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
@@ -3025,12 +3091,12 @@ void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
             DrawRectangleLines(stickerX, 60, stickerW, 140, Color{250, 195, 15, 255});
             
             DrawText("SKY CIRCUIT", stickerX + 12, 70, 12, GOLD);
-            DrawText("ARCADE SYSTEM v1.5", stickerX + 12, 86, 8, GRAY);
-            DrawText("COIN: PRESS C", stickerX + 12, 105, 9, RAYWHITE);
-            DrawText("START: ENTER", stickerX + 12, 120, 9, RAYWHITE);
-            DrawText("SHOOT: Z or SPACE", stickerX + 12, 135, 9, GOLD);
-            DrawText("BOMB: X KEY", stickerX + 12, 150, 9, PURPLE);
-            DrawText("SLOW: SHIFT", stickerX + 12, 165, 9, SKYBLUE);
+            DrawText("ROUTE VANTAGE", stickerX + 12, 86, 8, GRAY);
+            DrawText("FREE PLAY", stickerX + 12, 105, 9, RAYWHITE);
+            DrawText("DRAG TO FLY", stickerX + 12, 120, 9, SKYBLUE);
+            DrawText("AUTO-FIRE", stickerX + 12, 135, 9, GOLD);
+            DrawText("BOMB: 2-FINGER", stickerX + 12, 150, 9, PURPLE);
+            DrawText("START: TAP", stickerX + 12, 165, 9, RAYWHITE);
 
             // Draw miniature player ship graphics preview
             SpriteManager::Instance().Draw(SpriteId::PlayerIdle, Vector2{rx / 2.0f, 260.0f}, 0.0f, 2.0f);
@@ -3052,11 +3118,11 @@ void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
             // Warnings panel
             DrawRectangle(stickerX, 60, stickerW, 110, Color{15, 15, 18, 255});
             DrawRectangleLines(stickerX, 60, stickerW, 110, RED);
-            DrawText("WARNING!", stickerX + 12, 70, 11, RED);
-            DrawText("DO NOT COIN IN", stickerX + 12, 90, 8, RAYWHITE);
-            DrawText("WHILE ATTRACT MODE", stickerX + 12, 105, 8, RAYWHITE);
-            DrawText("IS DEMONSTRATING", stickerX + 12, 120, 8, RAYWHITE);
-            DrawText("FLIGHT SYSTEMS", stickerX + 12, 135, 8, RAYWHITE);
+            DrawText("GATE NOTICE", stickerX + 12, 70, 11, RED);
+            DrawText("ROUTE MEMORY", stickerX + 12, 90, 8, RAYWHITE);
+            DrawText("REPEATS UNDER", stickerX + 12, 105, 8, RAYWHITE);
+            DrawText("PILOT STRESS.", stickerX + 12, 120, 8, RAYWHITE);
+            DrawText("ONE MORE RUN.", stickerX + 12, 135, 8, RAYWHITE);
 
             // High scores cabinet teaser
             DrawText("TOP PILOTS", stickerX + 12, 210, 11, GOLD);
@@ -3069,43 +3135,22 @@ void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
 }
 
 void Game::DrawHud() const {
+    DrawRectangle(0, 0, ScreenW, 34, Fade(BLACK, 0.68f));
+    DrawLine(0, 34, ScreenW, 34, Fade(SKYBLUE, 0.28f));
 
-    DrawRectangle(0, 0, ScreenW, 36, Fade(BLACK, 0.85f));
-    DrawRectangleLines(0, 0, ScreenW, 36, Fade(SKYBLUE, 0.4f));
-    
-    // SCORE
-    DrawText("1P", 12, 4, 10, LIME);
-    DrawText(TextFormat("%08d", player_.score), 12, 16, 13, RAYWHITE);
-    
-    // HI-SCORE
-    int hiScore = 25000;
-    if (!highScores_.empty()) {
-        hiScore = highScores_[0].score;
-    }
-    DrawText("HI-SCORE", ScreenW / 2 - MeasureText("HI-SCORE", 10) / 2, 4, 10, RED);
-    DrawText(TextFormat("%08d", std::max(hiScore, player_.score)), ScreenW / 2 - MeasureText(TextFormat("%08d", std::max(hiScore, player_.score)), 13) / 2, 16, 13, GOLD);
-    
-    // WEAPON
-    DrawText("WEAPON", 280, 4, 10, SKYBLUE);
-    DrawText(TextFormat("%s LV%d", player_.WeaponName(), player_.weaponLevel), 280, 16, 13, RAYWHITE);
-    
-    // LIVES (Icons)
-    int maxDrawLives = std::min(5, player_.lives);
+    DrawText(TextFormat("%07d", player_.score), 12, 10, 16, RAYWHITE);
+    DrawText(TextFormat("%s %d", player_.WeaponName(), player_.weaponLevel), 352 - MeasureText(TextFormat("%s %d", player_.WeaponName(), player_.weaponLevel), 12), 6, 12, SKYBLUE);
+    DrawText(TextFormat("L%d", loop_), 418, 6, 12, GOLD);
+
+    int maxDrawLives = std::min(4, player_.lives);
     for (int i = 0; i < maxDrawLives; ++i) {
-        float lx = 153.0f + i * 16.0f;
-        float ly = 22.0f;
-        SpriteManager::Instance().Draw(SpriteId::PlayerIdle, {lx, ly}, 0.0f, 0.65f);
+        SpriteManager::Instance().Draw(SpriteId::PlayerIdle, {356.0f + i * 17.0f, 25.0f}, 0.0f, 0.58f);
     }
-    DrawText("LIVES", 145, 4, 10, SKYBLUE);
-    
-    // BOMBS (Icons)
-    int maxDrawBombs = std::min(5, player_.bombs);
+
+    int maxDrawBombs = std::min(4, player_.bombs);
     for (int i = 0; i < maxDrawBombs; ++i) {
-        float bx = 221.0f + i * 12.0f;
-        float by = 22.0f;
-        SpriteManager::Instance().Draw(SpriteId::MiniBombCapsule, {bx, by}, 0.0f, 1.0f);
+        SpriteManager::Instance().Draw(SpriteId::MiniBombCapsule, {426.0f + i * 12.0f, 24.0f}, 0.0f, 0.92f);
     }
-    DrawText("BOMBS", 215, 4, 10, PURPLE);
 
     // Flashing Combo Decay Bar
     if (medalChain_ > 0) {
@@ -3115,65 +3160,55 @@ void Game::DrawHud() const {
         bool flash = (medalChainTimer_ > 0.4f) || ((int)(GetTime() * 12.0f) % 2 == 0);
         Color chainColor = flash ? GOLD : RED;
         
-        int comboY = 44;
-        DrawRectangle(12, comboY, 80, 16, Fade(BLACK, 0.7f));
-        DrawRectangleLines(12, comboY, 80, 16, Fade(GOLD, 0.4f));
+        int comboY = 42;
+        DrawRectangle(12, comboY, 96, 18, Fade(BLACK, 0.58f));
+        DrawRectangleLines(12, comboY, 96, 18, Fade(GOLD, 0.36f));
         
         DrawText(TextFormat("CHAIN x%d", medalChain_), 16, comboY + 3, 10, flash ? YELLOW : ORANGE);
-        DrawRectangle(16, comboY + 12, 72, 2, Fade(GRAY, 0.5f));
-        DrawRectangle(16, comboY + 12, (int)(72 * ratio), 2, chainColor);
+        DrawRectangle(16, comboY + 14, 84, 2, Fade(GRAY, 0.5f));
+        DrawRectangle(16, comboY + 14, (int)(84 * ratio), 2, chainColor);
     }
 
-    // Dynamic stage act / WARNING
     float routeDuration = stageDirector_.RouteDuration();
-    if (stageTime_ < routeDuration) {
-        int remaining = std::max(0, (int)(routeDuration - stageTime_));
-        DrawText(TextFormat("B%02d %s", stageDirector_.CurrentBlockIndex(stageTime_), stageDirector_.CurrentEncounterName(stageTime_)), 334, 4, 10, GRAY);
-        DrawText(TextFormat("%s %03d  L%d", stageDirector_.CurrentTransitionName(stageTime_), remaining, loop_), 334, 16, 10, SKYBLUE);
-    } else {
-        DrawText("WARNING", 395, 4, 10, RED);
-        DrawText("BOSS ALIVE", 395, 16, 12, RED);
-    }
-
     if (state_ == State::Playing && stageTime_ < routeDuration) {
         const char* banner = nullptr;
         const char* sub = nullptr;
         Color bannerColor = GOLD;
         float local = stageDirector_.CurrentBlockElapsed(stageTime_);
         if (stageDirector_.IsBonusStage(stageTime_)) {
-            banner = "BONUS FORMATION";
+            banner = "BONUS";
             sub = "TARGET PARADE";
             bannerColor = GOLD;
         } else if (stageDirector_.IsTacticalSilence(stageTime_)) {
-            banner = "TACTICAL SILENCE";
+            banner = "SAFE";
             sub = "NO CONTACT";
             bannerColor = SKYBLUE;
         } else if (std::string(stageDirector_.CurrentEncounterName(stageTime_)) == "BOSS ARRIVAL") {
-            banner = "BOSS APPROACH";
+            banner = "BOSS";
             sub = "GATE SIGNATURE";
             bannerColor = RED;
+        } else if (std::string(stageDirector_.CurrentTransitionName(stageTime_)) == "SPIKE") {
+            banner = "DANGER";
+            sub = "WIDE LANES";
+            bannerColor = ORANGE;
         }
 
-        if (banner && local < 3.2f) {
-            float alpha = std::min(1.0f, local * 1.6f) * std::min(1.0f, (3.2f - local) * 1.4f);
-            int titleW = MeasureText(banner, 18);
-            int subW = MeasureText(sub, 10);
-            int panelW = std::max(titleW, subW) + 34;
-            DrawRectangle(ScreenW / 2 - panelW / 2, 58, panelW, 42, Fade(BLACK, 0.58f * alpha));
-            DrawRectangleLines(ScreenW / 2 - panelW / 2, 58, panelW, 42, Fade(bannerColor, 0.72f * alpha));
-            DrawText(banner, ScreenW / 2 - titleW / 2, 66, 18, Fade(bannerColor, alpha));
-            DrawText(sub, ScreenW / 2 - subW / 2, 87, 10, Fade(RAYWHITE, 0.82f * alpha));
+        if (banner && local < 2.2f) {
+            float alpha = std::min(1.0f, local * 2.4f) * std::min(1.0f, (2.2f - local) * 1.8f);
+            int titleW = MeasureText(banner, 28);
+            int subW = MeasureText(sub, 11);
+            DrawRectangle(0, 54, ScreenW, 58, Fade(BLACK, 0.42f * alpha));
+            DrawLine(0, 54, ScreenW, 54, Fade(bannerColor, 0.62f * alpha));
+            DrawLine(0, 112, ScreenW, 112, Fade(bannerColor, 0.42f * alpha));
+            DrawText(banner, ScreenW / 2 - titleW / 2, 62, 28, Fade(bannerColor, alpha));
+            DrawText(sub, ScreenW / 2 - subW / 2, 94, 11, Fade(RAYWHITE, 0.82f * alpha));
         }
     }
     
-    if (state_ == State::Playing) {
-        DrawRectangle(0, ScreenH - 24, ScreenW, 24, Fade(BLACK, 0.75f));
-        DrawText(TextFormat("CREDIT %02d", credits_), 12, ScreenH - 18, 12, SKYBLUE);
-        if (difficulty_ == 1) {
-            DrawText("ACE DIFFICULTY (1.5x)", ScreenW - MeasureText("ACE DIFFICULTY (1.5x)", 12) - 12, ScreenH - 18, 12, RED);
-        } else {
-            DrawText("NORMAL DIFFICULTY", ScreenW - MeasureText("NORMAL DIFFICULTY", 12) - 12, ScreenH - 18, 12, LIME);
-        }
+    if (state_ == State::Playing && stageTime_ < routeDuration) {
+        int progressW = (int)((ScreenW - 24) * std::clamp(stageTime_ / routeDuration, 0.0f, 1.0f));
+        DrawRectangle(12, ScreenH - 10, ScreenW - 24, 3, Fade(BLACK, 0.62f));
+        DrawRectangle(12, ScreenH - 10, progressW, 3, Fade(SKYBLUE, 0.84f));
     }
 
     if (demoMode_) {
@@ -3237,73 +3272,45 @@ void Game::DrawCenteredText(const char* title, const char* subtitle) const {
 }
 
 void Game::DrawTitleMenu() const {
-    DrawRectangle(42, 120, ScreenW - 84, 305, Fade(BLACK, 0.85f));
-    DrawRectangleLines(42, 120, ScreenW - 84, 305, Fade(SKYBLUE, 0.8f));
+    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.28f));
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawRing({240.0f, 134.0f}, 98.0f, 101.0f, (float)GetTime() * 18.0f, (float)GetTime() * 18.0f + 310.0f, 72, Fade(Color{80, 220, 255, 255}, 0.16f));
+    DrawLineEx({54.0f, 206.0f}, {426.0f, 206.0f}, 2.0f, Fade(GOLD, 0.18f));
+    EndBlendMode();
     
-    int titleW = MeasureText("SKY CIRCUIT", 38);
+    int titleW = MeasureText("SKY CIRCUIT", 40);
     Color titleCol = (int)(GetTime() * 3.0f) % 2 == 0 ? GOLD : YELLOW;
-    DrawText("SKY CIRCUIT", ScreenW / 2 - titleW / 2, 140, 38, titleCol);
-    DrawText("REAL ARCADE CABINET EDITION", ScreenW / 2 - MeasureText("REAL ARCADE CABINET EDITION", 11) / 2, 185, 11, SKYBLUE);
+    DrawText("SKY CIRCUIT", ScreenW / 2 - titleW / 2, 86, 40, titleCol);
+    DrawText("ROUTE VANTAGE", ScreenW / 2 - MeasureText("ROUTE VANTAGE", 18) / 2, 134, 18, SKYBLUE);
+    DrawText("TOUCH-FIRST ARCADE RUN", ScreenW / 2 - MeasureText("TOUCH-FIRST ARCADE RUN", 12) / 2, 162, 12, RAYWHITE);
 
-    const char* items[5] = {"1 PLAYER START", "HOW TO PLAY", "SETTINGS", "LEADERBOARD", "SHUT DOWN CABINET"};
+    const char* items[5] = {"START RUN", "ROUTE BRIEF", "TUNING", "SCORES", "EXIT"};
     for (int i = 0; i < 5; ++i) {
-        int y = 220 + i * 32;
         bool selected = titleSelection_ == i;
         int xOffset = selected ? (int)(5.0f + 4.0f * std::sin((float)GetTime() * 14.0f)) : 0;
-        
-        if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(BLUE, 0.45f));
-        DrawText(selected ? ">" : " ", 132 + xOffset, y, 16, selected ? GOLD : GRAY);
-        
-        Color textCol = RAYWHITE;
         if (i == 0) {
-            if (credits_ == 0) {
-                textCol = selected ? RED : GRAY;
-            } else {
-                textCol = selected ? GOLD : LIME;
-            }
+            Rectangle r = {52.0f, 220.0f, 376.0f, 76.0f};
+            DrawRectangleRec(r, Fade(GOLD, selected ? 0.25f : 0.15f));
+            DrawRectangleLinesEx(r, selected ? 3.0f : 2.0f, Fade(GOLD, selected ? 0.90f : 0.58f));
+            DrawText("START RUN", 84 + xOffset, 240, 26, selected ? GOLD : RAYWHITE);
+            DrawText("GATELINE-01 // FREE PLAY", 86, 270, 12, Fade(SKYBLUE, 0.86f));
         } else {
-            textCol = selected ? GOLD : RAYWHITE;
+            Rectangle r = {64.0f, 320.0f + (float)(i - 1) * 52.0f, 352.0f, 44.0f};
+            DrawRectangleRec(r, Fade(BLACK, 0.62f));
+            DrawRectangleLinesEx(r, selected ? 2.0f : 1.0f, Fade(selected ? GOLD : SKYBLUE, selected ? 0.75f : 0.34f));
+            DrawText(selected ? ">" : " ", 84 + xOffset, (int)r.y + 13, 16, selected ? GOLD : GRAY);
+            DrawText(items[i], 112 + xOffset, (int)r.y + 12, 17, selected ? GOLD : RAYWHITE);
         }
-        DrawText(items[i], 158 + xOffset, y, 16, textCol);
     }
 
     float blink = std::sin((float)GetTime() * 10.0f);
     if (blink > 0.0f) {
-        if (credits_ == 0) {
-            int insW = MeasureText("INSERT COIN TO PLAY", 16);
-            DrawText("INSERT COIN TO PLAY", ScreenW / 2 - insW / 2, 382, 16, RED);
-        } else {
-            int stW = MeasureText("PRESS START (1P ACTIVE)", 16);
-            DrawText("PRESS START (1P ACTIVE)", ScreenW / 2 - stW / 2, 382, 16, LIME);
-        }
+        int stW = MeasureText("TAP START RUN", 16);
+        DrawText("TAP START RUN", ScreenW / 2 - stW / 2, 552, 16, LIME);
     }
-
-    // Glowing Coin Door Slot Graphic
-    int slotX = ScreenW / 2 - 60;
-    int slotY = 440;
-    DrawRectangle(slotX, slotY, 120, 40, BLACK);
-    DrawRectangleLines(slotX, slotY, 120, 40, (credits_ == 0 && (int)(GetTime() * 2) % 2 == 0) ? RED : DARKGRAY);
-    
-    // Coin insert entry path
-    DrawRectangle(slotX + 52, slotY + 8, 16, 24, DARKGRAY);
-    DrawRectangle(slotX + 58, slotY + 10, 4, 20, (credits_ == 0 && (int)(GetTime() * 2) % 2 == 0) ? RED : ORANGE);
-    
-    DrawText("COIN", slotX + 12, slotY + 15, 9, GRAY);
-    DrawText("25c", slotX + 85, slotY + 15, 9, GOLD);
-
-    // Large LED Credits Panel
-    DrawRectangle(ScreenW / 2 - 65, 498, 130, 28, Fade(DARKGRAY, 0.4f));
-    DrawRectangleLines(ScreenW / 2 - 65, 498, 130, 28, Fade(SKYBLUE, 0.4f));
-    
-    Color ledColor = credits_ > 0 ? LIME : RED;
-    const char* creditsStr = TextFormat("CREDITS: %02d", credits_);
-    int credW = MeasureText(creditsStr, 16);
-    DrawText(creditsStr, ScreenW / 2 - credW / 2, 504, 16, ledColor);
-
-    // Large readable cabinet guidelines
-    const char* instructStr = "PRESS [C] TO INSERT COIN  |  PRESS [ENTER] TO START";
-    int instW = MeasureText(instructStr, 11);
-    DrawText(instructStr, ScreenW / 2 - instW / 2, 545, 11, GRAY);
+    const char* instructStr = "ONE RUN. ONE ROUTE. ONE MORE TRY.";
+    int instW = MeasureText(instructStr, 12);
+    DrawText(instructStr, ScreenW / 2 - instW / 2, 586, 12, GRAY);
 }
 
 void Game::DrawHowTo() const {
@@ -3327,7 +3334,7 @@ void Game::DrawHowTo() const {
 
     // Objective Section
     DrawText("MISSION OBJECTIVE", 50, 114, 15, GOLD);
-    DrawText("Defeat the enemy Carrier boss before the 90s timer runs out.", 50, 134, 12, RAYWHITE);
+    DrawText("Clear compact waves, hit the bonus parade, then defeat VANTAGE-9.", 50, 134, 12, RAYWHITE);
     DrawText("Only your fighter's red core is vulnerable to bullet impacts.", 50, 150, 12, RAYWHITE);
 
     // Powerups Grid Section
@@ -3364,25 +3371,22 @@ void Game::DrawHowTo() const {
     drawPowerupPreview({365, 212}, GOLD, "$", 9.0f);
     DrawText("Medal (Pts)", 384, 206, 11, GOLD);
 
-    // Cabinet Controls Panel Section
-    DrawText("CABINET CONTROL PANEL", 50, 238, 15, GOLD);
+    // Touch-first controls panel
+    DrawText("MOBILE-FIRST CONTROLS", 50, 238, 15, GOLD);
     
     // Draw Metal Bezel Panel
     DrawRectangle(46, 260, ScreenW - 92, 116, DARKGRAY);
     DrawRectangleLines(46, 260, ScreenW - 92, 116, GRAY);
     DrawRectangle(50, 264, ScreenW - 100, 108, BLACK);
     
-    // Draw Joystick
+    // Draw thumb drag zone
     int joyX = 100;
     int joyY = 322;
-    DrawEllipse(joyX, joyY + 12, 18, 6, DARKGRAY);
-    DrawEllipse(joyX, joyY + 12, 14, 4, BLACK);
-    DrawLineEx({(float)joyX, (float)joyY + 12}, {(float)joyX - 6, (float)joyY - 14}, 4.0f, LIGHTGRAY);
-    DrawCircle(joyX - 6, joyY - 14, 9, RED);
-    DrawCircleLines(joyX - 6, joyY - 14, 9, MAROON);
-    DrawCircle(joyX - 9, joyY - 17, 3, Fade(WHITE, 0.6f)); // specular highlight
-    DrawText("JOYSTICK", joyX - MeasureText("JOYSTICK", 9) / 2, joyY + 22, 9, GRAY);
-    DrawText("(MOVE)", joyX - MeasureText("(MOVE)", 8) / 2, joyY + 34, 8, GRAY);
+    DrawCircleV({(float)joyX, (float)joyY}, 28.0f, Fade(SKYBLUE, 0.18f));
+    DrawCircleLines(joyX, joyY, 28.0f, Fade(SKYBLUE, 0.72f));
+    DrawCircleV({(float)joyX + 8.0f, (float)joyY - 12.0f}, 10.0f, Fade(RAYWHITE, 0.72f));
+    DrawText("DRAG", joyX - MeasureText("DRAG", 9) / 2, joyY + 34, 9, SKYBLUE);
+    DrawText("STEER", joyX - MeasureText("STEER", 8) / 2, joyY + 46, 8, GRAY);
 
     // Draw Buttons
     int btnY = 312;
@@ -3390,34 +3394,34 @@ void Game::DrawHowTo() const {
     DrawCircle(195, btnY, 13, RED);
     DrawCircleLines(195, btnY, 13, MAROON);
     DrawCircle(195, btnY, 11, Fade(BLACK, 0.2f));
-    DrawText("FIRE", 195 - MeasureText("FIRE", 9) / 2, btnY - 4, 9, RAYWHITE);
-    DrawText("[Z / Space]", 195 - MeasureText("[Z / Space]", 8) / 2, btnY + 18, 8, GRAY);
+    DrawText("AUTO", 195 - MeasureText("AUTO", 9) / 2, btnY - 4, 9, RAYWHITE);
+    DrawText("FIRE", 195 - MeasureText("FIRE", 8) / 2, btnY + 18, 8, GRAY);
 
     // Bomb Button (BLUE)
     DrawCircle(250, btnY, 13, BLUE);
     DrawCircleLines(250, btnY, 13, DARKBLUE);
     DrawCircle(250, btnY, 11, Fade(BLACK, 0.2f));
     DrawText("BOMB", 250 - MeasureText("BOMB", 9) / 2, btnY - 4, 9, RAYWHITE);
-    DrawText("[X]", 250 - MeasureText("[X]", 8) / 2, btnY + 18, 8, GRAY);
+    DrawText("2-FINGER", 250 - MeasureText("2-FINGER", 8) / 2, btnY + 18, 8, GRAY);
 
-    // 1P Start Button (WHITE)
+    // Start Button (WHITE)
     DrawCircle(305, btnY - 10, 10, RAYWHITE);
     DrawCircleLines(305, btnY - 10, 10, GRAY);
     DrawText("START", 305 - MeasureText("START", 8) / 2, btnY - 14, 8, BLACK);
-    DrawText("[ENTER]", 305 - MeasureText("[ENTER]", 8) / 2, btnY + 4, 8, GRAY);
+    DrawText("TAP", 305 - MeasureText("TAP", 8) / 2, btnY + 4, 8, GRAY);
 
-    // Coin Button (ORANGE)
+    // Free-play Cabinet Pulse (ORANGE)
     DrawCircle(355, btnY - 10, 10, ORANGE);
     DrawCircleLines(355, btnY - 10, 10, MAROON);
-    DrawText("COIN", 355 - MeasureText("COIN", 8) / 2, btnY - 14, 8, BLACK);
-    DrawText("[C]", 355 - MeasureText("[C]", 8) / 2, btnY + 4, 8, GRAY);
+    DrawText("FREE", 355 - MeasureText("FREE", 8) / 2, btnY - 14, 8, BLACK);
+    DrawText("PLAY", 355 - MeasureText("PLAY", 8) / 2, btnY + 4, 8, GRAY);
 
     // Cabinet Guidelines & Info
     DrawText("TACTICAL GUIDELINES", 50, 390, 15, GOLD);
-    DrawText("- Hold FIRE button to continuous shoot.", 50, 410, 12, RAYWHITE);
-    DrawText("- Deploy BOMB to clear bullets and deal screen-wide damage.", 50, 426, 12, RAYWHITE);
-    DrawText("- Gamepad equivalents: Left Stick moves | Button Down shoots.", 50, 442, 12, GRAY);
-    DrawText("- ACE Mode features scaled up enemy speeds and 1.5x points.", 50, 458, 12, RED);
+    DrawText("- Auto-fire keeps thumbs focused on movement.", 50, 410, 12, RAYWHITE);
+    DrawText("- Two-finger tap deploys a bomb.", 50, 426, 12, RAYWHITE);
+    DrawText("- Route Vantage rewards clean bonus chains.", 50, 442, 12, GRAY);
+    DrawText("- ACE Mode raises pressure and grants 1.5x points.", 50, 458, 12, RED);
 
     // Back to menu action
     Vector2 mousePos = GetMousePosition();
@@ -3760,7 +3764,144 @@ void Game::DrawClearScoresConfirm() const {
 }
 
 void Game::DrawTransition() const {
-    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, transitionAlpha_));
+    Color cue = SKYBLUE;
+    const char* label = "RE-ANCHOR";
+    int mode = 0;
+    if (transitionTarget_ == State::Playing) {
+        cue = LIME;
+        label = "READY";
+        mode = 1;
+    } else if (transitionTarget_ == State::Continue || transitionTarget_ == State::GameOver) {
+        cue = RED;
+        label = "DANGER";
+        mode = 2;
+    } else if (transitionTarget_ == State::StageClear || state_ == State::StageClear) {
+        cue = GOLD;
+        label = "REWARD";
+        mode = 3;
+    } else if (transitionTarget_ == State::Paused || state_ == State::Paused) {
+        cue = SKYBLUE;
+        label = "SAFE";
+        mode = 4;
+    }
+    DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, transitionAlpha_ * 0.92f));
+    if (transitionAlpha_ > 0.08f) {
+        float pulse = 0.5f + 0.5f * std::sin((float)GetTime() * 10.0f);
+        BeginBlendMode(BLEND_ADDITIVE);
+        if (mode == 2) {
+            DrawRectangle(0, 104, 36, 278, Fade(cue, transitionAlpha_ * (0.16f + pulse * 0.07f)));
+            DrawRectangle(ScreenW - 36, 104, 36, 278, Fade(cue, transitionAlpha_ * (0.16f + pulse * 0.07f)));
+        } else if (mode == 3) {
+            for (int i = 0; i < 7; ++i) {
+                float x = 72.0f + i * 56.0f;
+                DrawCircleV({x, 184.0f + std::sin((float)GetTime() * 2.0f + i) * 8.0f}, 3.0f, Fade(GOLD, transitionAlpha_ * 0.28f));
+            }
+        } else if (mode == 4) {
+            DrawLineEx({150.0f, 116.0f}, {150.0f, 390.0f}, 2.0f, Fade(cue, transitionAlpha_ * 0.16f));
+            DrawLineEx({330.0f, 116.0f}, {330.0f, 390.0f}, 2.0f, Fade(cue, transitionAlpha_ * 0.16f));
+        } else {
+            DrawRing({240.0f, 214.0f}, 58.0f, 61.0f, (float)GetTime() * 54.0f, (float)GetTime() * 54.0f + 290.0f, 48, Fade(cue, transitionAlpha_ * 0.18f));
+        }
+        EndBlendMode();
+        DrawRectangle(0, 270, ScreenW, 78, Fade(cue, transitionAlpha_ * 0.16f));
+        DrawLine(0, 270, ScreenW, 270, Fade(cue, transitionAlpha_ * (0.45f + pulse * 0.24f)));
+        DrawLine(0, 348, ScreenW, 348, Fade(cue, transitionAlpha_ * (0.36f + pulse * 0.18f)));
+        int labelW = MeasureText(label, 28);
+        DrawText(label, ScreenW / 2 - labelW / 2, 294, 28, Fade(cue, transitionAlpha_));
+    }
+}
+
+void Game::DrawStageRitualOverlay() const {
+    if (state_ != State::Playing) return;
+    float routeTime = std::min(stageTime_, stageDirector_.RouteDuration());
+    float time = (float)GetTime();
+    float pulse = 0.5f + 0.5f * std::sin(time * 4.2f);
+
+    bool bonus = !bossSpawned_ && stageDirector_.IsBonusStage(stageTime_);
+    bool safe = !bossSpawned_ && stageDirector_.IsRecoveryWindow(stageTime_);
+    bool silence = !bossSpawned_ && stageDirector_.IsTacticalSilence(stageTime_);
+    bool runway = !bossSpawned_ && stageDirector_.IsBossRunway(stageTime_);
+
+    if (bonus) {
+        float sweep = fmodf(time * 88.0f, (float)ScreenH + 90.0f) - 45.0f;
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int i = 0; i < 5; ++i) {
+            float y = sweep - i * 72.0f;
+            if (y < -50.0f) y += ScreenH + 90.0f;
+            DrawLineEx({54.0f, y}, {426.0f, y + 44.0f}, 2.0f, Fade(GOLD, 0.18f));
+            DrawLineEx({74.0f, y + 20.0f}, {406.0f, y + 58.0f}, 1.4f, Fade(Color{0, 230, 220, 255}, 0.11f));
+        }
+        for (int i = 0; i < 3; ++i) {
+            Vector2 c = {240.0f, 150.0f + i * 72.0f};
+            float phase = time * 38.0f + i * 44.0f;
+            DrawRing(c, 132.0f + i * 10.0f, 135.0f + i * 10.0f, phase, phase + 82.0f, 32, Fade(GOLD, 0.15f + pulse * 0.05f));
+            DrawRing(c, 94.0f + i * 8.0f, 96.0f + i * 8.0f, -phase * 0.8f, -phase * 0.8f + 58.0f, 24, Fade(Color{255, 64, 150, 255}, 0.09f));
+        }
+        for (int i = 0; i < 7; ++i) {
+            float x = 78.0f + i * 54.0f;
+            float y = 94.0f + std::sin(time * 2.1f + i) * 7.0f;
+            DrawCircleV({x, y}, 2.2f + pulse * 0.9f, Fade(GOLD, 0.20f));
+        }
+        EndBlendMode();
+        return;
+    }
+
+    if (silence) {
+        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.20f + pulse * 0.04f));
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawLineEx({80.0f, 215.0f}, {400.0f, 215.0f}, 1.2f, Fade(Color{130, 220, 255, 255}, 0.22f));
+        DrawCircleLines(240, 215, 44.0f + pulse * 4.0f, Fade(Color{130, 220, 255, 255}, 0.14f));
+        EndBlendMode();
+        return;
+    }
+
+    if (runway || bossWarningTimer_ > 0.0f || BossAlive()) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        Vector2 gate = {240.0f, 142.0f};
+        float spin = time * 28.0f;
+        DrawRing(gate, 94.0f, 97.0f, spin, spin + 310.0f, 72, Fade(Color{80, 220, 255, 255}, 0.18f + pulse * 0.05f));
+        DrawRing(gate, 64.0f, 67.0f, -spin * 1.5f, -spin * 1.5f + 250.0f, 56, Fade(Color{255, 70, 115, 255}, 0.14f));
+        DrawLineEx({38.0f, 88.0f}, {38.0f, 374.0f}, 2.0f, Fade(RED, 0.16f + pulse * 0.06f));
+        DrawLineEx({442.0f, 88.0f}, {442.0f, 374.0f}, 2.0f, Fade(RED, 0.16f + pulse * 0.06f));
+        DrawTriangle({240.0f, 22.0f}, {197.0f, 174.0f}, {283.0f, 174.0f}, Fade(Color{255, 76, 120, 255}, 0.06f));
+        EndBlendMode();
+        return;
+    }
+
+    if (routeTime >= 94.0f && routeTime < 100.0f) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int i = 0; i < 6; ++i) {
+            float x = 58.0f + i * 72.0f;
+            float y = fmodf(time * 52.0f + i * 63.0f, (float)ScreenH + 80.0f) - 40.0f;
+            DrawLineEx({x - 18.0f, y - 16.0f}, {x + 24.0f, y + 20.0f}, 2.0f, Fade(ORANGE, 0.11f));
+        }
+        DrawRectangle(0, 102, 34, 250, Fade(RED, 0.08f + pulse * 0.04f));
+        DrawRectangle(ScreenW - 34, 102, 34, 250, Fade(RED, 0.08f + pulse * 0.04f));
+        EndBlendMode();
+        return;
+    }
+
+    if ((routeTime >= 40.0f && routeTime < 47.0f) || (routeTime >= 67.0f && routeTime < 73.0f)) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        float rail = 0.12f + pulse * 0.06f;
+        DrawRectangle(0, 86, 22, 302, Fade(RED, rail));
+        DrawRectangle(ScreenW - 22, 86, 22, 302, Fade(RED, rail));
+        DrawLineEx({74.0f, 98.0f}, {118.0f, 138.0f}, 2.0f, Fade(ORANGE, 0.15f));
+        DrawLineEx({406.0f, 98.0f}, {362.0f, 138.0f}, 2.0f, Fade(ORANGE, 0.15f));
+        DrawLineEx({74.0f, 360.0f}, {118.0f, 320.0f}, 2.0f, Fade(ORANGE, 0.15f));
+        DrawLineEx({406.0f, 360.0f}, {362.0f, 320.0f}, 2.0f, Fade(ORANGE, 0.15f));
+        EndBlendMode();
+        return;
+    }
+
+    if (safe) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRectangleGradientH(120, 84, 240, 320, Fade(SKYBLUE, 0.0f), Fade(SKYBLUE, 0.045f));
+        DrawLineEx({146.0f, 84.0f}, {146.0f, 392.0f}, 1.3f, Fade(Color{130, 230, 255, 255}, 0.14f + pulse * 0.05f));
+        DrawLineEx({334.0f, 84.0f}, {334.0f, 392.0f}, 1.3f, Fade(Color{130, 230, 255, 255}, 0.14f + pulse * 0.05f));
+        DrawRing({240.0f, 232.0f}, 58.0f + pulse * 5.0f, 60.0f + pulse * 5.0f, 0.0f, 360.0f, 48, Fade(SKYBLUE, 0.09f));
+        EndBlendMode();
+    }
 }
 
 void Game::Draw() {
@@ -3817,6 +3958,7 @@ void Game::Draw() {
     for (const auto& b : enemyBullets_) b.Draw(debug_);
     EndMode2D();
 
+    DrawStageRitualOverlay();
     DrawHud();
     if (debug_ && state_ == State::Playing) {
         DrawStageDiagnostics();
@@ -3865,8 +4007,8 @@ void Game::Draw() {
         DrawLine(0, 240, ScreenW, 240, RED);
         
         Color warnColor = (int)(bossWarningTimer_ * 5) % 2 == 0 ? RED : YELLOW;
-        int warnW = MeasureText("ORBITAL GATEKEEPER DETECTED: VANTAGE-9", 16);
-        DrawText("ORBITAL GATEKEEPER DETECTED: VANTAGE-9", ScreenW / 2 - warnW / 2, 202, 16, warnColor);
+        int warnW = MeasureText("BOSS APPROACH: VANTAGE-9", 20);
+        DrawText("BOSS APPROACH: VANTAGE-9", ScreenW / 2 - warnW / 2, 200, 20, warnColor);
     }
 
     if (state_ == State::Playing) {
@@ -3878,23 +4020,14 @@ void Game::Draw() {
 
     if (state_ == State::Playing && tutorialTimer_ > 0.0f) {
         float alpha = std::min(1.0f, tutorialTimer_);
-        DrawRectangle(30, ScreenH - 180, ScreenW - 60, 90, Fade(BLACK, alpha * 0.85f));
-        DrawRectangleLines(30, ScreenH - 180, ScreenW - 60, 90, Fade(SKYBLUE, alpha * 0.75f));
+        DrawRectangle(24, ScreenH - 140, ScreenW - 48, 68, Fade(BLACK, alpha * 0.72f));
+        DrawRectangleLines(24, ScreenH - 140, ScreenW - 48, 68, Fade(SKYBLUE, alpha * 0.58f));
         
-        int textY = ScreenH - 165;
-        if (controlLayout_ == 0) {
-            int w1 = MeasureText("KEYBOARD CONTROLS (CLASSIC)", 15);
-            DrawText("KEYBOARD CONTROLS (CLASSIC)", ScreenW / 2 - w1 / 2, textY, 15, Fade(GOLD, alpha));
-            int w2 = MeasureText("MOVE: Arrow Keys  |  SHOOT: Z or SPACE  |  BOMB: X", 13);
-            DrawText("MOVE: Arrow Keys  |  SHOOT: Z or SPACE  |  BOMB: X", ScreenW / 2 - w2 / 2, textY + 24, 13, Fade(WHITE, alpha));
-        } else {
-            int w1 = MeasureText("KEYBOARD CONTROLS (LEFT-HAND / WASD)", 15);
-            DrawText("KEYBOARD CONTROLS (LEFT-HAND / WASD)", ScreenW / 2 - w1 / 2, textY, 15, Fade(GOLD, alpha));
-            int w2 = MeasureText("MOVE: W / A / S / D  |  SHOOT: J or SPACE  |  BOMB: K", 13);
-            DrawText("MOVE: W / A / S / D  |  SHOOT: J or SPACE  |  BOMB: K", ScreenW / 2 - w2 / 2, textY + 24, 13, Fade(WHITE, alpha));
-        }
-        int w3 = MeasureText("Gamepad: D-pad / Stick  |  Shoot: A/X  |  Bomb: B", 12);
-        DrawText("Gamepad: D-pad / Stick  |  Shoot: A/X  |  Bomb: B", ScreenW / 2 - w3 / 2, textY + 44, 12, Fade(GRAY, alpha));
+        int textY = ScreenH - 126;
+        int w1 = MeasureText("DRAG TO FLY", 18);
+        DrawText("DRAG TO FLY", ScreenW / 2 - w1 / 2, textY, 18, Fade(GOLD, alpha));
+        int w2 = MeasureText("AUTO-FIRE  //  TWO-FINGER BOMB", 13);
+        DrawText("AUTO-FIRE  //  TWO-FINGER BOMB", ScreenW / 2 - w2 / 2, textY + 28, 13, Fade(RAYWHITE, alpha));
     }
 
     if (state_ == State::Title) {
@@ -3952,57 +4085,39 @@ void Game::Draw() {
     } else if (state_ == State::StageClear) {
         stageClearDebrief_.Draw(clearTimer_, loop_, player_.lives, player_.bombs, stageClearBonus_);
     } else if (state_ == State::GameOver) {
-        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.65f));
-        DrawRectangle(42, 190, ScreenW - 84, 250, Fade(BLACK, 0.8f));
-        DrawRectangleLines(42, 190, ScreenW - 84, 250, Fade(RED, 0.75f));
-        
-        // Warning stripes (diagonal red/black) at top and bottom
-        int stripY = 190;
-        DrawRectangle(42, stripY, ScreenW - 84, 8, RED);
-        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
-            DrawLineEx({(float)sx, (float)stripY}, {(float)sx + 8, (float)stripY + 8}, 3.0f, BLACK);
-        }
-        int stripY2 = 432;
-        DrawRectangle(42, stripY2, ScreenW - 84, 8, RED);
-        for (int sx = 42; sx < ScreenW - 42; sx += 16) {
-            DrawLineEx({(float)sx, (float)stripY2}, {(float)sx + 8, (float)stripY2 + 8}, 3.0f, BLACK);
-        }
+        DrawRectangle(0, 0, ScreenW, ScreenH, Fade(BLACK, 0.62f));
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRectangle(0, 112, 28, 338, Fade(RED, 0.14f));
+        DrawRectangle(ScreenW - 28, 112, 28, 338, Fade(RED, 0.14f));
+        DrawRing({240.0f, 176.0f}, 64.0f, 67.0f, (float)GetTime() * 34.0f, (float)GetTime() * 34.0f + 270.0f, 56, Fade(RED, 0.18f));
+        EndBlendMode();
+        DrawRectangle(36, 178, ScreenW - 72, 330, Fade(BLACK, 0.82f));
+        DrawRectangleLines(36, 178, ScreenW - 72, 330, Fade(RED, 0.74f));
 
-        int goTitleW = MeasureText("GAME OVER", 28);
-        DrawText("GAME OVER", ScreenW / 2 - goTitleW / 2, 215, 28, RED);
-        DrawLine(60, 255, ScreenW - 60, 255, Fade(RED, 0.4f));
+        int goTitleW = MeasureText("RUN LOST", 30);
+        DrawText("RUN LOST", ScreenW / 2 - goTitleW / 2, 204, 30, RED);
+        DrawText(TextFormat("SCORE %08d", player_.score), ScreenW / 2 - MeasureText(TextFormat("SCORE %08d", player_.score), 15) / 2, 244, 15, SKYBLUE);
         
-        const char* goItems[3] = { "Restart Mission", "Settings", "Quit to Title" };
+        const char* goItems[3] = { "RUN IT BACK", "TUNING", "TITLE" };
         for (int i = 0; i < 3; ++i) {
-            int y = 290 + i * 36;
             bool selected = (gameOverSelection_ == i);
             int xOffset = selected ? (int)(5.0f + 4.0f * std::sin((float)GetTime() * 14.0f)) : 0;
-            
-            if (selected) DrawRectangle(120, y - 6, 240, 26, Fade(RED, 0.25f));
-            DrawText(selected ? ">" : " ", 132 + xOffset, y, 16, selected ? GOLD : GRAY);
-            
-            Color textCol = RAYWHITE;
-            const char* label = goItems[i];
             if (i == 0) {
-                if (demoMode_) {
-                    textCol = selected ? GOLD : RAYWHITE;
-                } else {
-                    if (credits_ == 0) {
-                        textCol = selected ? RED : GRAY;
-                        label = "Insert Coin to Restart";
-                    } else {
-                        textCol = selected ? GOLD : LIME;
-                        label = "Restart Mission (-1)";
-                    }
-                }
+                Rectangle r = {54.0f, 286.0f, 372.0f, 64.0f};
+                DrawRectangleRec(r, Fade(RED, selected ? 0.24f : 0.13f));
+                DrawRectangleLinesEx(r, selected ? 3.0f : 2.0f, Fade(GOLD, selected ? 0.86f : 0.48f));
+                DrawText(goItems[i], 106 + xOffset, 306, 23, selected ? GOLD : LIME);
             } else {
-                textCol = selected ? GOLD : RAYWHITE;
+                Rectangle r = {84.0f, 368.0f + (float)(i - 1) * 52.0f, 312.0f, 44.0f};
+                DrawRectangleRec(r, Fade(BLACK, 0.62f));
+                DrawRectangleLinesEx(r, selected ? 2.0f : 1.0f, Fade(selected ? GOLD : RED, selected ? 0.72f : 0.30f));
+                DrawText(selected ? ">" : " ", 104 + xOffset, (int)r.y + 13, 16, selected ? GOLD : GRAY);
+                DrawText(goItems[i], 132 + xOffset, (int)r.y + 12, 17, selected ? GOLD : RAYWHITE);
             }
-            DrawText(label, 158 + xOffset, y, 16, textCol);
         }
         
-        int tipW = MeasureText("UP/DOWN navigate  |  ENTER/CLICK confirm", 12);
-        DrawText("UP/DOWN navigate  |  ENTER/CLICK confirm", ScreenW / 2 - tipW / 2, 412, 12, GRAY);
+        int tipW = MeasureText("ONE MORE RUN", 12);
+        DrawText("ONE MORE RUN", ScreenW / 2 - tipW / 2, 476, 12, GRAY);
     }
     
     if (transitioning_) {
@@ -4124,16 +4239,16 @@ void Game::LoadSettings() {
     hitboxOverlayEnabled_ = false;
     isFullscreen_ = false;
     controlLayout_ = 0;
-    crtShaderEnabled_ = true;
-    cleanPixelMode_ = false;
+    crtShaderEnabled_ = false;
+    cleanPixelMode_ = true;
     crtCurvature_ = 3;
-    crtScanline_ = 3;
-    crtMask_ = 4;
-    crtBloom_ = 2;
-    crtVignette_ = 3;
-    crtGlare_ = 2;
+    crtScanline_ = 1;
+    crtMask_ = 0;
+    crtBloom_ = 1;
+    crtVignette_ = 1;
+    crtGlare_ = 0;
     aspectMode_ = 0;
-    drawBezel_ = true;
+    drawBezel_ = false;
 
     bool fileExists = false;
     std::ifstream file("settings.cfg");
@@ -4221,6 +4336,7 @@ void Game::StartTransition(State target) {
     transitionTimer_ = 0.0f;
     transitionTarget_ = target;
     transitionAlpha_ = 0.0f;
+    enemyBullets_.clear();
     if (target == State::GameOver) {
         gameOverTimer_ = 0.0f;
         gameOverSelection_ = 0;
@@ -4232,9 +4348,9 @@ void Game::StartTransition(State target) {
 void Game::UpdateTransition(float dt) {
     if (!transitioning_) return;
     transitionTimer_ += dt;
-    if (transitionTimer_ < 0.25f) {
-        transitionAlpha_ = transitionTimer_ / 0.25f;
-    } else if (transitionTimer_ < 0.35f) {
+    if (transitionTimer_ < 0.32f) {
+        transitionAlpha_ = transitionTimer_ / 0.32f;
+    } else if (transitionTimer_ < 0.48f) {
         if (state_ != transitionTarget_) {
             state_ = transitionTarget_;
             if (state_ == State::Title) {
@@ -4244,8 +4360,8 @@ void Game::UpdateTransition(float dt) {
             }
         }
         transitionAlpha_ = 1.0f;
-    } else if (transitionTimer_ < 0.60f) {
-        transitionAlpha_ = 1.0f - (transitionTimer_ - 0.35f) / 0.25f;
+    } else if (transitionTimer_ < 0.82f) {
+        transitionAlpha_ = 1.0f - (transitionTimer_ - 0.48f) / 0.34f;
     } else {
         transitioning_ = false;
         transitionAlpha_ = 0.0f;

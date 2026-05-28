@@ -149,7 +149,6 @@ private:
     int stageClearTicksPlayed_ = 0;
     int stageClearBonus_ = 0;
     float gameOverTimer_ = 0.0f;
-    int credits_ = 0;
     int difficulty_ = 0; // 0 = Normal, 1 = Ace
     float continueTimer_ = 0.0f;
     int difficultySelection_ = 0;
@@ -222,7 +221,7 @@ private:
         float speed;
         Color color;
     };
-    static constexpr int NumStars = 80;
+    static constexpr int NumStars = 52;
     Star stars_[NumStars]{};
 
     // Boss Warning & Death Sequence state fields
@@ -239,16 +238,16 @@ private:
     int medalChain_ = 0;
 
     // Visual Scaling, CRT Shader, and Cabinet Bezels
-    bool crtShaderEnabled_ = true;
-    bool cleanPixelMode_ = false;
+    bool crtShaderEnabled_ = false;
+    bool cleanPixelMode_ = true;
     int crtCurvature_ = 3;
-    int crtScanline_ = 3;
-    int crtMask_ = 4;
-    int crtBloom_ = 2;
-    int crtVignette_ = 3;
-    int crtGlare_ = 2;
+    int crtScanline_ = 1;
+    int crtMask_ = 0;
+    int crtBloom_ = 1;
+    int crtVignette_ = 1;
+    int crtGlare_ = 0;
     int aspectMode_ = 0; // 0 = Fit, 1 = Integer, 2 = Stretch
-    bool drawBezel_ = true;
+    bool drawBezel_ = false;
     RenderTexture2D screenTarget_{};
     Shader crtShader_{};
 
@@ -310,6 +309,7 @@ private:
     void UpdateContinue(float dt);
     void Draw();
     void DrawBackground() const;
+    void DrawStageRitualOverlay() const;
     void DrawHud() const;
     void DrawStageDiagnostics() const;
     void DrawCenteredText(const char* title, const char* subtitle) const;

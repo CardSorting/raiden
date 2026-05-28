@@ -81,19 +81,17 @@ constexpr int CountOf(const T (&)[N]) {
 }
 
 constexpr TimedCue ActLaunch[] = {
-    { 1.30f, EntryDriftSolo },
-    { 4.20f, EntryNeedlePair },
-    { 7.20f, EntryWideFeel },
-    { 10.70f, EntryTopCrest },
-    { 13.40f, EntryNeedlePair }
+    { 0.55f, EntryDriftSolo },
+    { 2.80f, EntryNeedlePair },
+    { 5.15f, EntryWideFeel },
+    { 8.05f, EntryTopCrest }
 };
 
 constexpr TimedCue ActSweep[] = {
     { 0.70f, SweepLeftLead },
-    { 4.20f, SweepRightAnswer },
-    { 7.40f, SweepCrossReturn },
-    { 10.40f, DescendingScissors },
-    { 13.30f, SweepHookShot }
+    { 3.70f, SweepRightAnswer },
+    { 6.70f, SweepCrossReturn },
+    { 9.65f, DescendingScissors }
 };
 
 constexpr TimedCue ActReassembly[] = {
@@ -102,23 +100,22 @@ constexpr TimedCue ActReassembly[] = {
 };
 
 constexpr TimedCue ActIntercept[] = {
-    { 1.00f, InterceptVanguard },
-    { 4.60f, InterceptDelayedSupport },
-    { 8.10f, InterceptCenterColumn },
-    { 11.70f, InterceptSideNeedles },
-    { 14.50f, InterceptRearGuard }
+    { 0.90f, InterceptVanguard },
+    { 4.00f, InterceptDelayedSupport },
+    { 7.25f, InterceptCenterColumn },
+    { 10.45f, InterceptRearGuard }
 };
 
 constexpr TimedCue ActEncirclement[] = {
-    { 1.80f, EncirclementPincer },
-    { 5.20f, EncirclementClamp },
-    { 8.60f, EncirclementRelease }
+    { 1.15f, EncirclementPincer },
+    { 4.20f, EncirclementClamp },
+    { 6.95f, EncirclementRelease }
 };
 
 constexpr TimedCue ActRecovery[] = {
     { 0.90f, RecoveryLoneSurvivor },
-    { 4.40f, RecoveryEscort },
-    { 7.60f, RecoveryWideCaravan }
+    { 3.30f, RecoveryEscort },
+    { 5.80f, RecoveryWideCaravan }
 };
 
 constexpr TimedCue ActDebrisDrift[] = {
@@ -127,10 +124,10 @@ constexpr TimedCue ActDebrisDrift[] = {
 };
 
 constexpr TimedCue ActBonusParade[] = {
-    { 0.80f, BonusParadeLeft },
-    { 3.80f, BonusParadeRight },
-    { 6.60f, BonusParadeColumn },
-    { 9.10f, BonusParadeFinale }
+    { 0.55f, BonusParadeLeft },
+    { 2.90f, BonusParadeRight },
+    { 5.15f, BonusParadeColumn },
+    { 7.70f, BonusParadeFinale }
 };
 
 constexpr TimedCue ActThreatHorizon[] = {
@@ -140,11 +137,10 @@ constexpr TimedCue ActThreatHorizon[] = {
 
 constexpr TimedCue ActEscalation[] = {
     { 0.80f, EscalationStagger },
-    { 5.20f, SynchronizedDive },
-    { 9.80f, EscalationTurrets },
-    { 14.10f, CollapseCorridor },
-    { 18.50f, MirroredScissors },
-    { 22.40f, LaneDeny }
+    { 4.35f, SynchronizedDive },
+    { 8.10f, EscalationTurrets },
+    { 12.70f, CollapseCorridor },
+    { 16.65f, MirroredScissors }
 };
 
 constexpr TimedCue ActFortressCollapse[] = {
@@ -154,62 +150,62 @@ constexpr TimedCue ActFortressCollapse[] = {
 
 constexpr TimedCue ActBossArrival[] = {
     { 0.80f, GatePatrolLeft },
-    { 3.70f, GatePatrolRight },
-    { 6.20f, BossArrivalEscort },
-    { 8.60f, BossArrivalShadow }
+    { 2.80f, GatePatrolRight },
+    { 4.90f, BossArrivalEscort },
+    { 7.10f, BossArrivalShadow }
 };
 
 constexpr WaveBlock StageOneBlocks[] = {
     {
-        "OPENING ORIENTATION", 0.0f, 16.0f,
+        "OPENING ORIENTATION", 0.0f, 11.0f,
         StageSection::Opening, EncounterType::Orientation, StageTransition::Calm,
-        "Reacquaint movement, clean lanes, and enemy silhouettes.",
-        "Solo popcorn, mirrored needles, and one delayed aimed crossing.",
-        "Sparse enemies with one delayed aimed shot.",
-        ActLaunch, CountOf(ActLaunch), 0.22f
+        "Anchor thumb movement, ship scale, and clean enemy silhouettes immediately.",
+        "Solo popcorn, broad mirrored needles, and one readable crossing.",
+        "Sparse ships with wide lanes and almost no fire.",
+        ActLaunch, CountOf(ActLaunch), 0.16f
     },
     {
-        "SWEEP LANGUAGE", 16.0f, 16.0f,
+        "SWEEP LANGUAGE", 11.0f, 12.0f,
         StageSection::PatternIntro, EncounterType::Sweep, StageTransition::Pressure,
-        "Teach wide lateral traversal and edge awareness.",
-        "Alternating lateral popcorn sweeps with a center anchor.",
-        "Left/right call and response with a hook finish.",
-        ActSweep, CountOf(ActSweep), 0.42f
+        "Teach broad lateral traversal without requiring edge-perfect dodges.",
+        "Alternating lateral popcorn sweeps with one clear center anchor.",
+        "Left/right call and response, then a reset instead of a long hook.",
+        ActSweep, CountOf(ActSweep), 0.34f
     },
     {
-        "FORMATION REASSEMBLY", 32.0f, 5.0f,
+        "FORMATION REASSEMBLY", 23.0f, 4.0f,
         StageSection::Transition, EncounterType::FormationReassembly, StageTransition::Release,
-        "Stop the sweep pressure and visibly reorganize the stage language.",
+        "Stop pressure quickly and visibly reorganize the stage language.",
         "Non-firing ships fold into synchronized lanes.",
         "A short visual reset before aimed threats take over.",
-        ActReassembly, CountOf(ActReassembly), 0.12f
+        ActReassembly, CountOf(ActReassembly), 0.08f
     },
     {
-        "AIMED INTERCEPTORS", 37.0f, 16.0f,
+        "AIMED INTERCEPTORS", 27.0f, 13.0f,
         StageSection::Reinforcement, EncounterType::Intercept, StageTransition::Pressure,
-        "Reinforce baiting, timing shifts, and feints.",
-        "Aimed popcorn columns, side needles, and delayed turret support.",
-        "Central artillery appears behind familiar needle lanes.",
-        ActIntercept, CountOf(ActIntercept), 0.55f
+        "Reinforce baiting and timing shifts with single-purpose threats.",
+        "Aimed popcorn columns and one delayed turret support beat.",
+        "Central artillery appears, then space opens before the trap.",
+        ActIntercept, CountOf(ActIntercept), 0.43f
     },
     {
-        "FALSE RECOVERY PINCH", 53.0f, 12.0f,
+        "FALSE RECOVERY PINCH", 40.0f, 7.0f,
         StageSection::Combination, EncounterType::Pincer, StageTransition::Pressure,
-        "Combine opposing vectors and force lane commitment.",
-        "Twin turrets, crossing pincers, and a clamp release.",
-        "Turret bursts and converging popcorn close the center, then peel away.",
-        ActEncirclement, CountOf(ActEncirclement), 0.62f
+        "Create a short commitment test with obvious exits.",
+        "One turret pair, crossing pincers, and a broad release.",
+        "Pressure closes briefly, then peels away before fatigue sets in.",
+        ActEncirclement, CountOf(ActEncirclement), 0.50f
     },
     {
-        "BREATHING LANE", 65.0f, 10.0f,
+        "BREATHING LANE", 47.0f, 6.0f,
         StageSection::Recovery, EncounterType::Recovery, StageTransition::Release,
         "Reduce projectile density and create emotional reset.",
         "One retreating survivor followed by non-firing escort/caravan traffic.",
         "Slow, low-threat ships restore dodge space and let the player re-center.",
-        ActRecovery, CountOf(ActRecovery), 0.20f
+        ActRecovery, CountOf(ActRecovery), 0.14f
     },
     {
-        "DEBRIS DRIFT", 75.0f, 6.0f,
+        "DEBRIS DRIFT", 53.0f, 3.0f,
         StageSection::Transition, EncounterType::DebrisDrift, StageTransition::Silence,
         "Let the battlefield cool after the trap.",
         "Slow non-firing wreckage silhouettes cross the upper lanes.",
@@ -217,31 +213,31 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActDebrisDrift, CountOf(ActDebrisDrift), 0.08f
     },
     {
-        "BONUS FORMATION", 81.0f, 14.0f,
+        "BONUS FORMATION", 56.0f, 11.0f,
         StageSection::Bonus, EncounterType::BonusParade, StageTransition::Celebration,
-        "Reward precision and rhythm without survival pressure.",
-        "Large synchronized non-firing target parades sweep across the screen.",
-        "Pure score chase spectacle between combat phrases.",
-        ActBonusParade, CountOf(ActBonusParade), 0.18f
+        "Deliver an early mobile reward beat with low stress and high feedback.",
+        "Large synchronized non-firing target parades sweep in musical arcs.",
+        "Pure score chase spectacle between compact combat phrases.",
+        ActBonusParade, CountOf(ActBonusParade), 0.12f
     },
     {
-        "THREAT HORIZON", 95.0f, 8.0f,
+        "THREAT HORIZON", 67.0f, 6.0f,
         StageSection::Transition, EncounterType::ThreatHorizon, StageTransition::Anticipation,
         "Signal that the reward phase is ending and the fortress is waking.",
         "Slow scouts and a warning beacon enter with minimal fire.",
         "Psychological preparation before the corridor spike.",
-        ActThreatHorizon, CountOf(ActThreatHorizon), 0.28f
+        ActThreatHorizon, CountOf(ActThreatHorizon), 0.22f
     },
     {
-        "FORTRESS CORRIDOR", 103.0f, 26.0f,
+        "FORTRESS CORRIDOR", 73.0f, 21.0f,
         StageSection::MidStageSpike, EncounterType::CorridorCompression, StageTransition::Spike,
-        "Deliver the memorable mid-stage compression sequence.",
-        "Dives, paired turrets, corridor walls, and a final lane denial pair.",
-        "Each layer narrows space in sequence without adding random bullet noise.",
-        ActEscalation, CountOf(ActEscalation), 0.82f
+        "Deliver a memorable compression spike in short readable bursts.",
+        "Dives, paired turrets, broad corridor walls, and one clean release.",
+        "Each layer narrows space in sequence while preserving visible safe lanes.",
+        ActEscalation, CountOf(ActEscalation), 0.64f
     },
     {
-        "FORTRESS COLLAPSE", 129.0f, 8.0f,
+        "FORTRESS COLLAPSE", 94.0f, 6.0f,
         StageSection::BossRunway, EncounterType::DebrisDrift, StageTransition::Release,
         "Show the stage has been survived before the boss owns the screen.",
         "Retreating ships and drifting wreckage exit with no new bullets.",
@@ -249,7 +245,7 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActFortressCollapse, CountOf(ActFortressCollapse), 0.16f
     },
     {
-        "TACTICAL SILENCE", 137.0f, 8.0f,
+        "TACTICAL SILENCE", 100.0f, 6.0f,
         StageSection::BossRunway, EncounterType::TacticalSilence, StageTransition::Silence,
         "Remove threats and let anticipation become the main event.",
         "No enemies, no bullets, only atmosphere.",
@@ -257,17 +253,17 @@ constexpr WaveBlock StageOneBlocks[] = {
         nullptr, 0, 0.0f
     },
     {
-        "BOSS ARRIVAL", 145.0f, 10.0f,
+        "BOSS ARRIVAL", 106.0f, 8.0f,
         StageSection::BossRunway, EncounterType::BossArrival, StageTransition::Anticipation,
         "Make the boss feel like it arrives instead of spawning.",
         "Sparse gate patrols, escort shadows, and visible gate silhouette.",
         "Slow ceremonial pressure before VANTAGE-9 enters.",
-        ActBossArrival, CountOf(ActBossArrival), 0.32f
+        ActBossArrival, CountOf(ActBossArrival), 0.26f
     }
 };
 
 constexpr int BlockCount = CountOf(StageOneBlocks);
-constexpr float BossEntryTime = 155.0f;
+constexpr float BossEntryTime = 114.0f;
 
 const char* SectionName(StageSection section) {
     switch (section) {
@@ -350,9 +346,9 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case EntryNeedlePair:
-            AddEnemy(enemies, EnemyType::Popcorn, {170.0f, -30.0f}, {14.0f, 84.0f}, loop, 2,
+            AddEnemy(enemies, EnemyType::Popcorn, {156.0f, -30.0f}, {10.0f, 78.0f}, loop, 2,
                      EnemyMovePattern::NeedleSweep, EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 0.0f);
-            AddEnemy(enemies, EnemyType::Popcorn, {318.0f, -72.0f}, {-14.0f, 84.0f}, loop, 2,
+            AddEnemy(enemies, EnemyType::Popcorn, {324.0f, -72.0f}, {-10.0f, 78.0f}, loop, 2,
                      EnemyMovePattern::NeedleSweep, EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.1f);
             break;
 
@@ -364,28 +360,28 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case EntryTopCrest:
-            for (int i = 0; i < 4; ++i) {
-                float x = 132.0f + i * 72.0f;
+            for (int i = 0; i < 3; ++i) {
+                float x = 132.0f + i * 108.0f;
                 float vx = (i < 2) ? 18.0f : -18.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 18.0f}, {vx, 94.0f}, loop, 4,
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 20.0f}, {vx, 88.0f}, loop, 4,
                          EnemyMovePattern::Straight, EnemyFirePattern::Hold,
                          0.0f, 0.0f, 0, 0.0f);
             }
             break;
 
         case SweepLeftLead:
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {-24.0f - i * 26.0f, 36.0f - i * 28.0f},
-                         {126.0f, 86.0f}, loop, 5, EnemyMovePattern::NeedleSweep,
-                         i == 2 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.15f, 0.0f, 1, i * 0.42f);
+                         {116.0f, 78.0f}, loop, 5, EnemyMovePattern::NeedleSweep,
+                         i == 2 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.35f, 0.0f, 1, i * 0.42f);
             }
             break;
 
         case SweepRightAnswer:
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {504.0f + i * 26.0f, 24.0f - i * 28.0f},
-                         {-126.0f, 88.0f}, loop, 6, EnemyMovePattern::NeedleSweep,
-                         i == 2 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.10f, 0.0f, 1, 2.8f + i * 0.42f);
+                         {-116.0f, 80.0f}, loop, 6, EnemyMovePattern::NeedleSweep,
+                         i == 2 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.30f, 0.0f, 1, 2.8f + i * 0.42f);
             }
             break;
 
@@ -399,11 +395,11 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case DescendingScissors:
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 3; ++i) {
                 float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (88.0f + i * 20.0f), -24.0f - i * 28.0f},
-                         {-side * 30.0f, 112.0f}, loop, 8, EnemyMovePattern::DescendingScissors,
-                         i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.05f + i * 0.08f, 0.0f, 1, i * 1.2f);
+                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (104.0f + i * 24.0f), -24.0f - i * 32.0f},
+                         {-side * 24.0f, 102.0f}, loop, 8, EnemyMovePattern::DescendingScissors,
+                         i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.28f + i * 0.10f, 0.0f, 1, i * 1.2f);
             }
             break;
 
@@ -418,27 +414,27 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case InterceptVanguard:
-            for (int i = 0; i < 3; ++i) {
-                float x = 170.0f + i * 70.0f;
+            for (int i = 0; i < 2; ++i) {
+                float x = 176.0f + i * 128.0f;
                 float y = -22.0f - i * 22.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, y}, {0.0f, 106.0f}, loop, 10,
-                         EnemyMovePattern::Straight, EnemyFirePattern::AimedSingle, 1.25f + i * 0.25f, 0.0f, 1, 0.0f);
+                AddEnemy(enemies, EnemyType::Popcorn, {x, y}, {0.0f, 96.0f}, loop, 10,
+                         EnemyMovePattern::Straight, EnemyFirePattern::AimedSingle, 1.45f + i * 0.28f, 0.0f, 1, 0.0f);
             }
             break;
 
         case InterceptDelayedSupport:
             AddEnemy(enemies, EnemyType::Turret, {108.0f, -30.0f}, {0.0f, 42.0f}, loop, 11,
-                     EnemyMovePattern::Default, EnemyFirePattern::Default, 1.15f, 0.0f, 2, 0.0f);
+                     EnemyMovePattern::Default, EnemyFirePattern::Default, 1.45f, 0.0f, 1, 0.0f);
             AddEnemy(enemies, EnemyType::Popcorn, {364.0f, -32.0f}, {-28.0f, 112.0f}, loop, 11,
                      EnemyMovePattern::NeedleSweep, EnemyFirePattern::AimedSingle, 1.55f, 0.0f, 1, 1.8f);
             break;
 
         case InterceptCenterColumn:
             AddEnemy(enemies, EnemyType::Turret, {240.0f, -34.0f}, {0.0f, 48.0f}, loop, 12,
-                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.05f, 0.58f, 3, 0.0f);
-            for (int i = 0; i < 4; ++i) {
-                float side = (i < 2) ? -1.0f : 1.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (72.0f + i * 14.0f), -34.0f - i * 18.0f},
+                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.35f, 0.72f, 2, 0.0f);
+            for (int i = 0; i < 2; ++i) {
+                float side = (i == 0) ? -1.0f : 1.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + (i == 0 ? -112.0f : 112.0f), -34.0f - i * 22.0f},
                          {side * 24.0f, 106.0f}, loop, 12, EnemyMovePattern::Straight,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 0.0f);
             }
@@ -463,9 +459,9 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
 
         case EncirclementPincer:
             AddEnemy(enemies, EnemyType::Turret, {80.0f, -34.0f}, {0.0f, 48.0f}, loop, 15,
-                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.15f, 0.52f, 2, 0.0f);
+                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.40f, 0.70f, 1, 0.0f);
             AddEnemy(enemies, EnemyType::Turret, {400.0f, -34.0f}, {0.0f, 48.0f}, loop, 15,
-                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.45f, 0.52f, 2, 0.0f);
+                     EnemyMovePattern::Default, EnemyFirePattern::TurretBurst, 1.70f, 0.70f, 1, 0.0f);
             AddEnemy(enemies, EnemyType::Popcorn, {-24.0f, 210.0f}, {112.0f, 58.0f}, loop, 15,
                      EnemyMovePattern::Pincer, EnemyFirePattern::AimedSingle, 1.05f, 0.0f, 1, 0.0f);
             AddEnemy(enemies, EnemyType::Popcorn, {504.0f, 168.0f}, {-112.0f, 62.0f}, loop, 15,
@@ -473,10 +469,10 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case EncirclementClamp:
-            for (int i = 0; i < 4; ++i) {
-                AddEnemy(enemies, EnemyType::Popcorn, {112.0f + i * 86.0f, -24.0f - i * 18.0f},
-                         {0.0f, 112.0f}, loop, 16, EnemyMovePattern::Straight,
-                         EnemyFirePattern::AimedSingle, 1.02f + i * 0.18f, 0.0f, 1, 0.0f);
+            for (int i = 0; i < 3; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {122.0f + i * 118.0f, -24.0f - i * 22.0f},
+                         {0.0f, 102.0f}, loop, 16, EnemyMovePattern::Straight,
+                         i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold, 1.25f + i * 0.18f, 0.0f, 1, 0.0f);
             }
             break;
 
@@ -503,8 +499,8 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case RecoveryWideCaravan:
-            for (int i = 0; i < 4; ++i) {
-                float x = 96.0f + i * 96.0f;
+            for (int i = 0; i < 3; ++i) {
+                float x = 104.0f + i * 136.0f;
                 AddEnemy(enemies, EnemyType::Popcorn, {x, -28.0f - i * 12.0f}, {0.0f, 96.0f}, loop, 20,
                          EnemyMovePattern::Straight, EnemyFirePattern::Hold,
                          0.0f, 0.0f, 0, 0.0f);
@@ -530,7 +526,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case DebrisDriftLeft:
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < 2; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {-26.0f - i * 18.0f, 76.0f + i * 58.0f},
                          {130.0f, 12.0f}, loop, 0, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.8f);
@@ -538,7 +534,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case DebrisDriftRight:
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < 2; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {506.0f + i * 18.0f, 92.0f + i * 54.0f},
                          {-130.0f, 12.0f}, loop, 0, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.8f);
@@ -546,37 +542,37 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case BonusParadeLeft:
-            for (int i = 0; i < 6; ++i) {
-                AddEnemy(enemies, EnemyType::Popcorn, {-28.0f - i * 22.0f, 62.0f + i * 30.0f},
-                         {124.0f, 5.0f}, loop, 27, EnemyMovePattern::CrossLane,
-                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.38f);
+            for (int i = 0; i < 5; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {-28.0f - i * 34.0f, 58.0f + i * 42.0f},
+                         {148.0f, 3.0f}, loop, 27, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.56f);
             }
             break;
 
         case BonusParadeRight:
-            for (int i = 0; i < 6; ++i) {
-                AddEnemy(enemies, EnemyType::Popcorn, {508.0f + i * 22.0f, 58.0f + i * 30.0f},
-                         {-124.0f, 5.0f}, loop, 28, EnemyMovePattern::CrossLane,
-                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.38f);
+            for (int i = 0; i < 5; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {508.0f + i * 34.0f, 58.0f + i * 42.0f},
+                         {-148.0f, 3.0f}, loop, 28, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.56f);
             }
             break;
 
         case BonusParadeColumn:
-            for (int i = 0; i < 8; ++i) {
-                float x = (i % 2 == 0) ? 142.0f : 338.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 28.0f},
-                         {0.0f, 54.0f}, loop, 29, EnemyMovePattern::NeedleSweep,
-                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.45f);
+            for (int i = 0; i < 6; ++i) {
+                float x = (i % 2 == 0) ? 128.0f : 352.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 36.0f},
+                         {0.0f, 70.0f}, loop, 29, EnemyMovePattern::NeedleSweep,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.72f);
             }
             break;
 
         case BonusParadeFinale:
             for (int i = 0; i < 8; ++i) {
                 bool left = i < 4;
-                float y = 72.0f + (i % 4) * 34.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {left ? -30.0f - i * 14.0f : 510.0f + i * 14.0f, y},
-                         {left ? 152.0f : -152.0f, 4.0f}, loop, 30, EnemyMovePattern::NeedleSweep,
-                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, left ? i * 0.5f : 3.14f + i * 0.5f);
+                float y = 66.0f + (i % 4) * 38.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {left ? -30.0f - i * 16.0f : 510.0f + i * 16.0f, y},
+                         {left ? 156.0f : -156.0f, 2.0f}, loop, 30, EnemyMovePattern::NeedleSweep,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, left ? i * 0.64f : 3.14f + i * 0.64f);
             }
             break;
 
@@ -596,12 +592,12 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case EscalationStagger:
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 3; ++i) {
                 float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (76.0f + i * 20.0f), -22.0f - i * 24.0f},
-                         {-side * 36.0f, 112.0f}, loop, 21, EnemyMovePattern::DescendingScissors,
-                         i == 2 ? EnemyFirePattern::FanPulse : EnemyFirePattern::AimedSingle,
-                         0.92f + i * 0.12f, 1.10f, 1, i * 0.7f);
+                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (94.0f + i * 24.0f), -22.0f - i * 28.0f},
+                         {-side * 28.0f, 104.0f}, loop, 21, EnemyMovePattern::DescendingScissors,
+                         i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold,
+                         1.18f + i * 0.14f, 1.10f, 1, i * 0.7f);
             }
             break;
 
@@ -616,18 +612,18 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
 
         case EscalationTurrets:
             AddEnemy(enemies, EnemyType::Turret, {122.0f, -32.0f}, {0.0f, 54.0f}, loop, 23,
-                     EnemyMovePattern::Default, EnemyFirePattern::Default, 0.95f, 0.0f, 2, 0.0f);
+                     EnemyMovePattern::Default, EnemyFirePattern::Default, 1.20f, 0.0f, 1, 0.0f);
             AddEnemy(enemies, EnemyType::Turret, {358.0f, -72.0f}, {0.0f, 54.0f}, loop, 23,
-                     EnemyMovePattern::Default, EnemyFirePattern::Default, 1.35f, 0.0f, 2, 0.0f);
+                     EnemyMovePattern::Default, EnemyFirePattern::Default, 1.65f, 0.0f, 1, 0.0f);
             break;
 
         case CollapseCorridor:
-            for (int i = 0; i < 6; ++i) {
-                float x = (i < 3) ? 82.0f + i * 38.0f : 398.0f - (i - 3) * 38.0f;
+            for (int i = 0; i < 4; ++i) {
+                float x = (i < 2) ? 82.0f + i * 56.0f : 398.0f - (i - 2) * 56.0f;
                 float vx = (x < 240.0f) ? 36.0f : -36.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, -24.0f - i * 22.0f}, {vx, 108.0f}, loop, 24,
-                         EnemyMovePattern::Pincer, i == 2 ? EnemyFirePattern::FanPulse : EnemyFirePattern::AimedSingle,
-                         0.98f + i * 0.10f, 1.05f, 1, i * 0.5f);
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -24.0f - i * 28.0f}, {vx, 102.0f}, loop, 24,
+                         EnemyMovePattern::Pincer, i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold,
+                         1.22f + i * 0.12f, 1.05f, 1, i * 0.5f);
             }
             break;
 
