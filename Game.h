@@ -130,6 +130,7 @@ private:
     bool stageRecoveryActive_ = false;
     bool stageBossRunwayActive_ = false;
     bool stageSilenceActive_ = false;
+    bool stageBonusActive_ = false;
     int diagLastBlock_ = -1;
     bool diagSludgeWarned_ = false;
     std::string diagLastDeathBlock_ = "NONE";

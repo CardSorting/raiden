@@ -122,15 +122,15 @@ constexpr TimedCue ActRecovery[] = {
 };
 
 constexpr TimedCue ActDebrisDrift[] = {
-    { 0.80f, DebrisDriftLeft },
-    { 3.20f, DebrisDriftRight }
+    { 0.50f, DebrisDriftLeft },
+    { 1.80f, DebrisDriftRight }
 };
 
 constexpr TimedCue ActBonusParade[] = {
     { 0.80f, BonusParadeLeft },
     { 3.80f, BonusParadeRight },
-    { 7.00f, BonusParadeColumn },
-    { 10.20f, BonusParadeFinale }
+    { 6.60f, BonusParadeColumn },
+    { 9.10f, BonusParadeFinale }
 };
 
 constexpr TimedCue ActThreatHorizon[] = {
@@ -505,7 +505,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case RecoveryWideCaravan:
             for (int i = 0; i < 4; ++i) {
                 float x = 96.0f + i * 96.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, -28.0f - i * 12.0f}, {0.0f, 86.0f}, loop, 20,
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -28.0f - i * 12.0f}, {0.0f, 96.0f}, loop, 20,
                          EnemyMovePattern::Straight, EnemyFirePattern::Hold,
                          0.0f, 0.0f, 0, 0.0f);
             }
@@ -532,7 +532,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case DebrisDriftLeft:
             for (int i = 0; i < 3; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {-26.0f - i * 18.0f, 76.0f + i * 58.0f},
-                         {58.0f, 18.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         {130.0f, 12.0f}, loop, 0, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.8f);
             }
             break;
@@ -540,7 +540,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case DebrisDriftRight:
             for (int i = 0; i < 3; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {506.0f + i * 18.0f, 92.0f + i * 54.0f},
-                         {-58.0f, 16.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         {-130.0f, 12.0f}, loop, 0, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.8f);
             }
             break;
@@ -548,7 +548,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case BonusParadeLeft:
             for (int i = 0; i < 6; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {-28.0f - i * 22.0f, 62.0f + i * 30.0f},
-                         {118.0f, 5.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         {124.0f, 5.0f}, loop, 27, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.38f);
             }
             break;
@@ -556,7 +556,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case BonusParadeRight:
             for (int i = 0; i < 6; ++i) {
                 AddEnemy(enemies, EnemyType::Popcorn, {508.0f + i * 22.0f, 58.0f + i * 30.0f},
-                         {-118.0f, 5.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         {-124.0f, 5.0f}, loop, 28, EnemyMovePattern::CrossLane,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.38f);
             }
             break;
@@ -564,8 +564,8 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
         case BonusParadeColumn:
             for (int i = 0; i < 8; ++i) {
                 float x = (i % 2 == 0) ? 142.0f : 338.0f;
-                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 24.0f},
-                         {0.0f, 72.0f}, loop, 0, EnemyMovePattern::NeedleSweep,
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 28.0f},
+                         {0.0f, 54.0f}, loop, 29, EnemyMovePattern::NeedleSweep,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.45f);
             }
             break;
@@ -575,7 +575,7 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
                 bool left = i < 4;
                 float y = 72.0f + (i % 4) * 34.0f;
                 AddEnemy(enemies, EnemyType::Popcorn, {left ? -30.0f - i * 14.0f : 510.0f + i * 14.0f, y},
-                         {left ? 136.0f : -136.0f, 4.0f}, loop, 0, EnemyMovePattern::NeedleSweep,
+                         {left ? 152.0f : -152.0f, 4.0f}, loop, 30, EnemyMovePattern::NeedleSweep,
                          EnemyFirePattern::Hold, 0.0f, 0.0f, 0, left ? i * 0.5f : 3.14f + i * 0.5f);
             }
             break;
@@ -654,13 +654,13 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             break;
 
         case GatePatrolLeft:
-            AddEnemy(enemies, EnemyType::Turret, {124.0f, -34.0f}, {0.0f, 34.0f}, loop, 27,
-                     EnemyMovePattern::GatePatrol, EnemyFirePattern::TurretBurst, 1.55f, 0.65f, 1, 0.0f);
+            AddEnemy(enemies, EnemyType::Turret, {124.0f, -34.0f}, {0.0f, 34.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 0.0f);
             break;
 
         case GatePatrolRight:
-            AddEnemy(enemies, EnemyType::Turret, {356.0f, -34.0f}, {0.0f, 34.0f}, loop, 28,
-                     EnemyMovePattern::GatePatrol, EnemyFirePattern::TurretBurst, 1.55f, 0.65f, 1, 3.14f);
+            AddEnemy(enemies, EnemyType::Turret, {356.0f, -34.0f}, {0.0f, 34.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f);
             break;
 
         case GateWarningEchoes:

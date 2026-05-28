@@ -569,6 +569,7 @@ void Game::StartGame() {
     stageRecoveryActive_ = false;
     stageBossRunwayActive_ = false;
     stageSilenceActive_ = false;
+    stageBonusActive_ = false;
     diagLastBlock_ = -1;
     diagSludgeWarned_ = false;
     diagLastDeathBlock_ = "NONE";
@@ -615,6 +616,7 @@ void Game::ReturnToTitle() {
     stageRecoveryActive_ = false;
     stageBossRunwayActive_ = false;
     stageSilenceActive_ = false;
+    stageBonusActive_ = false;
     diagLastBlock_ = -1;
     diagSludgeWarned_ = false;
     diagLastDeathBlock_ = "NONE";
@@ -673,6 +675,7 @@ void Game::NextLoop() {
     stageRecoveryActive_ = false;
     stageBossRunwayActive_ = false;
     stageSilenceActive_ = false;
+    stageBonusActive_ = false;
     diagLastBlock_ = -1;
     diagSludgeWarned_ = false;
     diagLastDeathBlock_ = "NONE";
@@ -1314,9 +1317,35 @@ void Game::UpdatePlaying(float dt) {
                                              stageDirector_.CurrentBlockElapsed(stageTime_)));
         }
         enemyBullets_.clear();
+        enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
+                                      [](const Enemy& e) { return !e.IsBoss(); }),
+                       enemies_.end());
+        for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
         enemyShotAudioTimer_ = 0.0f;
     }
     stageRecoveryActive_ = recoveryWindow;
+
+    bool bonusStage = !bossSpawned_ && stageDirector_.IsBonusStage(stageTime_);
+    if (bonusStage && !stageBonusActive_) {
+        int bullets = ActiveEnemyBulletCount();
+        int nonBossEnemies = ActiveNonBossEnemyCount();
+        if (bullets > 0 || nonBossEnemies > 0) {
+            TraceLog(LOG_WARNING, TextFormat("[STAGE DIAG] bonus entry cleanup: staleBullets=%d staleNonBossEnemies=%d t=%.2f",
+                                             bullets, nonBossEnemies, stageDirector_.CurrentBlockElapsed(stageTime_)));
+        }
+        enemyBullets_.clear();
+        enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
+                                      [](const Enemy& e) { return !e.IsBoss(); }),
+                       enemies_.end());
+        for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
+        enemyShotAudioTimer_ = 0.0f;
+    } else if (!bonusStage && stageBonusActive_) {
+        enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
+                                      [](const Enemy& e) { return !e.IsBoss(); }),
+                       enemies_.end());
+        for (int i = 0; i < 32; ++i) formationCount_[i] = 0;
+    }
+    stageBonusActive_ = bonusStage;
 
     bool bossRunway = !bossSpawned_ && stageDirector_.IsBossRunway(stageTime_);
     if (bossRunway && !stageBossRunwayActive_) {
@@ -2194,7 +2223,7 @@ void Game::UpdateStageDiagnostics() {
     bool bulletSludge = bullets > DiagBulletWarnThreshold;
     bool enemySludge = !bonus && enemies > DiagEnemyWarnThreshold;
     bool combinedSludge = !climax && bullets >= DiagCombinedBulletThreshold && enemies >= DiagCombinedEnemyThreshold;
-    bool calmPollution = (recovery || runway || silence) && bullets > DiagRecoveryBulletThreshold;
+    bool calmPollution = (recovery || runway || bonus || silence) && bullets > DiagRecoveryBulletThreshold;
 
     if (!diagSludgeWarned_ && (bulletSludge || enemySludge || combinedSludge || calmPollution)) {
         diagSludgeWarned_ = true;
@@ -3166,7 +3195,7 @@ void Game::DrawStageDiagnostics() const {
     bool pressureWarn = bullets > DiagBulletWarnThreshold ||
                         (!bonus && enemies > DiagEnemyWarnThreshold) ||
                         (bullets >= DiagCombinedBulletThreshold && enemies >= DiagCombinedEnemyThreshold) ||
-                        ((recovery || runway || silence) && bullets > DiagRecoveryBulletThreshold);
+                        ((recovery || runway || bonus || silence) && bullets > DiagRecoveryBulletThreshold);
 
     int x = 12;
     int y = 72;
