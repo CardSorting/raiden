@@ -8,6 +8,8 @@ enum class StageSection {
     Reinforcement,
     Combination,
     Recovery,
+    Transition,
+    Bonus,
     MidStageSpike,
     BossRunway
 };
@@ -23,6 +25,12 @@ enum class EncounterType {
     ArtilleryControl,
     BulletCurtain,
     Recovery,
+    FormationReassembly,
+    DebrisDrift,
+    ThreatHorizon,
+    BonusParade,
+    TacticalSilence,
+    BossArrival,
     BossRunway
 };
 
@@ -33,7 +41,8 @@ enum class StageTransition {
     Anticipation,
     Spike,
     Silence,
-    Climax
+    Climax,
+    Celebration
 };
 
 class StageDirector {
@@ -54,6 +63,8 @@ public:
     float CurrentIntensity(float stageTime) const;
     bool IsRecoveryWindow(float stageTime) const;
     bool IsBossRunway(float stageTime) const;
+    bool IsBonusStage(float stageTime) const;
+    bool IsTacticalSilence(float stageTime) const;
 
 private:
     int nextCue_ = 0;

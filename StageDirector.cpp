@@ -27,6 +27,16 @@ enum StageCue {
     RecoveryLoneSurvivor,
     RecoveryEscort,
     RecoveryWideCaravan,
+    ReassemblyLeader,
+    ReassemblyWingFold,
+    DebrisDriftLeft,
+    DebrisDriftRight,
+    BonusParadeLeft,
+    BonusParadeRight,
+    BonusParadeColumn,
+    BonusParadeFinale,
+    ThreatHorizonScouts,
+    ThreatHorizonBeacon,
 
     EscalationStagger,
     SynchronizedDive,
@@ -39,7 +49,10 @@ enum StageCue {
     GatePatrolRight,
     GateWarningEchoes,
     FinalScout,
-    LastDiver
+    LastDiver,
+    FortressCollapseRetreat,
+    BossArrivalEscort,
+    BossArrivalShadow
 };
 
 struct TimedCue {
@@ -83,6 +96,11 @@ constexpr TimedCue ActSweep[] = {
     { 13.30f, SweepHookShot }
 };
 
+constexpr TimedCue ActReassembly[] = {
+    { 0.60f, ReassemblyLeader },
+    { 2.70f, ReassemblyWingFold }
+};
+
 constexpr TimedCue ActIntercept[] = {
     { 1.00f, InterceptVanguard },
     { 4.60f, InterceptDelayedSupport },
@@ -103,6 +121,23 @@ constexpr TimedCue ActRecovery[] = {
     { 7.60f, RecoveryWideCaravan }
 };
 
+constexpr TimedCue ActDebrisDrift[] = {
+    { 0.80f, DebrisDriftLeft },
+    { 3.20f, DebrisDriftRight }
+};
+
+constexpr TimedCue ActBonusParade[] = {
+    { 0.80f, BonusParadeLeft },
+    { 3.80f, BonusParadeRight },
+    { 7.00f, BonusParadeColumn },
+    { 10.20f, BonusParadeFinale }
+};
+
+constexpr TimedCue ActThreatHorizon[] = {
+    { 1.20f, ThreatHorizonScouts },
+    { 4.80f, ThreatHorizonBeacon }
+};
+
 constexpr TimedCue ActEscalation[] = {
     { 0.80f, EscalationStagger },
     { 5.20f, SynchronizedDive },
@@ -112,12 +147,16 @@ constexpr TimedCue ActEscalation[] = {
     { 22.40f, LaneDeny }
 };
 
-constexpr TimedCue ActGate[] = {
-    { 1.20f, GatePatrolLeft },
-    { 5.20f, GatePatrolRight },
-    { 9.10f, GateWarningEchoes },
-    { 13.20f, FinalScout },
-    { 16.20f, LastDiver }
+constexpr TimedCue ActFortressCollapse[] = {
+    { 0.70f, FortressCollapseRetreat },
+    { 3.90f, DebrisDriftLeft }
+};
+
+constexpr TimedCue ActBossArrival[] = {
+    { 0.80f, GatePatrolLeft },
+    { 3.70f, GatePatrolRight },
+    { 6.20f, BossArrivalEscort },
+    { 8.60f, BossArrivalShadow }
 };
 
 constexpr WaveBlock StageOneBlocks[] = {
@@ -138,7 +177,15 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActSweep, CountOf(ActSweep), 0.42f
     },
     {
-        "AIMED INTERCEPTORS", 32.0f, 16.0f,
+        "FORMATION REASSEMBLY", 32.0f, 5.0f,
+        StageSection::Transition, EncounterType::FormationReassembly, StageTransition::Release,
+        "Stop the sweep pressure and visibly reorganize the stage language.",
+        "Non-firing ships fold into synchronized lanes.",
+        "A short visual reset before aimed threats take over.",
+        ActReassembly, CountOf(ActReassembly), 0.12f
+    },
+    {
+        "AIMED INTERCEPTORS", 37.0f, 16.0f,
         StageSection::Reinforcement, EncounterType::Intercept, StageTransition::Pressure,
         "Reinforce baiting, timing shifts, and feints.",
         "Aimed popcorn columns, side needles, and delayed turret support.",
@@ -146,7 +193,7 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActIntercept, CountOf(ActIntercept), 0.55f
     },
     {
-        "FALSE RECOVERY PINCH", 48.0f, 11.0f,
+        "FALSE RECOVERY PINCH", 53.0f, 12.0f,
         StageSection::Combination, EncounterType::Pincer, StageTransition::Pressure,
         "Combine opposing vectors and force lane commitment.",
         "Twin turrets, crossing pincers, and a clamp release.",
@@ -154,7 +201,7 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActEncirclement, CountOf(ActEncirclement), 0.62f
     },
     {
-        "BREATHING LANE", 59.0f, 11.0f,
+        "BREATHING LANE", 65.0f, 10.0f,
         StageSection::Recovery, EncounterType::Recovery, StageTransition::Release,
         "Reduce projectile density and create emotional reset.",
         "One retreating survivor followed by non-firing escort/caravan traffic.",
@@ -162,7 +209,31 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActRecovery, CountOf(ActRecovery), 0.20f
     },
     {
-        "FORTRESS CORRIDOR", 70.0f, 26.0f,
+        "DEBRIS DRIFT", 75.0f, 6.0f,
+        StageSection::Transition, EncounterType::DebrisDrift, StageTransition::Silence,
+        "Let the battlefield cool after the trap.",
+        "Slow non-firing wreckage silhouettes cross the upper lanes.",
+        "A quiet score-breath before the bonus parade.",
+        ActDebrisDrift, CountOf(ActDebrisDrift), 0.08f
+    },
+    {
+        "BONUS FORMATION", 81.0f, 14.0f,
+        StageSection::Bonus, EncounterType::BonusParade, StageTransition::Celebration,
+        "Reward precision and rhythm without survival pressure.",
+        "Large synchronized non-firing target parades sweep across the screen.",
+        "Pure score chase spectacle between combat phrases.",
+        ActBonusParade, CountOf(ActBonusParade), 0.18f
+    },
+    {
+        "THREAT HORIZON", 95.0f, 8.0f,
+        StageSection::Transition, EncounterType::ThreatHorizon, StageTransition::Anticipation,
+        "Signal that the reward phase is ending and the fortress is waking.",
+        "Slow scouts and a warning beacon enter with minimal fire.",
+        "Psychological preparation before the corridor spike.",
+        ActThreatHorizon, CountOf(ActThreatHorizon), 0.28f
+    },
+    {
+        "FORTRESS CORRIDOR", 103.0f, 26.0f,
         StageSection::MidStageSpike, EncounterType::CorridorCompression, StageTransition::Spike,
         "Deliver the memorable mid-stage compression sequence.",
         "Dives, paired turrets, corridor walls, and a final lane denial pair.",
@@ -170,17 +241,33 @@ constexpr WaveBlock StageOneBlocks[] = {
         ActEscalation, CountOf(ActEscalation), 0.82f
     },
     {
-        "BOSS RUNWAY", 96.0f, 20.0f,
-        StageSection::BossRunway, EncounterType::BossRunway, StageTransition::Anticipation,
-        "Drain visual noise and let the stage inhale before the carrier.",
-        "Slow gate patrols, echo scouts, and one final diver group.",
-        "Sparse gate patrols, visible gate silhouette, long spacing.",
-        ActGate, CountOf(ActGate), 0.35f
+        "FORTRESS COLLAPSE", 129.0f, 8.0f,
+        StageSection::BossRunway, EncounterType::DebrisDrift, StageTransition::Release,
+        "Show the stage has been survived before the boss owns the screen.",
+        "Retreating ships and drifting wreckage exit with no new bullets.",
+        "Combat pressure falls away into approach staging.",
+        ActFortressCollapse, CountOf(ActFortressCollapse), 0.16f
+    },
+    {
+        "TACTICAL SILENCE", 137.0f, 8.0f,
+        StageSection::BossRunway, EncounterType::TacticalSilence, StageTransition::Silence,
+        "Remove threats and let anticipation become the main event.",
+        "No enemies, no bullets, only atmosphere.",
+        "A deliberate inhale before the carrier arrives.",
+        nullptr, 0, 0.0f
+    },
+    {
+        "BOSS ARRIVAL", 145.0f, 10.0f,
+        StageSection::BossRunway, EncounterType::BossArrival, StageTransition::Anticipation,
+        "Make the boss feel like it arrives instead of spawning.",
+        "Sparse gate patrols, escort shadows, and visible gate silhouette.",
+        "Slow ceremonial pressure before VANTAGE-9 enters.",
+        ActBossArrival, CountOf(ActBossArrival), 0.32f
     }
 };
 
 constexpr int BlockCount = CountOf(StageOneBlocks);
-constexpr float BossEntryTime = 116.0f;
+constexpr float BossEntryTime = 155.0f;
 
 const char* SectionName(StageSection section) {
     switch (section) {
@@ -189,6 +276,8 @@ const char* SectionName(StageSection section) {
         case StageSection::Reinforcement: return "REINFORCE";
         case StageSection::Combination: return "COMBO";
         case StageSection::Recovery: return "RECOVERY";
+        case StageSection::Transition: return "TRANSITION";
+        case StageSection::Bonus: return "BONUS";
         case StageSection::MidStageSpike: return "SPIKE";
         case StageSection::BossRunway: return "RUNWAY";
     }
@@ -207,6 +296,12 @@ const char* EncounterName(EncounterType encounter) {
         case EncounterType::ArtilleryControl: return "ARTILLERY";
         case EncounterType::BulletCurtain: return "CURTAIN";
         case EncounterType::Recovery: return "RECOVERY";
+        case EncounterType::FormationReassembly: return "REASSEMBLY";
+        case EncounterType::DebrisDrift: return "DEBRIS";
+        case EncounterType::ThreatHorizon: return "HORIZON";
+        case EncounterType::BonusParade: return "BONUS";
+        case EncounterType::TacticalSilence: return "SILENCE";
+        case EncounterType::BossArrival: return "BOSS ARRIVAL";
         case EncounterType::BossRunway: return "BOSS RUNWAY";
     }
     return "ENCOUNTER";
@@ -221,6 +316,7 @@ const char* TransitionName(StageTransition transition) {
         case StageTransition::Spike: return "SPIKE";
         case StageTransition::Silence: return "SILENCE";
         case StageTransition::Climax: return "CLIMAX";
+        case StageTransition::Celebration: return "CELEBRATE";
     }
     return "FLOW";
 }
@@ -415,6 +511,90 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
             }
             break;
 
+        case ReassemblyLeader:
+            for (int i = 0; i < 3; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {168.0f + i * 72.0f, -28.0f - i * 12.0f},
+                         {0.0f, 62.0f}, loop, 0, EnemyMovePattern::Straight,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 0.0f);
+            }
+            break;
+
+        case ReassemblyWingFold:
+            for (int i = 0; i < 4; ++i) {
+                bool left = i < 2;
+                float y = 82.0f + (i % 2) * 44.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {left ? -24.0f : 504.0f, y},
+                         {left ? 76.0f : -76.0f, 18.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, left ? i * 0.6f : 3.14f + i * 0.6f);
+            }
+            break;
+
+        case DebrisDriftLeft:
+            for (int i = 0; i < 3; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {-26.0f - i * 18.0f, 76.0f + i * 58.0f},
+                         {58.0f, 18.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.8f);
+            }
+            break;
+
+        case DebrisDriftRight:
+            for (int i = 0; i < 3; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {506.0f + i * 18.0f, 92.0f + i * 54.0f},
+                         {-58.0f, 16.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.8f);
+            }
+            break;
+
+        case BonusParadeLeft:
+            for (int i = 0; i < 6; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {-28.0f - i * 22.0f, 62.0f + i * 30.0f},
+                         {118.0f, 5.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.38f);
+            }
+            break;
+
+        case BonusParadeRight:
+            for (int i = 0; i < 6; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {508.0f + i * 22.0f, 58.0f + i * 30.0f},
+                         {-118.0f, 5.0f}, loop, 0, EnemyMovePattern::CrossLane,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, 3.14f + i * 0.38f);
+            }
+            break;
+
+        case BonusParadeColumn:
+            for (int i = 0; i < 8; ++i) {
+                float x = (i % 2 == 0) ? 142.0f : 338.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {x, -26.0f - i * 24.0f},
+                         {0.0f, 72.0f}, loop, 0, EnemyMovePattern::NeedleSweep,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.45f);
+            }
+            break;
+
+        case BonusParadeFinale:
+            for (int i = 0; i < 8; ++i) {
+                bool left = i < 4;
+                float y = 72.0f + (i % 4) * 34.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {left ? -30.0f - i * 14.0f : 510.0f + i * 14.0f, y},
+                         {left ? 136.0f : -136.0f, 4.0f}, loop, 0, EnemyMovePattern::NeedleSweep,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, left ? i * 0.5f : 3.14f + i * 0.5f);
+            }
+            break;
+
+        case ThreatHorizonScouts:
+            for (int i = 0; i < 3; ++i) {
+                AddEnemy(enemies, EnemyType::Popcorn, {144.0f + i * 96.0f, -30.0f - i * 18.0f},
+                         {0.0f, 58.0f}, loop, 0, EnemyMovePattern::Straight,
+                         i == 1 ? EnemyFirePattern::AimedSingle : EnemyFirePattern::Hold,
+                         1.70f, 0.0f, 1, 0.0f);
+            }
+            break;
+
+        case ThreatHorizonBeacon:
+            AddEnemy(enemies, EnemyType::Turret, {240.0f, -40.0f}, {0.0f, 28.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold,
+                     0.0f, 0.0f, 0, 1.57f);
+            break;
+
         case EscalationStagger:
             for (int i = 0; i < 5; ++i) {
                 float side = (i % 2 == 0) ? -1.0f : 1.0f;
@@ -502,6 +682,30 @@ void StageDirector::SpawnCue(int cue, int loop, std::vector<Enemy>& enemies) {
                          EnemyFirePattern::Hold,
                          0.0f, 0.0f, 0, 1.0f + i * 0.7f);
             }
+            break;
+
+        case FortressCollapseRetreat:
+            for (int i = 0; i < 4; ++i) {
+                float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                AddEnemy(enemies, EnemyType::Popcorn, {240.0f + side * (60.0f + i * 18.0f), -24.0f - i * 16.0f},
+                         {side * 48.0f, 78.0f}, loop, 0, EnemyMovePattern::CollapseRetreat,
+                         EnemyFirePattern::Hold, 0.0f, 0.0f, 0, i * 0.85f);
+            }
+            break;
+
+        case BossArrivalEscort:
+            AddEnemy(enemies, EnemyType::Popcorn, {104.0f, -28.0f}, {18.0f, 58.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold,
+                     0.0f, 0.0f, 0, 0.3f);
+            AddEnemy(enemies, EnemyType::Popcorn, {376.0f, -28.0f}, {-18.0f, 58.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold,
+                     0.0f, 0.0f, 0, 3.4f);
+            break;
+
+        case BossArrivalShadow:
+            AddEnemy(enemies, EnemyType::Turret, {240.0f, -48.0f}, {0.0f, 24.0f}, loop, 0,
+                     EnemyMovePattern::GatePatrol, EnemyFirePattern::Hold,
+                     0.0f, 0.0f, 0, 1.57f);
             break;
     }
 }
@@ -618,4 +822,18 @@ bool StageDirector::IsBossRunway(float stageTime) const {
     if (block < 0) block = 0;
     if (block >= BlockCount) block = BlockCount - 1;
     return StageOneBlocks[block].section == StageSection::BossRunway;
+}
+
+bool StageDirector::IsBonusStage(float stageTime) const {
+    int block = CurrentBlockIndex(stageTime) - 1;
+    if (block < 0) block = 0;
+    if (block >= BlockCount) block = BlockCount - 1;
+    return StageOneBlocks[block].section == StageSection::Bonus;
+}
+
+bool StageDirector::IsTacticalSilence(float stageTime) const {
+    int block = CurrentBlockIndex(stageTime) - 1;
+    if (block < 0) block = 0;
+    if (block >= BlockCount) block = BlockCount - 1;
+    return StageOneBlocks[block].encounter == EncounterType::TacticalSilence;
 }

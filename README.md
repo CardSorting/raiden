@@ -54,7 +54,7 @@ Once the mission starts, a helper banner will appear at the bottom of the playfi
   - **Missile**: secondary homing projectiles.
 - Bomb button clears enemy bullets, damages enemies, grants brief invulnerability, and shakes the screen.
 - Powerups: weapon change, weapon upgrade, bomb, and score medal.
-- Authored arcade stage progression with named wave blocks, recovery windows, mid-stage spike, and boss runway.
+- Authored arcade stage progression with named wave blocks, transition choreography, a bonus formation round, recovery windows, mid-stage spike, and expanded boss runway.
 - Miniboss with aimed, radial, and mixed attack phases.
 - Stage clear restarts the loop harder.
 - Particle explosions, HUD, scrolling layered background, and F1 debug hitboxes.
@@ -118,8 +118,8 @@ If using MinGW or Ninja single-config generators, the executable may be at `buil
 
 - The game uses simple vectors and circle collisions for clarity and fast iteration.
 - Procedural vector art and tones are intentional: the game has no copyrighted sprites, logos, music, or level layouts.
-- The gameplay loop is deterministic-feeling and compact: push through staggered route acts, defeat the carrier, clear the stage, then repeat at a higher difficulty.
-- Stage pacing is directed through explicit wave blocks: opening orientation, pattern introduction, reinforcement, combination, recovery, mid-stage spike, and boss runway.
+- The gameplay loop is deterministic-feeling and compact: push through staggered route acts, take a short score-attack bonus parade, defeat the carrier, clear the stage, then repeat at a higher difficulty.
+- Stage pacing is directed through explicit wave blocks: opening orientation, sweep language, formation reassembly, aimed interceptors, false recovery pinch, breathing lane, debris drift, bonus formation, threat horizon, fortress corridor, fortress collapse, tactical silence, boss arrival, and boss combat.
 - The red center dot is the actual player hitbox; the ship body may overlap bullets without counting as a hit.
 
 ## Verification
