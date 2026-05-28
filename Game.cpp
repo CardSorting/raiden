@@ -702,23 +702,12 @@ void Game::NextLoop() {
 }
 
 void Game::Update(float dt) {
-    // Legacy cabinet pulse: free-play builds keep the cadence without gating runs.
-    bool coinPressed = IsKeyPressed(KEY_C);
-    if (IsGamepadAvailable(0)) {
-        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)) coinPressed = true;
-    }
-    if (coinPressed) {
-        audio_.PlayInsertCoin();
-        effects_.AddText({ 240, 320 }, "FREE PLAY", GOLD);
-    }
-
     // Detect active input device for hybrid navigation focus
     bool anyKeyboardGamepad = 
         IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) ||
         IsKeyPressed(KEY_W) || IsKeyPressed(KEY_S) || IsKeyPressed(KEY_A) || IsKeyPressed(KEY_D) ||
         IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
-        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K) ||
-        IsKeyPressed(KEY_C);
+        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K);
         
     if (IsGamepadAvailable(0)) {
         for (int b = 0; b < 15; ++b) {
