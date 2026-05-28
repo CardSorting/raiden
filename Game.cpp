@@ -3010,38 +3010,56 @@ void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
 }
 
 void Game::DrawHud() const {
-    DrawRectangle(0, 0, ScreenW, 34, Fade(BLACK, 0.68f));
-    DrawLine(0, 34, ScreenW, 34, Fade(SKYBLUE, 0.28f));
+    const int hudH = 46;
+    const int sidePad = 10;
+    bool combatFocus = (state_ == State::Playing && ActiveEnemyBulletCount() >= 30);
+    DrawRectangle(0, 0, ScreenW, hudH, Fade(BLACK, 0.74f));
+    DrawLine(0, hudH, ScreenW, hudH, Fade(SKYBLUE, 0.30f));
 
-    DrawText(TextFormat("%07d", player_.score), 12, 10, 16, RAYWHITE);
-    DrawText(TextFormat("%s %d", player_.WeaponName(), player_.weaponLevel), 352 - MeasureText(TextFormat("%s %d", player_.WeaponName(), player_.weaponLevel), 12), 6, 12, SKYBLUE);
-    DrawText(TextFormat("L%d", loop_), 418, 6, 12, GOLD);
+    DrawText(TextFormat("%07d", player_.score), sidePad, 7, 20, RAYWHITE);
 
-    int maxDrawLives = std::min(4, player_.lives);
+    const char* weaponLabel = TextFormat("%s %d", player_.WeaponName(), player_.weaponLevel);
+    int weaponW = MeasureText(weaponLabel, 12);
+    int loopW = MeasureText(TextFormat("LOOP %d", loop_), 12);
+    int rightAnchor = ScreenW - sidePad;
+    if (!combatFocus) {
+        DrawText(TextFormat("LOOP %d", loop_), rightAnchor - loopW, 6, 12, GOLD);
+        DrawText(weaponLabel, rightAnchor - loopW - 10 - weaponW, 6, 12, SKYBLUE);
+    }
+
+    if (!combatFocus) {
+        DrawText("LIFE", sidePad, 30, 10, Fade(SKYBLUE, 0.9f));
+        DrawText("BOMB", sidePad + 92, 30, 10, Fade(Color{214, 154, 255, 255}, 0.9f));
+    }
+
+    int maxDrawLives = std::min(5, player_.lives);
     for (int i = 0; i < maxDrawLives; ++i) {
-        SpriteManager::Instance().Draw(SpriteId::PlayerIdle, {356.0f + i * 17.0f, 25.0f}, 0.0f, 0.58f);
+        SpriteManager::Instance().Draw(SpriteId::PlayerIdle, {(float)(sidePad + 28 + i * 15), 37.0f}, 0.0f, 0.52f);
     }
 
-    int maxDrawBombs = std::min(4, player_.bombs);
+    int maxDrawBombs = std::min(5, player_.bombs);
     for (int i = 0; i < maxDrawBombs; ++i) {
-        SpriteManager::Instance().Draw(SpriteId::MiniBombCapsule, {426.0f + i * 12.0f, 24.0f}, 0.0f, 0.92f);
+        SpriteManager::Instance().Draw(SpriteId::MiniBombCapsule, {(float)(sidePad + 126 + i * 12), 37.0f}, 0.0f, 0.86f);
     }
 
-    // Flashing Combo Decay Bar
-    if (medalChain_ > 0) {
+    // Flashing combo indicator (kept in top HUD to avoid touch occlusion near the bottom).
+    if (medalChain_ > 0 && !combatFocus) {
         float ratio = medalChainTimer_ / 1.35f;
         ratio = std::clamp(ratio, 0.0f, 1.0f);
         
         bool flash = (medalChainTimer_ > 0.4f) || ((int)(GetTime() * 12.0f) % 2 == 0);
         Color chainColor = flash ? GOLD : RED;
         
-        int comboY = 42;
-        DrawRectangle(12, comboY, 96, 18, Fade(BLACK, 0.58f));
-        DrawRectangleLines(12, comboY, 96, 18, Fade(GOLD, 0.36f));
-        
-        DrawText(TextFormat("CHAIN x%d", medalChain_), 16, comboY + 3, 10, flash ? YELLOW : ORANGE);
-        DrawRectangle(16, comboY + 14, 84, 2, Fade(GRAY, 0.5f));
-        DrawRectangle(16, comboY + 14, (int)(84 * ratio), 2, chainColor);
+        int comboW = 124;
+        int comboH = 15;
+        int comboX = ScreenW - sidePad - comboW;
+        int comboY = 29;
+        DrawRectangle(comboX, comboY, comboW, comboH, Fade(BLACK, 0.66f));
+        DrawRectangleLines(comboX, comboY, comboW, comboH, Fade(GOLD, 0.44f));
+
+        DrawText(TextFormat("CHAIN x%d", medalChain_), comboX + 5, comboY + 2, 9, flash ? YELLOW : ORANGE);
+        DrawRectangle(comboX + 72, comboY + 6, 45, 3, Fade(GRAY, 0.46f));
+        DrawRectangle(comboX + 72, comboY + 6, (int)(45 * ratio), 3, chainColor);
     }
 
     float routeDuration = stageDirector_.RouteDuration();
@@ -3081,9 +3099,9 @@ void Game::DrawHud() const {
     }
     
     if (state_ == State::Playing && stageTime_ < routeDuration) {
-        int progressW = (int)((ScreenW - 24) * std::clamp(stageTime_ / routeDuration, 0.0f, 1.0f));
-        DrawRectangle(12, ScreenH - 10, ScreenW - 24, 3, Fade(BLACK, 0.62f));
-        DrawRectangle(12, ScreenH - 10, progressW, 3, Fade(SKYBLUE, 0.84f));
+        int progressW = (int)(ScreenW * std::clamp(stageTime_ / routeDuration, 0.0f, 1.0f));
+        DrawRectangle(0, hudH - 2, ScreenW, 2, Fade(BLACK, 0.72f));
+        DrawRectangle(0, hudH - 2, progressW, 2, Fade(SKYBLUE, 0.92f));
     }
 
     if (demoMode_) {

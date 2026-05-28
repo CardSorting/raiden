@@ -766,5 +766,5 @@ CMakeFiles/sky_circuit.dir/main.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/erase_if_container.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/ranges_iterator_traits.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__node_handle \
-  /Users/bozoegg/Desktop/raiden/WaveManager.h \
+  /Users/bozoegg/Desktop/raiden/StageDirector.h \
   /Users/bozoegg/Desktop/raiden/AudioSystem.h
