@@ -1,0 +1,14 @@
+# Target labels
+ raylib-populate
+# Source files and their labels
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/CMakeFiles/raylib-populate
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/CMakeFiles/raylib-populate.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/CMakeFiles/CMakeFiles/raylib-populate-complete.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-build.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-configure.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-download.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-install.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-mkdir.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-patch.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-test.rule
+/Users/bozoegg/Desktop/raiden/build-ios/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/CMakeFiles/raylib-populate-update.rule
