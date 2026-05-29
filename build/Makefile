@@ -321,29 +321,29 @@ SpriteManager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/SpriteManager.cpp.s
 .PHONY : SpriteManager.cpp.s
 
-WaveManager.o: WaveManager.cpp.o
-.PHONY : WaveManager.o
+StageDirector.o: StageDirector.cpp.o
+.PHONY : StageDirector.o
 
 # target to build an object file
-WaveManager.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/WaveManager.cpp.o
-.PHONY : WaveManager.cpp.o
+StageDirector.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/StageDirector.cpp.o
+.PHONY : StageDirector.cpp.o
 
-WaveManager.i: WaveManager.cpp.i
-.PHONY : WaveManager.i
+StageDirector.i: StageDirector.cpp.i
+.PHONY : StageDirector.i
 
 # target to preprocess a source file
-WaveManager.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/WaveManager.cpp.i
-.PHONY : WaveManager.cpp.i
+StageDirector.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/StageDirector.cpp.i
+.PHONY : StageDirector.cpp.i
 
-WaveManager.s: WaveManager.cpp.s
-.PHONY : WaveManager.s
+StageDirector.s: StageDirector.cpp.s
+.PHONY : StageDirector.s
 
 # target to generate assembly for a file
-WaveManager.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/WaveManager.cpp.s
-.PHONY : WaveManager.cpp.s
+StageDirector.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sky_circuit.dir/build.make CMakeFiles/sky_circuit.dir/StageDirector.cpp.s
+.PHONY : StageDirector.cpp.s
 
 main.o: main.cpp.o
 .PHONY : main.o
@@ -402,9 +402,9 @@ help:
 	@echo "... SpriteManager.o"
 	@echo "... SpriteManager.i"
 	@echo "... SpriteManager.s"
-	@echo "... WaveManager.o"
-	@echo "... WaveManager.i"
-	@echo "... WaveManager.s"
+	@echo "... StageDirector.o"
+	@echo "... StageDirector.i"
+	@echo "... StageDirector.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

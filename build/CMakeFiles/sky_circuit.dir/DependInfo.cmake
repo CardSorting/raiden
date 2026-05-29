@@ -16,7 +16,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/bozoegg/Desktop/raiden/Player.cpp" "CMakeFiles/sky_circuit.dir/Player.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/Player.cpp.o.d"
   "/Users/bozoegg/Desktop/raiden/Powerup.cpp" "CMakeFiles/sky_circuit.dir/Powerup.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/Powerup.cpp.o.d"
   "/Users/bozoegg/Desktop/raiden/SpriteManager.cpp" "CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o.d"
-  "/Users/bozoegg/Desktop/raiden/WaveManager.cpp" "CMakeFiles/sky_circuit.dir/WaveManager.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/WaveManager.cpp.o.d"
+  "/Users/bozoegg/Desktop/raiden/StageDirector.cpp" "CMakeFiles/sky_circuit.dir/StageDirector.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/StageDirector.cpp.o.d"
   "/Users/bozoegg/Desktop/raiden/main.cpp" "CMakeFiles/sky_circuit.dir/main.cpp.o" "gcc" "CMakeFiles/sky_circuit.dir/main.cpp.o.d"
   )
 

@@ -170,19 +170,19 @@ CMakeFiles/sky_circuit.dir/Powerup.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/sky_circuit.dir/Powerup.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/bozoegg/Desktop/raiden/Powerup.cpp -o CMakeFiles/sky_circuit.dir/Powerup.cpp.s
 
-CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
-CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: /Users/bozoegg/Desktop/raiden/WaveManager.cpp
-CMakeFiles/sky_circuit.dir/WaveManager.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/sky_circuit.dir/WaveManager.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/WaveManager.cpp.o -MF CMakeFiles/sky_circuit.dir/WaveManager.cpp.o.d -o CMakeFiles/sky_circuit.dir/WaveManager.cpp.o -c /Users/bozoegg/Desktop/raiden/WaveManager.cpp
+CMakeFiles/sky_circuit.dir/StageDirector.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
+CMakeFiles/sky_circuit.dir/StageDirector.cpp.o: /Users/bozoegg/Desktop/raiden/StageDirector.cpp
+CMakeFiles/sky_circuit.dir/StageDirector.cpp.o: CMakeFiles/sky_circuit.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/bozoegg/Desktop/raiden/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/sky_circuit.dir/StageDirector.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/sky_circuit.dir/StageDirector.cpp.o -MF CMakeFiles/sky_circuit.dir/StageDirector.cpp.o.d -o CMakeFiles/sky_circuit.dir/StageDirector.cpp.o -c /Users/bozoegg/Desktop/raiden/StageDirector.cpp
 
-CMakeFiles/sky_circuit.dir/WaveManager.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/sky_circuit.dir/WaveManager.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/bozoegg/Desktop/raiden/WaveManager.cpp > CMakeFiles/sky_circuit.dir/WaveManager.cpp.i
+CMakeFiles/sky_circuit.dir/StageDirector.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/sky_circuit.dir/StageDirector.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/bozoegg/Desktop/raiden/StageDirector.cpp > CMakeFiles/sky_circuit.dir/StageDirector.cpp.i
 
-CMakeFiles/sky_circuit.dir/WaveManager.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/sky_circuit.dir/WaveManager.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/bozoegg/Desktop/raiden/WaveManager.cpp -o CMakeFiles/sky_circuit.dir/WaveManager.cpp.s
+CMakeFiles/sky_circuit.dir/StageDirector.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/sky_circuit.dir/StageDirector.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/bozoegg/Desktop/raiden/StageDirector.cpp -o CMakeFiles/sky_circuit.dir/StageDirector.cpp.s
 
 CMakeFiles/sky_circuit.dir/Effects.cpp.o: CMakeFiles/sky_circuit.dir/flags.make
 CMakeFiles/sky_circuit.dir/Effects.cpp.o: /Users/bozoegg/Desktop/raiden/Effects.cpp
@@ -221,7 +221,7 @@ sky_circuit_OBJECTS = \
 "CMakeFiles/sky_circuit.dir/Enemy.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Bullet.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Powerup.cpp.o" \
-"CMakeFiles/sky_circuit.dir/WaveManager.cpp.o" \
+"CMakeFiles/sky_circuit.dir/StageDirector.cpp.o" \
 "CMakeFiles/sky_circuit.dir/Effects.cpp.o" \
 "CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o"
 
@@ -235,7 +235,7 @@ sky_circuit: CMakeFiles/sky_circuit.dir/Player.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Enemy.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Bullet.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Powerup.cpp.o
-sky_circuit: CMakeFiles/sky_circuit.dir/WaveManager.cpp.o
+sky_circuit: CMakeFiles/sky_circuit.dir/StageDirector.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/Effects.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/SpriteManager.cpp.o
 sky_circuit: CMakeFiles/sky_circuit.dir/build.make

@@ -126,6 +126,17 @@ static void TrimOldestEnemyBullets(std::vector<Bullet>& bullets, int maxCount) {
     bullets.erase(bullets.begin(), bullets.begin() + ((int)bullets.size() - maxCount));
 }
 
+// Arcade cabinet credit readout — cosmetic only; never gates play.
+static constexpr int CabinetCreditDisplay = 99;
+
+static void DrawCabinetCreditReadout(int centerX, int y, int fontSize = 14) {
+    const char* creditStr = TextFormat("CREDIT %02d", CabinetCreditDisplay);
+    int creditW = MeasureText(creditStr, fontSize);
+    DrawRectangle(centerX - creditW / 2 - 10, y - 3, creditW + 20, fontSize + 6, Fade(DARKGRAY, 0.42f));
+    DrawRectangleLines(centerX - creditW / 2 - 10, y - 3, creditW + 20, fontSize + 6, Fade(GOLD, 0.55f));
+    DrawText(creditStr, centerX - creditW / 2, y, fontSize, LIME);
+}
+
 static constexpr int SettingsCount = 20;
 static constexpr int VisibleSettingsRows = 11;
 static constexpr float BossDeathDuration = 1.34f;
@@ -702,12 +713,23 @@ void Game::NextLoop() {
 }
 
 void Game::Update(float dt) {
+    // Cabinet coin pulse: arcade feel only — credits are infinite and never gate play.
+    bool coinPressed = IsKeyPressed(KEY_C);
+    if (IsGamepadAvailable(0)) {
+        if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)) coinPressed = true;
+    }
+    if (coinPressed) {
+        audio_.PlayInsertCoin();
+        effects_.AddText({240.0f, 320.0f}, "FREE PLAY", GOLD);
+    }
+
     // Detect active input device for hybrid navigation focus
     bool anyKeyboardGamepad = 
         IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) ||
         IsKeyPressed(KEY_W) || IsKeyPressed(KEY_S) || IsKeyPressed(KEY_A) || IsKeyPressed(KEY_D) ||
         IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
-        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K);
+        IsKeyPressed(KEY_P) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X) || IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K) ||
+        IsKeyPressed(KEY_C);
         
     if (IsGamepadAvailable(0)) {
         for (int b = 0; b < 15; ++b) {
@@ -2713,8 +2735,9 @@ void Game::DrawContinue() const {
         int prW = MeasureText("TAP TO RE-LAUNCH", 20);
         DrawText("TAP TO RE-LAUNCH", ScreenW / 2 - prW / 2, cy + 203, 20, LIME);
     }
-    int routeW = MeasureText("ROUTE VANTAGE // FREE PLAY", 12);
-    DrawText("ROUTE VANTAGE // FREE PLAY", ScreenW / 2 - routeW / 2, cy + 270, 12, GRAY);
+    DrawCabinetCreditReadout(ScreenW / 2, cy + 262, 13);
+    int routeW = MeasureText("FREE PLAY // TAP TO RE-LAUNCH", 12);
+    DrawText("FREE PLAY // TAP TO RE-LAUNCH", ScreenW / 2 - routeW / 2, cy + 288, 12, GRAY);
 }
 
 void Game::DrawBackground() const {
@@ -2956,7 +2979,7 @@ void Game::DrawCabinetBezel(float rx, float ry, float rw, float rh) const {
             
             DrawText("SKY CIRCUIT", stickerX + 12, 70, 12, GOLD);
             DrawText("ROUTE VANTAGE", stickerX + 12, 86, 8, GRAY);
-            DrawText("FREE PLAY", stickerX + 12, 105, 9, RAYWHITE);
+            DrawText(TextFormat("CREDIT %02d", CabinetCreditDisplay), stickerX + 12, 105, 9, LIME);
             DrawText("DRAG TO FLY", stickerX + 12, 120, 9, SKYBLUE);
             DrawText("AUTO-FIRE", stickerX + 12, 135, 9, GOLD);
             DrawText("BOMB: 2-FINGER", stickerX + 12, 150, 9, PURPLE);
@@ -3099,6 +3122,10 @@ void Game::DrawHud() const {
         DrawRectangle(0, ScreenH - 46, ScreenW, 46, Fade(BLACK, 0.85f));
         DrawText("DEMO PLAY - PRESS ANY KEY", ScreenW / 2 - demoW / 2, ScreenH - 30, 16, demoColor);
     }
+
+    if (state_ == State::Title || state_ == State::Continue || state_ == State::GameOver) {
+        DrawText(TextFormat("CREDIT %02d", CabinetCreditDisplay), 12, ScreenH - 18, 12, SKYBLUE);
+    }
 }
 
 void Game::DrawStageDiagnostics() const {
@@ -3185,14 +3212,24 @@ void Game::DrawTitleMenu() const {
         }
     }
 
+    int slotX = ScreenW / 2 - 54;
+    int slotY = 524;
+    DrawRectangle(slotX, slotY, 108, 34, Fade(BLACK, 0.72f));
+    DrawRectangleLines(slotX, slotY, 108, 34, Fade(GOLD, 0.48f));
+    DrawRectangle(slotX + 46, slotY + 6, 14, 22, DARKGRAY);
+    DrawRectangle(slotX + 52, slotY + 8, 4, 18, ORANGE);
+    DrawText("COIN", slotX + 10, slotY + 11, 9, GRAY);
+
+    DrawCabinetCreditReadout(ScreenW / 2, 564, 15);
+
     float blink = std::sin((float)GetTime() * 10.0f);
     if (blink > 0.0f) {
         int stW = MeasureText("TAP START RUN", 16);
-        DrawText("TAP START RUN", ScreenW / 2 - stW / 2, 552, 16, LIME);
+        DrawText("TAP START RUN", ScreenW / 2 - stW / 2, 588, 16, LIME);
     }
-    const char* instructStr = "ONE RUN. ONE ROUTE. ONE MORE TRY.";
+    const char* instructStr = "FREE PLAY  //  ONE RUN. ONE MORE TRY.";
     int instW = MeasureText(instructStr, 12);
-    DrawText(instructStr, ScreenW / 2 - instW / 2, 586, 12, GRAY);
+    DrawText(instructStr, ScreenW / 2 - instW / 2, 614, 12, GRAY);
 }
 
 void Game::DrawHowTo() const {
